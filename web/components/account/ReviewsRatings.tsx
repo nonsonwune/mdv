@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { Card, Button, Badge, Modal, Toast, EmptyState, Input, TextArea } from '../ui'
+import { Card, Button, Badge, Modal, EmptyState, Input, Alert } from '../ui'
 import { formatNaira } from '../../lib/format'
 import type { Product } from '../../lib/types'
 
@@ -83,6 +83,15 @@ export default function ReviewsRatings() {
   useEffect(() => {
     loadReviewsData()
   }, [])
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
 
   const loadReviewsData = () => {
     // Load mock reviews
@@ -870,13 +879,16 @@ export default function ReviewsRatings() {
             placeholder="Summarize your experience"
           />
 
-          <TextArea
-            label="Your Review*"
-            value={reviewForm.comment}
-            onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-            placeholder="Share details about your experience with the product"
-            rows={4}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-2">Your Review*</label>
+            <textarea
+              value={reviewForm.comment}
+              onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+              placeholder="Share details about your experience with the product"
+              rows={4}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-700"
+            />
+          </div>
 
           <Input
             label="Pros (optional)"
@@ -949,12 +961,16 @@ export default function ReviewsRatings() {
         </div>
       </Modal>
 
-      {/* Toast */}
+      {/* Toast Alert */}
       {showToast && (
-        <Toast
-          message={toastMessage}
-          onClose={() => setShowToast(false)}
-        />
+        <div className="fixed bottom-4 right-4 z-50">
+          <Alert 
+            variant="success" 
+            className="shadow-lg"
+          >
+            {toastMessage}
+          </Alert>
+        </div>
       )}
     </div>
   )

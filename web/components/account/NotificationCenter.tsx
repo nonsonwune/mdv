@@ -607,7 +607,7 @@ export default function NotificationCenter() {
                               </Button>
                             )}
                             {notification.actionUrl && (
-                              <Link href={notification.actionUrl}>
+                              <Link href={notification.actionUrl as any}>
                                 <Button variant="primary" size="sm">
                                   {notification.actionLabel || 'View'}
                                 </Button>
