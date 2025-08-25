@@ -101,50 +101,22 @@ def start_server():
     print(f"Server will listen on port: {port}")
     
     try:
-        # Add /app to Python path if not present
+        # Setup Python path
         if '/app' not in sys.path:
             sys.path.insert(0, '/app')
             print("Added /app to Python path")
+        
+        # Change to backend directory for proper module resolution
+        os.chdir('/app/backend')
+        print(f"Changed working directory to: {os.getcwd()}")
         
         print("Attempting to import uvicorn...")
         import uvicorn
         print("✓ Uvicorn imported successfully")
         
         print("Attempting to import FastAPI app...")
-        # Try different import paths
-        app = None
-        import_errors = []
-        
-        # Try path 1: Direct from backend.api.main
-        try:
-            from backend.api.main import app
-            print("✓ App imported from backend.api.main")
-        except ImportError as e:
-            import_errors.append(f"backend.api.main: {e}")
-            
-            # Try path 2: From api.main
-            try:
-                from api.main import app
-                print("✓ App imported from api.main")
-            except ImportError as e2:
-                import_errors.append(f"api.main: {e2}")
-                
-                # Try path 3: Direct import after changing directory
-                try:
-                    os.chdir('/app/backend')
-                    sys.path.insert(0, '/app/backend')
-                    from api.main import app
-                    print("✓ App imported from api.main after chdir")
-                except ImportError as e3:
-                    import_errors.append(f"api.main (after chdir): {e3}")
-                    
-        if app is None:
-            print("✗ Failed to import app from any path:")
-            for err in import_errors:
-                print(f"  - {err}")
-            print("\nFull traceback:")
-            traceback.print_exc()
-            sys.exit(1)
+        from api.main import app
+        print("✓ App imported successfully from api.main")
         
         print("Starting uvicorn server...")
         uvicorn.run(
@@ -154,6 +126,11 @@ def start_server():
             log_level="info",
             access_log=True
         )
+    except ImportError as e:
+        print(f"Import error: {e}")
+        print("\nFull traceback:")
+        traceback.print_exc()
+        sys.exit(1)
     except Exception as e:
         print(f"Failed to start server: {e}")
         print("\nFull traceback:")

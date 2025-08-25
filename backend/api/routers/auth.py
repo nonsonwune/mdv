@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +6,8 @@ from backend.mdv.auth import create_access_token
 from backend.mdv.models import User, Role
 from backend.mdv.password import hash_password, verify_password, needs_rehash
 from backend.mdv.rate_limit import limiter, RATE_LIMITS
-from ..deps import get_db
 from backend.mdv.schemas import AuthLoginRequest, AuthLoginResponse
+from ..deps import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 

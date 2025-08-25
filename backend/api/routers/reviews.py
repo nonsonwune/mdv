@@ -11,7 +11,8 @@ from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from backend.mdv.auth import get_current_claims, get_current_user_optional
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from backend.mdv.auth import get_current_claims, get_current_user_optional, bearer_scheme
 from backend.mdv.models import (
     User, Product, Order, OrderItem, Variant, OrderStatus,
     Review, ReviewVote, ProductImage
@@ -99,8 +100,8 @@ async def get_product_reviews(
     sort_by: str = Query("recent", regex="^(recent|helpful|rating_high|rating_low)$"),
     rating_filter: Optional[int] = Query(None, ge=1, le=5),
     verified_only: bool = Query(False),
-    user: Optional[User] = Depends(get_current_user_optional),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme)
 ):
     """Get reviews for a specific product."""
     # Verify product exists
@@ -145,6 +146,9 @@ async def get_product_reviews(
     query = query.offset((page - 1) * per_page).limit(per_page)
     result = await db.execute(query)
     reviews = result.scalars().all()
+    
+    # Get current user if authenticated
+    user = await get_current_user_optional(creds, db)
     
     # Convert to response format
     review_responses = []

@@ -6,9 +6,11 @@ from typing import Annotated, Iterable, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from .config import settings
-from .models import Role
+from .models import Role, User
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -50,4 +52,21 @@ def require_roles(*allowed: Iterable[Role]):
         return claims
 
     return _checker
+
+
+async def get_current_user_optional(
+    creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
+    db: AsyncSession
+) -> Optional[User]:
+    """Get current user if authenticated, otherwise return None."""
+    if creds is None or creds.scheme.lower() != "bearer":
+        return None
+    
+    try:
+        claims = decode_token(creds.credentials)
+        user_id = int(claims.get("sub"))
+        result = await db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
+    except (JWTError, ValueError, HTTPException):
+        return None
 
