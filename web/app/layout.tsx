@@ -11,6 +11,14 @@ import ToastProvider from "./_components/ToastProvider"
 export const metadata: Metadata = {
   title: "Maison De Valeur",
   description: "Affordable essentials and last-season fashion.",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
+  themeColor: "#800000",
+  manifest: "/manifest.json",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
