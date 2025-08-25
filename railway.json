@@ -41,7 +41,7 @@
         "dockerfilePath": "Dockerfile.backend"
       },
       "deploy": {
-        "startCommand": "arq backend.worker.main.WorkerSettings",
+        "startCommand": "arq worker.main.WorkerSettings",
         "restartPolicyType": "ON_FAILURE",
         "restartPolicyMaxRetries": 10
       },
