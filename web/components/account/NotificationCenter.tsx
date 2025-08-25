@@ -2,8 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Card, Button, Badge, EmptyState, Toggle, Modal, Toast } from '../ui'
+import { Card, Button, Badge, EmptyState, Modal, Alert } from '../ui'
 import { formatNaira } from '../../lib/format'
+
+// Simple Toggle component inline
+const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className={`
+      relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+      ${checked ? 'bg-maroon-700' : 'bg-neutral-300'}
+    `}
+  >
+    <span
+      className={`
+        inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+        ${checked ? 'translate-x-6' : 'translate-x-1'}
+      `}
+    />
+  </button>
+)
 
 interface Notification {
   id: string
@@ -82,6 +101,15 @@ export default function NotificationCenter() {
   useEffect(() => {
     filterNotifications()
   }, [notifications, activeTab, selectedType])
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
 
   const loadNotifications = () => {
     // Mock notifications
@@ -779,12 +807,16 @@ export default function NotificationCenter() {
         </div>
       </Modal>
 
-      {/* Toast */}
+      {/* Toast Alert */}
       {showToast && (
-        <Toast
-          message={toastMessage}
-          onClose={() => setShowToast(false)}
-        />
+        <div className="fixed bottom-4 right-4 z-50">
+          <Alert 
+            variant="success" 
+            className="shadow-lg"
+          >
+            {toastMessage}
+          </Alert>
+        </div>
       )}
     </div>
   )

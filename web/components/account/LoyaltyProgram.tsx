@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Card, Button, Badge, ProgressBar, EmptyState, Modal, Toast } from '../ui'
+import { Card, Button, Badge, EmptyState, Modal, Alert } from '../ui'
 import { formatNaira } from '../../lib/format'
 import type { UserData } from './UserProfile'
 
@@ -136,6 +136,15 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
   useEffect(() => {
     loadLoyaltyData()
   }, [])
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
 
   const loadLoyaltyData = () => {
     // Load orders to calculate points
@@ -410,11 +419,12 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
                 <span>Progress to {nextTierData.name}</span>
                 <span>{stats.tierProgress.toFixed(0)}%</span>
               </div>
-              <ProgressBar 
-                value={stats.tierProgress} 
-                className="mb-2"
-                color="white"
-              />
+              <div className="w-full bg-white/30 rounded-full h-2 mb-2">
+                <div 
+                  className="bg-white h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${stats.tierProgress}%` }}
+                />
+              </div>
               <p className="text-xs opacity-75">
                 Spend {formatNaira(stats.pointsToNextTier)} more to reach {nextTierData.name} tier
               </p>
@@ -617,7 +627,7 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
                   </Badge>
                 </div>
                 <Button
-                  variant={reward.available ? 'primary' : 'outline'}
+                  variant={reward.available ? 'primary' : 'secondary'}
                   size="sm"
                   className="w-full"
                   onClick={() => handleRedeemReward(reward)}
@@ -859,12 +869,16 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
         )}
       </Modal>
 
-      {/* Toast */}
+      {/* Toast Alert */}
       {showToast && (
-        <Toast
-          message={toastMessage}
-          onClose={() => setShowToast(false)}
-        />
+        <div className="fixed bottom-4 right-4 z-50">
+          <Alert 
+            variant="success" 
+            className="shadow-lg"
+          >
+            {toastMessage}
+          </Alert>
+        </div>
       )}
     </div>
   )
