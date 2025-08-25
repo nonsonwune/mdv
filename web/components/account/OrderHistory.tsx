@@ -42,7 +42,7 @@ export interface Order {
 }
 
 interface OrderHistoryProps {
-  userId?: string
+  userId?: number | string
 }
 
 export default function OrderHistory({ userId }: OrderHistoryProps) {
