@@ -24,5 +24,5 @@ ENV PORT=8000
 EXPOSE 8000
 
 # Add debug output
-CMD ["sh", "-c", "echo 'Starting container...' && echo 'DATABASE_URL type:' && echo $DATABASE_URL | cut -d: -f1 && echo 'PORT: '$PORT && cd backend && alembic upgrade head && cd .. && uvicorn backend.api.main:app --host 0.0.0.0 --port ${PORT} --log-level info"]
+CMD ["sh", "-c", "echo 'Starting container...' && echo 'DATABASE_URL type:' && echo $DATABASE_URL | cut -d: -f1 && echo 'PORT: '$PORT && cd backend && alembic upgrade heads && cd .. && uvicorn backend.api.main:app --host 0.0.0.0 --port ${PORT} --log-level info"]
 
