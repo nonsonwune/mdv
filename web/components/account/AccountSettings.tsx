@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Card, Button, Input, Toggle, Badge, Modal, Toast } from '../ui'
+import { Card, Button, Input, Badge, Modal, Alert } from '../ui'
 import type { UserData } from './UserProfile'
 
 interface NotificationSettings {
@@ -63,9 +63,29 @@ interface PreferencesSettings {
 
 interface AccountSettingsProps {
   user: UserData
+  onUpdate?: (user: UserData) => void
 }
 
-export default function AccountSettings({ user }: AccountSettingsProps) {
+// Simple Toggle component inline
+const Toggle = ({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) => (
+  <button
+    type="button"
+    onClick={() => onChange(!checked)}
+    className={`
+      relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+      ${checked ? 'bg-maroon-700' : 'bg-neutral-300'}
+    `}
+  >
+    <span
+      className={`
+        inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+        ${checked ? 'translate-x-6' : 'translate-x-1'}
+      `}
+    />
+  </button>
+)
+
+export default function AccountSettings({ user, onUpdate }: AccountSettingsProps) {
   const [activeTab, setActiveTab] = useState<'notifications' | 'privacy' | 'security' | 'preferences'>('notifications')
   const [loading, setLoading] = useState(false)
   const [showToast, setShowToast] = useState(false)
@@ -157,6 +177,15 @@ export default function AccountSettings({ user }: AccountSettingsProps) {
   useEffect(() => {
     loadSettings()
   }, [])
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
 
   const loadSettings = () => {
     const savedSettings = localStorage.getItem('mdv_account_settings')
@@ -971,12 +1000,16 @@ export default function AccountSettings({ user }: AccountSettingsProps) {
         </div>
       </Modal>
 
-      {/* Toast */}
+      {/* Toast Alert */}
       {showToast && (
-        <Toast
-          message={toastMessage}
-          onClose={() => setShowToast(false)}
-        />
+        <div className="fixed bottom-4 right-4 z-50">
+          <Alert 
+            variant="success" 
+            className="shadow-lg"
+          >
+            {toastMessage}
+          </Alert>
+        </div>
       )}
     </div>
   )

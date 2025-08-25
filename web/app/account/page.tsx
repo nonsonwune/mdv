@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Card, Button, Tabs, TabsList, TabsTrigger, TabsContent } from '../../components/ui'
+import { Card, Button } from '../../components/ui'
 import UserDashboard from '../../components/account/UserDashboard'
 import UserProfile from '../../components/account/UserProfile'
 import OrderHistory from '../../components/account/OrderHistory'
