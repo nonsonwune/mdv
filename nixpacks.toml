@@ -1,0 +1,14 @@
+# Railway Nixpacks Configuration - Root
+# This is a monorepo with multiple services that use Docker
+# Railway should not attempt to auto-detect the build system
+
+# Tell Nixpacks to skip auto-detection
+providers = []
+
+# Build configuration should be handled at service level
+[phases.setup]
+nixPkgs = []
+
+# No default start command at root level
+[start]
+cmd = "echo 'This is a monorepo. Please configure individual services in Railway.'"

@@ -1,8 +1,21 @@
 {
+  "$schema": "https://railway.app/railway.schema.json",
   "name": "Maison De Valeur Monorepo",
   "services": [
     {
       "name": "mdv-api",
+      "source": {
+        "repo": ".",
+        "branch": "main"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "Dockerfile.backend"
+      },
+      "deploy": {
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
       "envs": [
         "ENV",
         "APP_URL",
@@ -19,6 +32,19 @@
     },
     {
       "name": "mdv-worker",
+      "source": {
+        "repo": ".",
+        "branch": "main"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "dockerfilePath": "Dockerfile.backend"
+      },
+      "deploy": {
+        "startCommand": "arq backend.worker.main.WorkerSettings",
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 10
+      },
       "envs": [
         "ENV",
         "DATABASE_URL",
@@ -38,6 +64,18 @@
     },
     {
         "name": "mdv-web",
+        "source": {
+          "repo": ".",
+          "branch": "main"
+        },
+        "build": {
+          "builder": "DOCKERFILE",
+          "dockerfilePath": "Dockerfile.web"
+        },
+        "deploy": {
+          "restartPolicyType": "ON_FAILURE",
+          "restartPolicyMaxRetries": 10
+        },
         "envs": [
           "NEXT_PUBLIC_API_URL",
           "NEXT_PUBLIC_APP_URL",
