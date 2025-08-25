@@ -20,6 +20,10 @@ interface UserData {
   phone?: string
   loyaltyTier?: string
   createdAt?: string
+  joinedDate?: string
+  verified?: boolean
+  totalOrders?: number
+  totalSpent?: number
 }
 
 export default function AccountPage() {
@@ -69,7 +73,11 @@ export default function AccountPage() {
         ...userData,
         firstName,
         lastName,
-        loyaltyTier: 'bronze' // Default tier
+        loyaltyTier: 'bronze', // Default tier
+        joinedDate: userData.createdAt || new Date().toISOString(),
+        verified: true,
+        totalOrders: 0,
+        totalSpent: 0
       })
     } catch (error) {
       console.error('Error loading user data:', error)
