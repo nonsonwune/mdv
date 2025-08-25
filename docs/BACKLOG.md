@@ -11,7 +11,7 @@ P0 – MVP (Full Paystack checkout)
   - [ ] /cart page: fetch cart, qty updates, proceed to checkout
   - [ ] /checkout page: form (address, email, coupon); POST /api/checkout/init; redirect to authorization_url
   - [ ] /checkout/callback page: read order_id/ref; poll GET /api/orders/{order_id}/tracking until Paid or timeout; UX for failure/retry
-  - [ ] Gate app/api/paystack/mock/route.ts with NODE_ENV or ALLOW_MOCKS=true (404 otherwise)
+  - [x] Gate app/api/paystack/mock/route.ts with NODE_ENV or ALLOW_MOCKS=true (COMPLETED: route removed, mock handled by backend)
 - Repository hygiene
   - [ ] Update .env.example with missing keys (ENABLE_SAME_DAY_LAGOS, COUPON_APPLIES_TO_DISCOUNTED, FREE_SHIPPING_THRESHOLD_LAGOS, DEFAULT_REFUND_METHOD, RESEND_FROM, EMAIL_FROM_DOMAIN)
 

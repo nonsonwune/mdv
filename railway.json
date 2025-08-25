@@ -50,6 +50,7 @@
         "ENV",
         "DATABASE_URL",
         "REDIS_URL",
+        "JWT_SECRET",
         "RESEND_API_KEY",
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "SENTRY_DSN"

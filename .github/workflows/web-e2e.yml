@@ -39,7 +39,6 @@ jobs:
       DATABASE_URL: postgresql+psycopg://mdv:mdv@localhost:5432/mdv
       REDIS_URL: redis://localhost:6379/0
       PAYSTACK_PUBLIC_KEY: pk_test_dummy
-      PAYSTACK_SECRET_KEY: ""
       JWT_SECRET: github-ci-secret
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_APP_URL: http://localhost:3000

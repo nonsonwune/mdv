@@ -10,14 +10,14 @@ Findings
   - backend/worker/worker.py: send_email TODO to integrate with mdv.emailer
 - Next.js routes
   - Implemented: / (home catalog)
-  - Present API route: /api/paystack/mock (dev helper; must be gated)
+  - Mock payment UI: /paystack-mock (calls backend mock endpoint)
   - Missing: /product/[slug], /cart, /checkout, /checkout/callback
 - Backend endpoints
   - Public: health, products (list/get), cart (create/get/add), checkout/init, order tracking
   - Payments: paystack webhook (HMAC verification)
   - Admin: orders list, fulfillment ready, shipments create/status, cancel, refund
 - Env usages
-  - Backend reads from .env via pydantic-settings; Web reads NEXT_PUBLIC_* and PAYSTACK_SECRET_KEY in app/api/paystack/mock
+  - Backend reads from .env via pydantic-settings; Web reads NEXT_PUBLIC_* only (payment secrets isolated to backend)
 - Code quality
   - Python: async SQLAlchemy patterns and migrations are consistent; observability is optional via envs
   - Web: Tailwind config present; no ESLint config; TypeScript strict

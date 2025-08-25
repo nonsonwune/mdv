@@ -27,7 +27,8 @@ Executive summary
   - expire_reservations job; stub send_email (TODO integrate mdv.emailer).
 - Web (Next.js 14, App Router)
   - Implemented: layout, home catalog fetching /api/products; Tailwind theme.
-  - Dev-only webhook mock forwarder: app/api/paystack/mock/route.ts (must be gated by env).
+  - Mock payment UI: app/paystack-mock/page.tsx (calls backend mock endpoint directly).
+  - Security: Payment secrets removed from frontend service, handled by backend only.
   - Missing: product detail, cart, checkout, callback/success pages; tests; ESLint config.
 - Scripts & Makefile
   - Targets: db-up/down, deps, migrate, seed, api, worker, web; dev scripts for admin token, webhook simulation, reservation expiry.

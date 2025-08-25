@@ -66,7 +66,6 @@ Additional flags used by backend (see docs/CONFIG_SECURITY_REVIEW.md):
 
 Web envs:
 - NEXT_PUBLIC_API_URL, NEXT_PUBLIC_APP_URL
-- ALLOW_MOCKS (dev/CI only; gates server-side /api/paystack/mock)
 - NEXT_PUBLIC_ALLOW_MOCKS (dev/CI only; gates client-side /paystack-mock UI)
 
 ## Migrations

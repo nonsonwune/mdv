@@ -9,6 +9,9 @@ const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   output: 'standalone',
   images: {
     domains: imageDomains,

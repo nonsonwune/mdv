@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import { API_BASE } from "../../lib/api";
 
 export default function PaystackMockPage() {
   const sp = useSearchParams();
@@ -13,7 +14,7 @@ export default function PaystackMockPage() {
     try {
       const event = kind === "success" ? "charge.success" : "charge.failed";
       const body = { event, data: { reference: ref, amount: 1000 } };
-      const resp = await fetch("/api/paystack/mock", {
+      const resp = await fetch(`${API_BASE}/api/paystack/mock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

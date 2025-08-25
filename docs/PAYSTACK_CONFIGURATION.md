@@ -27,13 +27,12 @@ The backend services use both public and secret keys for API operations and webh
   - `PAYSTACK_SECRET_KEY` - For webhook signature verification
 
 ### Frontend Service
-The frontend uses the public key for client-side payment initialization and secret key only for the mock webhook route.
+The frontend uses only the public key for client-side payment initialization. Payment secrets are handled exclusively by backend services.
 
 #### 3. Web `.env.local` file
 - **Path**: `/Users/mac/Repository/mdv/web/.env.local`
 - **Variables**:
   - `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY` - For client-side Paystack SDK
-  - `PAYSTACK_SECRET_KEY` - For mock webhook route (server-side only)
 
 ### Example Files
 The following example files have been updated with the test credentials for developer reference:
@@ -69,12 +68,9 @@ The following example files have been updated with the test credentials for deve
    - Initiates payment flow
    - Redirects to Paystack or mock payment page
 
-2. **Mock Webhook Route** (`web/app/api/paystack/mock/route.ts`)
-   - Uses `PAYSTACK_SECRET_KEY` for test webhook signature generation
-   - Only active when `ALLOW_MOCKS=true`
-
-3. **Mock Payment Page** (`web/app/paystack-mock/page.tsx`)
+2. **Mock Payment Page** (`web/app/paystack-mock/page.tsx`)
    - Simulates Paystack payment flow for testing
+   - Calls backend mock endpoint directly (`/api/paystack/mock`)
    - Only accessible when `NEXT_PUBLIC_ALLOW_MOCKS=true`
 
 ## Testing Instructions
@@ -106,9 +102,11 @@ To enable mock payment flow (for local development):
 ## Security Notes
 
 1. **Never commit production keys** - The configured keys are test-only credentials
-2. **Secret key protection** - The secret key is never exposed to the client-side
-3. **Environment-specific keys** - Use different keys for development, staging, and production
-4. **Railway deployments** - Update Railway environment variables through the Railway dashboard, not in code
+2. **Secret key isolation** - Payment secrets (`PAYSTACK_SECRET_KEY`) are only available to backend services
+3. **Frontend security** - The frontend service has no access to payment secrets, improving security posture
+4. **Environment-specific keys** - Use different keys for development, staging, and production
+5. **Railway deployments** - Update Railway environment variables through the Railway dashboard, not in code
+6. **Mock functionality** - Mock payment testing is handled by backend endpoints, not frontend routes
 
 ## Migration to Production
 
@@ -116,9 +114,8 @@ When ready to use live Paystack credentials:
 
 1. Obtain production keys from Paystack dashboard
 2. Update Railway environment variables:
-   - `PAYSTACK_PUBLIC_KEY=pk_live_xxx`
-   - `PAYSTACK_SECRET_KEY=sk_live_xxx`
-   - `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_xxx`
+   - **Backend (mdv-api)**: `PAYSTACK_PUBLIC_KEY=pk_live_xxx`, `PAYSTACK_SECRET_KEY=sk_live_xxx`
+   - **Frontend (mdv-web)**: `NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_live_xxx`
 3. Set `ENV=prod` in backend services
 4. Disable mock modes:
    - `ALLOW_MOCKS=false`

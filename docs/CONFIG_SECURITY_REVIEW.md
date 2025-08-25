@@ -2,7 +2,8 @@
 
 Summary
 - Config surfaces are sound: FastAPI CORS is constrained by APP_URL; secrets and feature flags are read from env.
-- High-severity item: web/app/api/paystack/mock/route.ts acts as an HMAC signing/forwarding proxy and must be disabled outside dev/CI.
+- Security improvement: Frontend mock route (web/app/api/paystack/mock/route.ts) has been removed. Mock functionality is now handled by backend endpoints only.
+- Payment secrets (PAYSTACK_SECRET_KEY) are isolated to backend services, improving security posture.
 - .env.example is missing some keys that exist in backend/mdv/config.py – update recommended.
 
 Findings
@@ -13,7 +14,8 @@ Findings
 - Web config
   - NEXT_PUBLIC_API_URL, NEXT_PUBLIC_APP_URL – present in web/.env.local.example
 - Security items
-  - Paystack mock forwarder must be gated by NODE_ENV/ALLOW_MOCKS.
+  - Payment secrets are isolated to backend services only (PAYSTACK_SECRET_KEY removed from frontend).
+  - Mock functionality handled by backend endpoints, eliminating frontend security risks.
   - JWT secret must not be logged or echoed. Scripts correctly avoid printing secrets.
   - CORS depends on APP_URL – ensure correct domain in Railway.
   - Webhook endpoint strictly validates HMAC-SHA512 – correct.
