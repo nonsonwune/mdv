@@ -95,6 +95,8 @@ class Category(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
     slug: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    # Relationships
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
 
 
 class Product(Base):
@@ -104,10 +106,15 @@ class Product(Base):
     title: Mapped[str] = mapped_column(String(255))
     slug: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    category_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True)
     flags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     compare_at_price: Mapped[Optional[Numeric]] = mapped_column(Numeric(12, 2), nullable=True)
-    # Relationship: images (optional)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    # Relationships
     images: Mapped[list["ProductImage"]] = relationship("ProductImage", cascade="all, delete-orphan", lazy="selectin")
+    variants: Mapped[list["Variant"]] = relationship("Variant", cascade="all, delete-orphan", lazy="selectin")
+    category: Mapped[Optional["Category"]] = relationship("Category", back_populates="products")
 
 
 class Variant(Base):
@@ -120,6 +127,8 @@ class Variant(Base):
     size: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     color: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     price: Mapped[Numeric] = mapped_column(Numeric(12, 2))
+    # Relationships
+    inventory: Mapped[Optional["Inventory"]] = relationship("Inventory", back_populates="variant", uselist=False)
 
 
 class Inventory(Base):
@@ -128,6 +137,8 @@ class Inventory(Base):
     variant_id: Mapped[int] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), primary_key=True)
     quantity: Mapped[int] = mapped_column(Integer, default=0)
     safety_stock: Mapped[int] = mapped_column(Integer, default=0)
+    # Relationships
+    variant: Mapped["Variant"] = relationship("Variant", back_populates="inventory")
 
 
 class StockLedger(Base):
@@ -149,6 +160,7 @@ class ProductImage(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True)
     url: Mapped[str] = mapped_column(String(500))
+    public_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Cloudinary public_id for deletion
     alt_text: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
