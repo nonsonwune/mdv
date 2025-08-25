@@ -27,19 +27,26 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.on_event("startup")
 async def startup_seed_reference():
-    # Seed Zones and a minimal state mapping if empty
-    Session = get_session_factory()
-    async with Session() as db:
-        existing = (await db.execute(select(Zone))).scalars().first()
-        if not existing:
-            lagos = Zone(name="Lagos", fee=1000)
-            north = Zone(name="North", fee=2000)
-            other = Zone(name="Other Zone", fee=1500)
-            db.add_all([lagos, north, other])
-            await db.flush()
-            # Map Lagos state -> Lagos zone (basic seed)
-            db.add(StateZone(state="Lagos", zone_id=lagos.id))
-            await db.commit()
+    """Seed reference data on startup - non-blocking with error handling"""
+    try:
+        # Seed Zones and a minimal state mapping if empty
+        Session = get_session_factory()
+        async with Session() as db:
+            existing = (await db.execute(select(Zone))).scalars().first()
+            if not existing:
+                lagos = Zone(name="Lagos", fee=1000)
+                north = Zone(name="North", fee=2000)
+                other = Zone(name="Other Zone", fee=1500)
+                db.add_all([lagos, north, other])
+                await db.flush()
+                # Map Lagos state -> Lagos zone (basic seed)
+                db.add(StateZone(state="Lagos", zone_id=lagos.id))
+                await db.commit()
+                print("✓ Reference data seeded successfully")
+    except Exception as e:
+        print(f"Warning: Failed to seed reference data: {e}")
+        print("Continuing without seeding - database might not be ready yet")
+        # Don't fail startup if database is not ready
 
 # CORS
 allowed_origins = [settings.app_url] if settings.app_url else ["*"]
