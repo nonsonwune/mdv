@@ -1,0 +1,36 @@
+# Node
+node_modules/
+.next/
+out/
+web/.next/
+web/node_modules/
+web/.vercel/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+.coverage
+.pytest_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+
+# DB
+/data/
+
+# Alembic
+backend/alembic/versions/*.pyc
+
+# Env files
+web/.env.local
+.env
+
+# Logs
+*.log
+

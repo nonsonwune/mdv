@@ -1,0 +1,91 @@
+name: web-e2e
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mdv
+          POSTGRES_USER: mdv
+          POSTGRES_PASSWORD: mdv
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mdv" 
+          --health-interval 10s 
+          --health-timeout 5s 
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping || exit 1" 
+          --health-interval 10s 
+          --health-timeout 5s 
+          --health-retries 5
+
+    env:
+      ENV: dev
+      APP_URL: http://localhost:3000
+      DATABASE_URL: postgresql+psycopg://mdv:mdv@localhost:5432/mdv
+      REDIS_URL: redis://localhost:6379/0
+      PAYSTACK_PUBLIC_KEY: pk_test_dummy
+      PAYSTACK_SECRET_KEY: ""
+      JWT_SECRET: github-ci-secret
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      ALLOW_MOCKS: true
+      NEXT_PUBLIC_ALLOW_MOCKS: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: DB migrate and seed
+        run: |
+          alembic -c backend/alembic.ini upgrade head
+          python -m backend.scripts.seed_dev
+
+      - name: Start backend API
+        run: |
+          nohup uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 &
+          sleep 2
+
+      - name: Install web deps
+        working-directory: web
+        run: |
+          npm ci
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: |
+          npx playwright install --with-deps
+
+      - name: Run E2E tests
+        working-directory: web
+        run: |
+          npm run test:e2e
+

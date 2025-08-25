@@ -1,0 +1,416 @@
+openapi: 3.0.3
+info:
+  title: MDV API (MVP)
+  version: "0.1.0"
+servers:
+  - url: http://localhost:8000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/products:
+    get:
+      summary: List products
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: sort
+          schema: { type: string, enum: [relevance, newest, price_asc, price_desc], default: relevance }
+      responses:
+        200:
+          description: Products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProducts'
+  /api/products/{idOrSlug}:
+    get:
+      summary: Get product
+      parameters:
+        - in: path
+          name: idOrSlug
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        404: { description: Not found }
+  /api/cart:
+    post:
+      summary: Create cart
+      responses:
+        200:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartCreateResponse'
+  /api/cart/{cart_id}:
+    get:
+      summary: Get cart
+      parameters:
+        - in: path
+          name: cart_id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        404: { description: Not found }
+  /api/cart/{cart_id}/items:
+    post:
+      summary: Add item to cart
+      parameters:
+        - in: path
+          name: cart_id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemIn'
+      responses:
+        200:
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+  /api/cart/{cart_id}/items/{item_id}:
+    put:
+      summary: Update item quantity
+      parameters:
+        - in: path
+          name: cart_id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: item_id
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartItemQtyUpdate'
+      responses:
+        200:
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+    delete:
+      summary: Remove item from cart
+      parameters:
+        - in: path
+          name: cart_id
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: item_id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+  /api/cart/{cart_id}/clear:
+    post:
+      summary: Clear cart
+      parameters:
+        - in: path
+          name: cart_id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Emptied cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+  /api/shipping/calculate:
+    get:
+      summary: Shipping preview
+      parameters:
+        - in: query
+          name: state
+          required: true
+          schema: { type: string }
+        - in: query
+          name: subtotal
+          required: false
+          schema: { type: number }
+        - in: query
+          name: coupon_code
+          required: false
+          schema: { type: string }
+      responses:
+        200:
+          description: Estimate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShippingEstimate'
+  /api/checkout/init:
+    post:
+      summary: Initialize checkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutInitRequest'
+      responses:
+        200:
+          description: Authorization URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutInitResponse'
+  /api/orders/{order_id}/tracking:
+    get:
+      summary: Get order tracking status
+      parameters:
+        - in: path
+          name: order_id
+          required: true
+          schema: { type: integer }
+      responses:
+        200:
+          description: Tracking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderTrackingResponse'
+        404: { description: Not found }
+  /api/paystack/webhook:
+    post:
+      summary: Paystack webhook
+      parameters:
+        - in: header
+          name: x-paystack-signature
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        200: { description: OK }
+  /api/paystack/mock:
+    post:
+      summary: Local mock to simulate Paystack events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string }
+                data:
+                  type: object
+                  properties:
+                    reference: { type: string }
+      responses:
+        200: { description: OK }
+  /api/paystack/verify:
+    get:
+      summary: Verify payment by reference
+      parameters:
+        - in: query
+          name: reference
+          required: true
+          schema: { type: string }
+      responses:
+        200: { description: OK }
+  /api/auth/login:
+    post:
+      summary: Staff login (MVP)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthLoginRequest'
+      responses:
+        200:
+          description: Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthLoginResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status: { type: string }
+        service: { type: string }
+        version: { type: string }
+    PaginatedProducts:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+    Variant:
+      type: object
+      properties:
+        id: { type: integer }
+        sku: { type: string }
+        size: { type: string, nullable: true }
+        color: { type: string, nullable: true }
+        price: { type: number }
+    Product:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        slug: { type: string }
+        description: { type: string, nullable: true }
+        compare_at_price: { type: number, nullable: true }
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variant'
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductImage'
+    CartCreateResponse:
+      type: object
+      properties:
+        id: { type: integer }
+    CartItem:
+      type: object
+      properties:
+        id: { type: integer }
+        variant_id: { type: integer }
+        qty: { type: integer }
+        title: { type: string, nullable: true }
+        price: { type: number, nullable: true }
+        image_url: { type: string, nullable: true }
+    CartItemIn:
+      type: object
+      required: [variant_id, qty]
+      properties:
+        variant_id: { type: integer }
+        qty: { type: integer, minimum: 1 }
+    CartItemQtyUpdate:
+      type: object
+      required: [qty]
+      properties:
+        qty: { type: integer, minimum: 1 }
+    Cart:
+      type: object
+      properties:
+        id: { type: integer }
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+    ShippingEstimate:
+      type: object
+      properties:
+        shipping_fee: { type: number }
+        free_shipping_eligible: { type: boolean }
+        reason: { type: string, nullable: true }
+    AddressIn:
+      type: object
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        state: { type: string }
+        city: { type: string }
+        street: { type: string }
+    CheckoutInitRequest:
+      type: object
+      properties:
+        cart_id: { type: integer }
+        address: { $ref: '#/components/schemas/AddressIn' }
+        email: { type: string, format: email }
+        coupon_code: { type: string, nullable: true }
+    CheckoutInitResponse:
+      type: object
+      properties:
+        order_id: { type: integer }
+        authorization_url: { type: string, format: uri }
+        reference: { type: string }
+        totals:
+          type: object
+          additionalProperties: true
+    AuthLoginRequest:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    AuthLoginResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token: { type: string }
+        token_type: { type: string }
+        role: { type: string }
+    ProductImage:
+      type: object
+      properties:
+        id: { type: integer }
+        url: { type: string }
+        alt_text: { type: string, nullable: true }
+        width: { type: integer, nullable: true }
+        height: { type: integer, nullable: true }
+        sort_order: { type: integer }
+        is_primary: { type: boolean }
+    OrderTrackingResponse:
+      type: object
+      properties:
+        order_id: { type: integer }
+        status: { type: string }
+        timeline:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              at: { type: string, format: date-time }
+              message: { type: string, nullable: true }
+

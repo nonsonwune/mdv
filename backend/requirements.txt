@@ -1,0 +1,20 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.8.2
+pydantic-settings==2.4.0
+SQLAlchemy[asyncio]==2.0.34
+psycopg[binary,pool]==3.2.3
+alembic==1.13.2
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+arq==0.25.0
+redis==5.0.7
+httpx==0.27.0
+sentry-sdk==2.12.0
+opentelemetry-api==1.25.0
+opentelemetry-sdk==1.25.0
+opentelemetry-instrumentation-fastapi==0.46b0
+opentelemetry-exporter-otlp==1.25.0
+# Async Postgres driver used by SQLAlchemy AsyncEngine
+asyncpg==0.30.0
+

@@ -1,0 +1,10 @@
+{
+  "name": "Maison De Valeur",
+  "short_name": "MDV",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#7a0f2a",
+  "icons": []
+}
+

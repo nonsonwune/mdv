@@ -1,0 +1,27 @@
+import { api } from "../../../lib/api-client"
+import type { ProductListResponse } from "../../../lib/api-types"
+import type { Product } from "../../../lib/types"
+import EnhancedCategoryPage from "../../../components/catalog/EnhancedCategoryPage"
+
+async function getProducts(): Promise<Product[]> {
+  try {
+    const data = await api<ProductListResponse>("/api/products?page_size=100")
+    return (data.items as Product[]) || []
+  } catch {
+    return []
+  }
+}
+
+export default async function MenCategoryPage() {
+  const products = await getProducts()
+  
+  return (
+    <EnhancedCategoryPage
+      title="Men's Collection"
+      description="Discover our curated selection of men's fashion essentials."
+      products={products}
+      category="men"
+    />
+  )
+}
+
