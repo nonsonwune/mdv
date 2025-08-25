@@ -1,7 +1,7 @@
 """Add category_id to products and public_id to product_images
 
 Revision ID: add_category_cloudinary
-Revises: b3bf7ca54a70
+Revises: a1f9e2c7
 Create Date: 2025-01-25 11:45:00.000000
 
 """

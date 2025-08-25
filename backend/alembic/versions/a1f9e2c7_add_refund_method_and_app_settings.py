@@ -1,7 +1,7 @@
 """add refund method and app settings
 
 Revision ID: a1f9e2c7
-Revises: b3bf7ca54a70
+Revises: 55fb081a9d2a
 Create Date: 2025-08-23 11:10:00.000000
 """
 
