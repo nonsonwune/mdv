@@ -1,6 +1,6 @@
 """Add category_id to products and public_id to product_images
 
-Revision ID: add_category_cloudinary
+Revision ID: c2d8e9f3a1b5
 Revises: a1f9e2c7
 Create Date: 2025-01-25 11:45:00.000000
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'add_category_cloudinary'
+revision: str = 'c2d8e9f3a1b5'
 down_revision: Union[str, None] = 'a1f9e2c7'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
