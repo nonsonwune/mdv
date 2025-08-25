@@ -1,24 +1,24 @@
 """
-Product review management endpoints.
+Product review management endpoints with database persistence.
 """
 from __future__ import annotations
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, and_, func, desc
+from sqlalchemy import select, and_, func, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from backend.mdv.auth import get_current_claims
-from backend.mdv.models import User, Product, Order, OrderItem, Variant, OrderStatus
+from backend.mdv.auth import get_current_claims, get_current_user_optional
+from backend.mdv.models import (
+    User, Product, Order, OrderItem, Variant, OrderStatus,
+    Review, ReviewVote, ProductImage
+)
 from ..deps import get_db
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])
-
-# Temporary in-memory storage for reviews (should be database table)
-product_reviews = {}
-review_counter = {"id": 1}
 
 
 # Schemas
@@ -50,6 +50,7 @@ class ReviewResponse(BaseModel):
     helpful_count: int = 0
     created_at: datetime
     updated_at: datetime
+    user_voted_helpful: Optional[bool] = None  # If current user voted
 
 class ReviewSummaryResponse(BaseModel):
     product_id: int
@@ -73,8 +74,6 @@ class HelpfulVoteRequest(BaseModel):
 # Helper function to check if user has purchased product
 async def has_purchased_product(user_id: int, product_id: int, db: AsyncSession) -> bool:
     """Check if user has purchased the product."""
-    # Query orders for this user that contain the product
-    # OrderItem links to Variant, which links to Product
     result = await db.execute(
         select(OrderItem)
         .join(Order, OrderItem.order_id == Order.id)
@@ -82,7 +81,7 @@ async def has_purchased_product(user_id: int, product_id: int, db: AsyncSession)
         .where(
             and_(
                 Order.user_id == user_id,
-                Order.status.in_([OrderStatus.paid, OrderStatus.refunded]),  # Consider paid and refunded as valid purchases
+                Order.status.in_([OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered]),
                 Variant.product_id == product_id
             )
         )
@@ -100,6 +99,7 @@ async def get_product_reviews(
     sort_by: str = Query("recent", regex="^(recent|helpful|rating_high|rating_low)$"),
     rating_filter: Optional[int] = Query(None, ge=1, le=5),
     verified_only: bool = Query(False),
+    user: Optional[User] = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db)
 ):
     """Get reviews for a specific product."""
@@ -108,52 +108,69 @@ async def get_product_reviews(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    # Get reviews from storage
-    reviews = product_reviews.get(product_id, [])
+    # Build query
+    query = select(Review).options(
+        selectinload(Review.user),
+        selectinload(Review.variant),
+        selectinload(Review.votes)
+    ).where(Review.product_id == product_id)
     
     # Apply filters
     if rating_filter:
-        reviews = [r for r in reviews if r["rating"] == rating_filter]
+        query = query.where(Review.rating == rating_filter)
     if verified_only:
-        reviews = [r for r in reviews if r["verified_purchase"]]
+        query = query.where(Review.verified_purchase == True)
     
-    # Sort reviews
+    # Apply sorting
     if sort_by == "recent":
-        reviews = sorted(reviews, key=lambda x: x["created_at"], reverse=True)
+        query = query.order_by(desc(Review.created_at))
     elif sort_by == "helpful":
-        reviews = sorted(reviews, key=lambda x: x["helpful_count"], reverse=True)
+        query = query.order_by(desc(Review.helpful_count), desc(Review.created_at))
     elif sort_by == "rating_high":
-        reviews = sorted(reviews, key=lambda x: x["rating"], reverse=True)
+        query = query.order_by(desc(Review.rating), desc(Review.created_at))
     elif sort_by == "rating_low":
-        reviews = sorted(reviews, key=lambda x: x["rating"])
+        query = query.order_by(Review.rating, desc(Review.created_at))
+    
+    # Count total
+    count_query = select(func.count()).select_from(Review).where(Review.product_id == product_id)
+    if rating_filter:
+        count_query = count_query.where(Review.rating == rating_filter)
+    if verified_only:
+        count_query = count_query.where(Review.verified_purchase == True)
+    
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
     
     # Paginate
-    total = len(reviews)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_reviews = reviews[start:end]
+    query = query.offset((page - 1) * per_page).limit(per_page)
+    result = await db.execute(query)
+    reviews = result.scalars().all()
     
     # Convert to response format
     review_responses = []
-    for review in paginated_reviews:
-        # Get user name
-        user = await db.get(User, review["user_id"])
-        user_name = user.name if user else "Anonymous"
+    for review in reviews:
+        # Check if current user voted on this review
+        user_voted_helpful = None
+        if user:
+            vote = next((v for v in review.votes if v.user_id == user.id), None)
+            if vote:
+                user_voted_helpful = vote.is_helpful
         
         review_responses.append(ReviewResponse(
-            id=review["id"],
-            product_id=review["product_id"],
-            variant_id=review.get("variant_id"),
-            user_id=review["user_id"],
-            user_name=user_name,
-            rating=review["rating"],
-            title=review["title"],
-            comment=review["comment"],
-            would_recommend=review["would_recommend"],
-            verified_purchase=review["verified_purchase"],
-            helpful_count=review.get("helpful_count", 0),
-            created_at=review["created_at"],
-            updated_at=review["updated_at"]
+            id=review.id,
+            product_id=review.product_id,
+            variant_id=review.variant_id,
+            user_id=review.user_id,
+            user_name=review.user.name if review.user else "Anonymous",
+            rating=review.rating,
+            title=review.title,
+            comment=review.comment,
+            would_recommend=review.would_recommend,
+            verified_purchase=review.verified_purchase,
+            helpful_count=review.helpful_count,
+            created_at=review.created_at,
+            updated_at=review.updated_at,
+            user_voted_helpful=user_voted_helpful
         ))
     
     return ReviewListResponse(
@@ -161,7 +178,7 @@ async def get_product_reviews(
         total=total,
         page=page,
         per_page=per_page,
-        has_next=end < total
+        has_next=(page * per_page) < total
     )
 
 
@@ -177,8 +194,11 @@ async def get_review_summary(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    # Get reviews from storage
-    reviews = product_reviews.get(product_id, [])
+    # Get all reviews for statistics
+    result = await db.execute(
+        select(Review).where(Review.product_id == product_id)
+    )
+    reviews = result.scalars().all()
     
     if not reviews:
         return ReviewSummaryResponse(
@@ -192,20 +212,20 @@ async def get_review_summary(
     
     # Calculate statistics
     total_reviews = len(reviews)
-    total_rating = sum(r["rating"] for r in reviews)
+    total_rating = sum(r.rating for r in reviews)
     average_rating = total_rating / total_reviews if total_reviews > 0 else 0
     
     # Rating distribution
     rating_distribution = {str(i): 0 for i in range(1, 6)}
     for review in reviews:
-        rating_distribution[str(review["rating"])] += 1
+        rating_distribution[str(review.rating)] += 1
     
     # Recommendation percentage
-    recommendations = sum(1 for r in reviews if r["would_recommend"])
+    recommendations = sum(1 for r in reviews if r.would_recommend)
     recommendation_percentage = (recommendations / total_reviews * 100) if total_reviews > 0 else 0
     
     # Verified purchase count
-    verified_purchase_count = sum(1 for r in reviews if r["verified_purchase"])
+    verified_purchase_count = sum(1 for r in reviews if r.verified_purchase)
     
     return ReviewSummaryResponse(
         product_id=product_id,
@@ -224,7 +244,7 @@ async def create_review(
     claims: dict = Depends(get_current_claims),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new product review."""
+    """Create a new review for a product."""
     user_id = int(claims["sub"])
     
     # Verify product exists
@@ -232,55 +252,59 @@ async def create_review(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
+    # Verify variant if provided
+    if request.variant_id:
+        variant = await db.get(Variant, request.variant_id)
+        if not variant or variant.product_id != request.product_id:
+            raise HTTPException(status_code=404, detail="Variant not found or doesn't belong to product")
+    
     # Check if user already reviewed this product
-    existing_reviews = product_reviews.get(request.product_id, [])
-    if any(r["user_id"] == user_id for r in existing_reviews):
+    existing_review = await db.execute(
+        select(Review).where(
+            and_(
+                Review.product_id == request.product_id,
+                Review.user_id == user_id
+            )
+        )
+    )
+    if existing_review.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="You have already reviewed this product")
     
-    # Check if verified purchase
+    # Check if user has purchased the product
     verified_purchase = await has_purchased_product(user_id, request.product_id, db)
     
     # Create review
-    review = {
-        "id": review_counter["id"],
-        "product_id": request.product_id,
-        "variant_id": request.variant_id,
-        "user_id": user_id,
-        "rating": request.rating,
-        "title": request.title,
-        "comment": request.comment,
-        "would_recommend": request.would_recommend,
-        "verified_purchase": verified_purchase,
-        "helpful_count": 0,
-        "created_at": datetime.utcnow(),
-        "updated_at": datetime.utcnow()
-    }
+    review = Review(
+        product_id=request.product_id,
+        user_id=user_id,
+        variant_id=request.variant_id,
+        rating=request.rating,
+        title=request.title,
+        comment=request.comment,
+        would_recommend=request.would_recommend,
+        verified_purchase=verified_purchase
+    )
+    db.add(review)
+    await db.commit()
+    await db.refresh(review)
     
-    review_counter["id"] += 1
-    
-    # Store review
-    if request.product_id not in product_reviews:
-        product_reviews[request.product_id] = []
-    product_reviews[request.product_id].append(review)
-    
-    # Get user name for response
+    # Load user for response
     user = await db.get(User, user_id)
-    user_name = user.name if user else "Anonymous"
     
     return ReviewResponse(
-        id=review["id"],
-        product_id=review["product_id"],
-        variant_id=review.get("variant_id"),
-        user_id=review["user_id"],
-        user_name=user_name,
-        rating=review["rating"],
-        title=review["title"],
-        comment=review["comment"],
-        would_recommend=review["would_recommend"],
-        verified_purchase=review["verified_purchase"],
-        helpful_count=review.get("helpful_count", 0),
-        created_at=review["created_at"],
-        updated_at=review["updated_at"]
+        id=review.id,
+        product_id=review.product_id,
+        variant_id=review.variant_id,
+        user_id=review.user_id,
+        user_name=user.name if user else "Anonymous",
+        rating=review.rating,
+        title=review.title,
+        comment=review.comment,
+        would_recommend=review.would_recommend,
+        verified_purchase=review.verified_purchase,
+        helpful_count=0,
+        created_at=review.created_at,
+        updated_at=review.updated_at
     )
 
 
@@ -295,53 +319,45 @@ async def update_review(
     """Update an existing review."""
     user_id = int(claims["sub"])
     
-    # Find review
-    review = None
-    for product_id, reviews in product_reviews.items():
-        for r in reviews:
-            if r["id"] == review_id:
-                review = r
-                break
-        if review:
-            break
-    
+    # Get review
+    review = await db.get(Review, review_id)
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
     # Check ownership
-    if review["user_id"] != user_id:
-        raise HTTPException(status_code=403, detail="You can only update your own reviews")
+    if review.user_id != user_id:
+        raise HTTPException(status_code=403, detail="You can only edit your own reviews")
     
     # Update fields
     if request.rating is not None:
-        review["rating"] = request.rating
+        review.rating = request.rating
     if request.title is not None:
-        review["title"] = request.title
+        review.title = request.title
     if request.comment is not None:
-        review["comment"] = request.comment
+        review.comment = request.comment
     if request.would_recommend is not None:
-        review["would_recommend"] = request.would_recommend
+        review.would_recommend = request.would_recommend
     
-    review["updated_at"] = datetime.utcnow()
+    await db.commit()
+    await db.refresh(review)
     
-    # Get user name for response
+    # Load user for response
     user = await db.get(User, user_id)
-    user_name = user.name if user else "Anonymous"
     
     return ReviewResponse(
-        id=review["id"],
-        product_id=review["product_id"],
-        variant_id=review.get("variant_id"),
-        user_id=review["user_id"],
-        user_name=user_name,
-        rating=review["rating"],
-        title=review["title"],
-        comment=review["comment"],
-        would_recommend=review["would_recommend"],
-        verified_purchase=review["verified_purchase"],
-        helpful_count=review.get("helpful_count", 0),
-        created_at=review["created_at"],
-        updated_at=review["updated_at"]
+        id=review.id,
+        product_id=review.product_id,
+        variant_id=review.variant_id,
+        user_id=review.user_id,
+        user_name=user.name if user else "Anonymous",
+        rating=review.rating,
+        title=review.title,
+        comment=review.comment,
+        would_recommend=review.would_recommend,
+        verified_purchase=review.verified_purchase,
+        helpful_count=review.helpful_count,
+        created_at=review.created_at,
+        updated_at=review.updated_at
     )
 
 
@@ -354,25 +370,18 @@ async def delete_review(
 ):
     """Delete a review."""
     user_id = int(claims["sub"])
-    roles = claims.get("roles", [])
     
-    # Find and remove review
-    review_found = False
-    for product_id, reviews in product_reviews.items():
-        for i, r in enumerate(reviews):
-            if r["id"] == review_id:
-                # Check ownership or admin role
-                if r["user_id"] != user_id and "admin" not in roles:
-                    raise HTTPException(status_code=403, detail="You can only delete your own reviews")
-                
-                reviews.pop(i)
-                review_found = True
-                break
-        if review_found:
-            break
-    
-    if not review_found:
+    # Get review
+    review = await db.get(Review, review_id)
+    if not review:
         raise HTTPException(status_code=404, detail="Review not found")
+    
+    # Check ownership (or admin)
+    if review.user_id != user_id and claims.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="You can only delete your own reviews")
+    
+    await db.delete(review)
+    await db.commit()
     
     return {"message": "Review deleted successfully"}
 
@@ -388,100 +397,92 @@ async def mark_review_helpful(
     """Mark a review as helpful or not helpful."""
     user_id = int(claims["sub"])
     
-    # Find review
-    review = None
-    for product_id, reviews in product_reviews.items():
-        for r in reviews:
-            if r["id"] == review_id:
-                review = r
-                break
-        if review:
-            break
-    
+    # Get review
+    review = await db.get(Review, review_id)
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    # Prevent self-voting
-    if review["user_id"] == user_id:
+    # Check if user is trying to vote on their own review
+    if review.user_id == user_id:
         raise HTTPException(status_code=400, detail="You cannot vote on your own review")
     
-    # Track user votes (in production, this would be in database)
-    if "user_votes" not in review:
-        review["user_votes"] = {}
-    
     # Check if user already voted
-    if user_id in review["user_votes"]:
-        old_vote = review["user_votes"][user_id]
-        if old_vote and not request.helpful:
-            review["helpful_count"] -= 1
-        elif not old_vote and request.helpful:
-            review["helpful_count"] += 1
-    else:
-        if request.helpful:
-            review["helpful_count"] = review.get("helpful_count", 0) + 1
+    existing_vote = await db.execute(
+        select(ReviewVote).where(
+            and_(
+                ReviewVote.review_id == review_id,
+                ReviewVote.user_id == user_id
+            )
+        )
+    )
+    vote = existing_vote.scalar_one_or_none()
     
-    review["user_votes"][user_id] = request.helpful
+    if vote:
+        # Update existing vote
+        if vote.is_helpful != request.helpful:
+            vote.is_helpful = request.helpful
+            # Update helpful count
+            if request.helpful:
+                review.helpful_count += 1
+            else:
+                review.helpful_count = max(0, review.helpful_count - 1)
+    else:
+        # Create new vote
+        vote = ReviewVote(
+            review_id=review_id,
+            user_id=user_id,
+            is_helpful=request.helpful
+        )
+        db.add(vote)
+        # Update helpful count
+        if request.helpful:
+            review.helpful_count += 1
+    
+    await db.commit()
     
     return {
         "message": "Vote recorded",
-        "helpful_count": review.get("helpful_count", 0)
+        "helpful_count": review.helpful_count
     }
 
 
-# Get user's reviews
-@router.get("/user/me", response_model=ReviewListResponse)
-async def get_my_reviews(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(10, ge=1, le=50),
+# Get user's review for a product
+@router.get("/product/{product_id}/user", response_model=Optional[ReviewResponse])
+async def get_user_review_for_product(
+    product_id: int,
     claims: dict = Depends(get_current_claims),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all reviews by the current user."""
+    """Get the current user's review for a specific product."""
     user_id = int(claims["sub"])
     
-    # Collect all user's reviews
-    user_reviews = []
-    for product_id, reviews in product_reviews.items():
-        for review in reviews:
-            if review["user_id"] == user_id:
-                user_reviews.append(review)
+    result = await db.execute(
+        select(Review)
+        .options(selectinload(Review.user))
+        .where(
+            and_(
+                Review.product_id == product_id,
+                Review.user_id == user_id
+            )
+        )
+    )
+    review = result.scalar_one_or_none()
     
-    # Sort by recent
-    user_reviews = sorted(user_reviews, key=lambda x: x["created_at"], reverse=True)
+    if not review:
+        return None
     
-    # Paginate
-    total = len(user_reviews)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_reviews = user_reviews[start:end]
-    
-    # Get user name
-    user = await db.get(User, user_id)
-    user_name = user.name if user else "Anonymous"
-    
-    # Convert to response format
-    review_responses = []
-    for review in paginated_reviews:
-        review_responses.append(ReviewResponse(
-            id=review["id"],
-            product_id=review["product_id"],
-            variant_id=review.get("variant_id"),
-            user_id=review["user_id"],
-            user_name=user_name,
-            rating=review["rating"],
-            title=review["title"],
-            comment=review["comment"],
-            would_recommend=review["would_recommend"],
-            verified_purchase=review["verified_purchase"],
-            helpful_count=review.get("helpful_count", 0),
-            created_at=review["created_at"],
-            updated_at=review["updated_at"]
-        ))
-    
-    return ReviewListResponse(
-        reviews=review_responses,
-        total=total,
-        page=page,
-        per_page=per_page,
-        has_next=end < total
+    return ReviewResponse(
+        id=review.id,
+        product_id=review.product_id,
+        variant_id=review.variant_id,
+        user_id=review.user_id,
+        user_name=review.user.name if review.user else "Anonymous",
+        rating=review.rating,
+        title=review.title,
+        comment=review.comment,
+        would_recommend=review.would_recommend,
+        verified_purchase=review.verified_purchase,
+        helpful_count=review.helpful_count,
+        created_at=review.created_at,
+        updated_at=review.updated_at
     )

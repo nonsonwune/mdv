@@ -1,5 +1,5 @@
 """
-Wishlist management endpoints with database persistence.
+Wishlist management endpoints.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from datetime import datetime
 from backend.mdv.auth import get_current_claims
 from backend.mdv.models import (
     User, Product, Variant, Cart, CartItem,
-    Wishlist, WishlistItem, ProductImage, Inventory
+    Wishlist, WishlistItem, ProductImage
 )
 from ..deps import get_db
 
@@ -144,51 +144,41 @@ async def add_to_wishlist(
         if not variant or variant.product_id != request.product_id:
             raise HTTPException(status_code=404, detail="Variant not found")
     
-    # Get or create wishlist
-    result = await db.execute(
-        select(Wishlist).where(Wishlist.user_id == user_id)
-    )
-    wishlist = result.scalar_one_or_none()
+    # TODO: Replace with database operations when Wishlist model is created
+    if user_id not in user_wishlists:
+        user_wishlists[user_id] = {
+            "items": [],
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
     
-    if not wishlist:
-        wishlist = Wishlist(user_id=user_id)
-        db.add(wishlist)
-        await db.flush()
+    wishlist = user_wishlists[user_id]
     
     # Check if item already in wishlist
-    existing_result = await db.execute(
-        select(WishlistItem).where(
-            and_(
-                WishlistItem.wishlist_id == wishlist.id,
-                WishlistItem.product_id == request.product_id,
-                WishlistItem.variant_id == request.variant_id
-            )
-        )
+    existing_item = next(
+        (item for item in wishlist["items"] 
+         if item["product_id"] == request.product_id and 
+         item.get("variant_id") == request.variant_id),
+        None
     )
-    existing_item = existing_result.scalar_one_or_none()
     
     if existing_item:
-        return {"message": "Item already in wishlist", "item_id": existing_item.id}
+        return {"message": "Item already in wishlist", "item_id": existing_item["id"]}
     
     # Add new item
-    new_item = WishlistItem(
-        wishlist_id=wishlist.id,
-        product_id=request.product_id,
-        variant_id=request.variant_id
-    )
-    db.add(new_item)
-    await db.commit()
-    
-    # Get total items
-    count_result = await db.execute(
-        select(WishlistItem).where(WishlistItem.wishlist_id == wishlist.id)
-    )
-    total_items = len(count_result.scalars().all())
+    new_item = {
+        "id": len(wishlist["items"]) + 1,
+        "product_id": request.product_id,
+        "variant_id": request.variant_id,
+        "added_at": datetime.utcnow()
+    }
+    wishlist["items"].append(new_item)
+    wishlist["updated_at"] = datetime.utcnow()
     
     return {
         "message": "Item added to wishlist",
-        "item_id": new_item.id,
-        "total_items": total_items
+        "item_id": new_item["id"],
+        "total_items": len(wishlist["items"])
     }
 
 
@@ -202,41 +192,27 @@ async def remove_from_wishlist(
     """Remove an item from the wishlist."""
     user_id = int(claims["sub"])
     
-    # Get wishlist
-    result = await db.execute(
-        select(Wishlist).where(Wishlist.user_id == user_id)
-    )
-    wishlist = result.scalar_one_or_none()
-    
-    if not wishlist:
+    # TODO: Replace with database operations when Wishlist model is created
+    if user_id not in user_wishlists:
         raise HTTPException(status_code=404, detail="Wishlist not found")
     
-    # Find and remove item
-    item_result = await db.execute(
-        select(WishlistItem).where(
-            and_(
-                WishlistItem.wishlist_id == wishlist.id,
-                WishlistItem.id == item_id
-            )
-        )
-    )
-    item = item_result.scalar_one_or_none()
+    wishlist = user_wishlists[user_id]
     
-    if not item:
+    # Find and remove item
+    item_index = next(
+        (i for i, item in enumerate(wishlist["items"]) if item["id"] == item_id),
+        None
+    )
+    
+    if item_index is None:
         raise HTTPException(status_code=404, detail="Item not found in wishlist")
     
-    await db.delete(item)
-    await db.commit()
-    
-    # Get remaining items count
-    count_result = await db.execute(
-        select(WishlistItem).where(WishlistItem.wishlist_id == wishlist.id)
-    )
-    total_items = len(count_result.scalars().all())
+    wishlist["items"].pop(item_index)
+    wishlist["updated_at"] = datetime.utcnow()
     
     return {
         "message": "Item removed from wishlist",
-        "total_items": total_items
+        "total_items": len(wishlist["items"])
     }
 
 
@@ -251,25 +227,17 @@ async def move_to_cart(
     """Move an item from wishlist to cart."""
     user_id = int(claims["sub"])
     
-    # Get wishlist
-    wishlist_result = await db.execute(
-        select(Wishlist).where(Wishlist.user_id == user_id)
-    )
-    wishlist = wishlist_result.scalar_one_or_none()
-    
-    if not wishlist:
+    # TODO: Replace with database operations when Wishlist model is created
+    if user_id not in user_wishlists:
         raise HTTPException(status_code=404, detail="Wishlist not found")
     
+    wishlist = user_wishlists[user_id]
+    
     # Find item in wishlist
-    item_result = await db.execute(
-        select(WishlistItem).where(
-            and_(
-                WishlistItem.wishlist_id == wishlist.id,
-                WishlistItem.id == item_id
-            )
-        )
+    wishlist_item = next(
+        (item for item in wishlist["items"] if item["id"] == item_id),
+        None
     )
-    wishlist_item = item_result.scalar_one_or_none()
     
     if not wishlist_item:
         raise HTTPException(status_code=404, detail="Item not found in wishlist")
@@ -289,11 +257,11 @@ async def move_to_cart(
             raise HTTPException(status_code=404, detail="Cart not found")
     
     # Determine variant to add
-    variant_id = wishlist_item.variant_id
+    variant_id = wishlist_item.get("variant_id")
     if not variant_id:
         # Get default variant for product
         result = await db.execute(
-            select(Variant).where(Variant.product_id == wishlist_item.product_id).limit(1)
+            select(Variant).where(Variant.product_id == wishlist_item["product_id"]).limit(1)
         )
         variant = result.scalar_one_or_none()
         if not variant:
@@ -321,43 +289,33 @@ async def move_to_cart(
         db.add(cart_item)
     
     # Remove from wishlist
-    await db.delete(wishlist_item)
-    await db.commit()
+    wishlist["items"] = [item for item in wishlist["items"] if item["id"] != item_id]
+    wishlist["updated_at"] = datetime.utcnow()
     
-    # Get remaining wishlist items count
-    count_result = await db.execute(
-        select(WishlistItem).where(WishlistItem.wishlist_id == wishlist.id)
-    )
-    items_remaining = len(count_result.scalars().all())
+    await db.commit()
     
     return {
         "message": "Item moved to cart",
         "cart_id": cart_id,
-        "wishlist_items_remaining": items_remaining
+        "wishlist_items_remaining": len(wishlist["items"])
     }
 
 
 # Clear wishlist
 @router.delete("")
 async def clear_wishlist(
-    claims: dict = Depends(get_current_claims),
-    db: AsyncSession = Depends(get_db)
+    claims: dict = Depends(get_current_claims)
 ):
     """Clear all items from the wishlist."""
     user_id = int(claims["sub"])
     
-    # Get wishlist
-    result = await db.execute(
-        select(Wishlist).where(Wishlist.user_id == user_id)
-    )
-    wishlist = result.scalar_one_or_none()
-    
-    if wishlist:
-        # Delete all items
-        await db.execute(
-            delete(WishlistItem).where(WishlistItem.wishlist_id == wishlist.id)
-        )
-        await db.commit()
+    # TODO: Replace with database operations when Wishlist model is created
+    if user_id in user_wishlists:
+        user_wishlists[user_id] = {
+            "items": [],
+            "created_at": user_wishlists[user_id]["created_at"],
+            "updated_at": datetime.utcnow()
+        }
     
     return {"message": "Wishlist cleared"}
 
@@ -365,24 +323,18 @@ async def clear_wishlist(
 # Create wishlist (explicit creation)
 @router.post("", response_model=dict)
 async def create_wishlist(
-    claims: dict = Depends(get_current_claims),
-    db: AsyncSession = Depends(get_db)
+    claims: dict = Depends(get_current_claims)
 ):
     """Create a new wishlist for the user."""
     user_id = int(claims["sub"])
     
-    # Check if wishlist already exists
-    result = await db.execute(
-        select(Wishlist).where(Wishlist.user_id == user_id)
-    )
-    existing = result.scalar_one_or_none()
+    # TODO: Replace with database operations when Wishlist model is created
+    if user_id not in user_wishlists:
+        user_wishlists[user_id] = {
+            "items": [],
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+        return {"message": "Wishlist created", "user_id": user_id}
     
-    if existing:
-        return {"message": "Wishlist already exists", "user_id": user_id}
-    
-    # Create new wishlist
-    wishlist = Wishlist(user_id=user_id)
-    db.add(wishlist)
-    await db.commit()
-    
-    return {"message": "Wishlist created", "user_id": user_id}
+    return {"message": "Wishlist already exists", "user_id": user_id}
