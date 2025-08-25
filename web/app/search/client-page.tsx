@@ -7,6 +7,7 @@ import { usePagination } from "../../hooks/usePagination"
 import ProductCard from "../../components/products/ProductCard"
 import { Button, Drawer } from "../../components/ui"
 import { Pagination } from "../../components/ui/Pagination"
+import { AdvancedFilters } from "../../components/ui/AdvancedFilters"
 import type { Product } from "../../lib/types"
 
 interface EnhancedSearchPageProps {

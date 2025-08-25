@@ -57,7 +57,7 @@ export default function WishlistPage() {
           title="Your wishlist is empty"
           description="Save items you love to your wishlist and shop them anytime"
           action={
-            <Link href="/shop">
+            <Link href="/women">
               <Button variant="primary">Start Shopping</Button>
             </Link>
           }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Card, Button, Badge, Modal } from '../ui'
-import type { Product, ProductVariant } from '../../lib/types'
+import type { Product, Variant } from '../../lib/types'
 
 interface SizeRecommendationProps {
   product: Product
@@ -139,7 +139,7 @@ export default function SizeRecommendation({ product, onSizeSelect }: SizeRecomm
         {recommendedSize && !isCalculating && (
           <>
             <p className="text-sm text-neutral-600 mb-3">
-              Based on your measurements and {product.vendor || 'this brand'}'s sizing, 
+              Based on your measurements and this brand's sizing, 
               we recommend size {recommendedSize} for the best fit.
             </p>
 

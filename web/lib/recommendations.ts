@@ -23,23 +23,19 @@ export async function getProductRecommendations(
     const scoredProducts = otherProducts.map(p => {
       let score = 0
       
-      // Same vendor/brand gets high score
-      if (p.vendor === product.vendor) score += 5
-      
-      // Same product type gets high score
-      if (p.product_type === product.product_type) score += 4
-      
       // Similar price range
       const currentPrice = product.variants?.[0]?.price || 0
       const otherPrice = p.variants?.[0]?.price || 0
       const priceDiff = Math.abs(currentPrice - otherPrice)
-      if (priceDiff < 5000) score += 3
-      else if (priceDiff < 10000) score += 2
+      if (priceDiff < 5000) score += 5
+      else if (priceDiff < 10000) score += 3
       else if (priceDiff < 20000) score += 1
       
-      // Shared tags
-      const sharedTags = p.tags?.filter(tag => product.tags?.includes(tag)) || []
-      score += sharedTags.length
+      // Similar title (basic text similarity)
+      const titleSimilarity = p.title.toLowerCase().split(' ').filter(word => 
+        product.title.toLowerCase().includes(word)
+      ).length
+      score += titleSimilarity * 2
       
       // Random factor for variety
       score += Math.random() * 2
@@ -81,16 +77,8 @@ export async function getFrequentlyBoughtTogether(
     const complementary = allProducts.filter(p => {
       if (p.id === product.id) return false
       
-      // Different product type but same category
-      if (p.product_type !== product.product_type) {
-        // Check if they share category tags
-        const hasSharedCategory = p.tags?.some(tag => 
-          product.tags?.includes(tag) && ['men', 'women', 'essentials'].includes(tag)
-        )
-        return hasSharedCategory
-      }
-      
-      return false
+      // Just return random different products for now
+      return Math.random() > 0.5
     })
     
     // Shuffle and return limited results
@@ -119,7 +107,7 @@ export async function getPersonalizedRecommendations(
     
     // Get the recently viewed products
     const recentProducts = allProducts.filter(p => 
-      recentlyViewedIds.includes(p.id!)
+      recentlyViewedIds.includes(String(p.id))
     )
     
     if (recentProducts.length === 0) {
@@ -127,21 +115,28 @@ export async function getPersonalizedRecommendations(
     }
     
     // Collect attributes from recently viewed
-    const viewedVendors = new Set(recentProducts.map(p => p.vendor).filter(Boolean))
-    const viewedTypes = new Set(recentProducts.map(p => p.product_type).filter(Boolean))
-    const viewedTags = new Set(recentProducts.flatMap(p => p.tags || []))
+    const viewedTitles = new Set(recentProducts.flatMap(p => 
+      p.title.toLowerCase().split(' ')
+    ))
     
     // Score other products based on similarity to viewed items
     const scoredProducts = allProducts
-      .filter(p => !recentlyViewedIds.includes(p.id!))
+      .filter(p => !recentlyViewedIds.includes(String(p.id)))
       .map(p => {
         let score = 0
         
-        if (p.vendor && viewedVendors.has(p.vendor)) score += 3
-        if (p.product_type && viewedTypes.has(p.product_type)) score += 3
+        // Score based on title similarity
+        const titleWords = p.title.toLowerCase().split(' ')
+        const matchingWords = titleWords.filter(word => viewedTitles.has(word))
+        score += matchingWords.length * 2
         
-        const matchingTags = p.tags?.filter(tag => viewedTags.has(tag)) || []
-        score += matchingTags.length * 2
+        // Score based on price similarity
+        const avgViewedPrice = recentProducts.reduce((sum, rp) => 
+          sum + (rp.variants?.[0]?.price || 0), 0
+        ) / recentProducts.length
+        const priceDiff = Math.abs((p.variants?.[0]?.price || 0) - avgViewedPrice)
+        if (priceDiff < 10000) score += 3
+        else if (priceDiff < 20000) score += 1
         
         // Add randomness for variety
         score += Math.random() * 3

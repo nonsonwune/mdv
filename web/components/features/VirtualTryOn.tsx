@@ -49,6 +49,16 @@ export default function VirtualTryOn({ product, onClose }: VirtualTryOnProps) {
     }
   }, [])
 
+  // Auto-hide toast
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {

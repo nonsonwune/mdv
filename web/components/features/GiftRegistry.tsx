@@ -92,7 +92,7 @@ export default function GiftRegistry() {
               slug: 'luxury-bedding',
               title: 'Luxury Bedding Set',
               description: 'Premium cotton bedding',
-              images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Bedding' }],
+              images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Bedding', sort_order: 0, is_primary: true }],
               variants: [{ id: 1, sku: 'LBS-001', price: 85000, size: 'Queen' }]
             },
             quantity: 1,
@@ -107,7 +107,7 @@ export default function GiftRegistry() {
               slug: 'dinnerware-set',
               title: 'Dinnerware Set',
               description: '12-piece ceramic set',
-              images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Dinnerware' }],
+              images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Dinnerware', sort_order: 0, is_primary: true }],
               variants: [{ id: 2, sku: 'DWS-001', price: 45000 }]
             },
             quantity: 2,

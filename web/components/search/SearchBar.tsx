@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { debounce } from 'lodash'
 import { formatNaira } from '../../lib/format'
+import type { Route } from 'next'
 
 interface SearchSuggestion {
   id: string
@@ -58,54 +59,34 @@ export default function SearchBar({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const loadInitialData = () => {
+  const loadInitialData = async () => {
     // Load recent searches from localStorage
     const savedSearches = localStorage.getItem('mdv_recent_searches')
     if (savedSearches) {
       setRecentSearches(JSON.parse(savedSearches))
     }
 
-    // Load trending searches (mock data)
-    setTrendingSearches([
-      { query: 'summer dresses', count: 2345, trend: 'up' },
-      { query: 'sneakers', count: 1890, trend: 'up' },
-      { query: 'handbags', count: 1567, trend: 'stable' },
-      { query: 'sunglasses', count: 1234, trend: 'down' },
-      { query: 'watches', count: 987, trend: 'up' }
-    ])
-
-    // Load popular products (mock data)
-    setPopularProducts([
-      {
-        id: '1',
-        type: 'product',
-        title: 'Classic White Shirt',
-        subtitle: 'Best Seller',
-        image: '/api/placeholder/60/60',
-        url: '/product/classic-white-shirt',
-        price: 15000,
-        badge: 'Hot'
-      },
-      {
-        id: '2',
-        type: 'product',
-        title: 'Summer Floral Dress',
-        subtitle: 'New Arrival',
-        image: '/api/placeholder/60/60',
-        url: '/product/summer-floral-dress',
-        price: 25000,
-        badge: 'New'
-      },
-      {
-        id: '3',
-        type: 'product',
-        title: 'Denim Jeans',
-        subtitle: 'Trending',
-        image: '/api/placeholder/60/60',
-        url: '/product/denim-jeans',
-        price: 35000
+    // Load trending searches from API
+    try {
+      const response = await fetch('/api/search/trending')
+      if (response.ok) {
+        const data = await response.json()
+        setTrendingSearches(data.trending || [])
       }
-    ])
+    } catch (error) {
+      console.error('Failed to load trending searches:', error)
+    }
+
+    // Load popular products from API
+    try {
+      const response = await fetch('/api/search/popular')
+      if (response.ok) {
+        const data = await response.json()
+        setPopularProducts(data.popular || [])
+      }
+    } catch (error) {
+      console.error('Failed to load popular products:', error)
+    }
   }
 
   const handleClickOutside = (event: MouseEvent) => {
@@ -123,76 +104,32 @@ export default function SearchBar({
 
       setLoading(true)
       
-      // Simulate API call
-      setTimeout(() => {
-        const mockSuggestions: SearchSuggestion[] = [
-          // Query suggestions
-          {
+      try {
+        const response = await fetch(`/api/search/suggestions?q=${encodeURIComponent(searchQuery)}`)
+        if (response.ok) {
+          const data = await response.json()
+          setSuggestions(data.suggestions || [])
+        } else {
+          // Fallback to basic query suggestion
+          setSuggestions([{
             id: 'q1',
             type: 'query',
-            title: `${searchQuery} in Women's Fashion`,
-            url: `/search?q=${searchQuery}&category=women`
-          },
-          {
-            id: 'q2',
-            type: 'query',
-            title: `${searchQuery} in Men's Fashion`,
-            url: `/search?q=${searchQuery}&category=men`
-          },
-          // Category suggestions
-          {
-            id: 'c1',
-            type: 'category',
-            title: 'Dresses',
-            subtitle: 'in Women',
-            url: '/category/women/dresses'
-          },
-          // Brand suggestions
-          {
-            id: 'b1',
-            type: 'brand',
-            title: 'Nike',
-            subtitle: 'Brand',
-            url: '/brand/nike'
-          },
-          // Product suggestions
-          {
-            id: 'p1',
-            type: 'product',
-            title: 'Floral Print Dress',
-            subtitle: 'Women's Clothing',
-            image: '/api/placeholder/60/60',
-            url: '/product/floral-print-dress',
-            price: 28000
-          },
-          {
-            id: 'p2',
-            type: 'product',
-            title: 'Cotton T-Shirt',
-            subtitle: 'Men's Basics',
-            image: '/api/placeholder/60/60',
-            url: '/product/cotton-tshirt',
-            price: 12000
-          },
-          {
-            id: 'p3',
-            type: 'product',
-            title: 'Leather Handbag',
-            subtitle: 'Accessories',
-            image: '/api/placeholder/60/60',
-            url: '/product/leather-handbag',
-            price: 45000
-          }
-        ]
-
-        // Filter suggestions based on query
-        const filtered = mockSuggestions.filter(s => 
-          s.title.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-
-        setSuggestions(filtered)
+            title: searchQuery,
+            url: `/search?q=${encodeURIComponent(searchQuery)}`
+          }])
+        }
+      } catch (error) {
+        console.error('Search error:', error)
+        // Fallback to basic query suggestion
+        setSuggestions([{
+          id: 'q1',
+          type: 'query',
+          title: searchQuery,
+          url: `/search?q=${encodeURIComponent(searchQuery)}`
+        }])
+      } finally {
         setLoading(false)
-      }, 300)
+      }
     }, 300),
     []
   )
@@ -227,7 +164,7 @@ export default function SearchBar({
       if (onSearch) {
         onSearch(finalQuery)
       } else {
-        router.push(`/search?q=${encodeURIComponent(finalQuery)}`)
+        router.push(`/search?q=${encodeURIComponent(finalQuery)}` as Route)
       }
     }
   }
@@ -266,7 +203,7 @@ export default function SearchBar({
             if (selected.type === 'query') {
               handleSearch(selected.title)
             } else {
-              router.push(selected.url)
+              router.push(selected.url as Route)
             }
           } else if (query.length === 0) {
             // Handle recent/trending selection
@@ -392,7 +329,7 @@ export default function SearchBar({
               {suggestions.map((suggestion, index) => (
                 <Link
                   key={suggestion.id}
-                  href={suggestion.url}
+                  href={suggestion.url as Route}
                   onClick={() => {
                     if (suggestion.type === 'query') {
                       saveRecentSearch(suggestion.title)
@@ -526,7 +463,7 @@ export default function SearchBar({
                   <h3 className="text-sm font-semibold text-neutral-700 mb-3">Popular Products</h3>
                   <div className="space-y-2">
                     {popularProducts.map(product => (
-                      <Link key={product.id} href={product.url}>
+                      <Link key={product.id} href={product.url as Route}>
                         <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 cursor-pointer">
                           <Image
                             src={product.image!}

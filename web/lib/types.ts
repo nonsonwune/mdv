@@ -4,8 +4,8 @@ export type ProductImage = {
   alt_text?: string | null
   width?: number | null
   height?: number | null
-  sort_order?: number
-  is_primary?: boolean
+  sort_order: number
+  is_primary: boolean
 }
 
 export type Variant = {
@@ -23,7 +23,7 @@ export type Product = {
   description?: string | null
   compare_at_price?: number | null
   variants: Variant[]
-  images?: ProductImage[]
+  images: ProductImage[]
 }
 
 export type CartItem = {

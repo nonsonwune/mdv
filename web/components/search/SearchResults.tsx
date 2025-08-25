@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Card, Button, Badge, Select, EmptyState } from '../ui'
+import { Card, Button, Badge, EmptyState } from '../ui'
 import { formatNaira } from '../../lib/format'
 import { useWishlist } from '../../hooks/useWishlist'
 import { useCart } from '../../hooks/useCart'
@@ -41,7 +41,7 @@ export default function SearchResults({
 }: SearchResultsProps) {
   const [sortBy, setSortBy] = useState('relevance')
   const [selectedView, setSelectedView] = useState(viewMode)
-  const { toggleWishlist, isInWishlist } = useWishlist()
+  const { toggleItem, isInWishlist } = useWishlist()
   const { addToCart } = useCart()
   const [quickViewProduct, setQuickViewProduct] = useState<SearchResult | null>(null)
 
@@ -239,7 +239,7 @@ export default function SearchResults({
                       <Badge variant="success" size="sm">Best Seller</Badge>
                     )}
                     {discount > 0 && (
-                      <Badge variant="error" size="sm">-{discount}%</Badge>
+                      <Badge variant="danger" size="sm">-{discount}%</Badge>
                     )}
                   </div>
 
@@ -248,7 +248,7 @@ export default function SearchResults({
                     <button
                       onClick={(e) => {
                         e.preventDefault()
-                        toggleWishlist(product)
+                        toggleItem(product)
                       }}
                       className={`
                         p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all
@@ -286,10 +286,6 @@ export default function SearchResults({
                   </h3>
                 </Link>
                 
-                {product.vendor && (
-                  <p className="text-xs text-neutral-500 mb-2">{product.vendor}</p>
-                )}
-                
                 {renderRating()}
                 
                 <div className="flex items-center gap-2 mt-2">
@@ -307,11 +303,7 @@ export default function SearchResults({
                   className="w-full mt-3 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={() => {
                     if (product.variants?.[0]) {
-                      addToCart({
-                        variant: product.variants[0],
-                        product,
-                        quantity: 1
-                      })
+                      addToCart(product.variants[0].id)
                     }
                   }}
                 >
@@ -334,7 +326,7 @@ export default function SearchResults({
                       />
                     )}
                     {discount > 0 && (
-                      <Badge variant="error" size="sm" className="absolute top-2 left-2">
+                      <Badge variant="danger" size="sm" className="absolute top-2 left-2">
                         -{discount}%
                       </Badge>
                     )}
@@ -349,10 +341,6 @@ export default function SearchResults({
                           {product.title}
                         </h3>
                       </Link>
-                      
-                      {product.vendor && (
-                        <p className="text-sm text-neutral-500 mt-1">by {product.vendor}</p>
-                      )}
                       
                       <div className="flex items-center gap-3 mt-2">
                         {renderRating()}
@@ -380,7 +368,7 @@ export default function SearchResults({
 
                     <div className="flex flex-col gap-2">
                       <button
-                        onClick={() => toggleWishlist(product)}
+                        onClick={() => toggleItem(product)}
                         className={`
                           p-2 rounded-full border transition-all
                           ${inWishlist 
@@ -400,11 +388,7 @@ export default function SearchResults({
                         size="sm"
                         onClick={() => {
                           if (product.variants?.[0]) {
-                            addToCart({
-                              variant: product.variants[0],
-                              product,
-                              quantity: 1
-                            })
+                            addToCart(product.variants[0].id)
                           }
                         }}
                       >

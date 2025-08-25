@@ -102,7 +102,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         slug: 'summer-dress',
         title: 'Summer Floral Dress',
         description: 'Light and breezy for warm days',
-        images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Summer Dress' }],
+        images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Summer Dress', sort_order: 0, is_primary: true }],
         variants: [{ id: 1, sku: 'SFD-001-M', price: 45000, size: 'M' }],
         compare_at_price: 55000
       },
@@ -111,7 +111,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         slug: 'casual-shirt',
         title: 'Casual Button Shirt',
         description: 'Perfect for any occasion',
-        images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Casual Shirt' }],
+        images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Casual Shirt', sort_order: 0, is_primary: true }],
         variants: [{ id: 2, sku: 'CBS-001-L', price: 28000, size: 'L' }]
       },
       {
@@ -119,7 +119,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         slug: 'denim-jacket',
         title: 'Classic Denim Jacket',
         description: 'Timeless style',
-        images: [{ id: 3, url: '/api/placeholder/200/200', alt_text: 'Denim Jacket' }],
+        images: [{ id: 3, url: '/api/placeholder/200/200', alt_text: 'Denim Jacket', sort_order: 0, is_primary: true }],
         variants: [{ id: 3, sku: 'CDJ-001-L', price: 65000, size: 'L' }]
       }
     ]

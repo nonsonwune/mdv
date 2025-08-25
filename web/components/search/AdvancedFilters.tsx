@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Card, Button, Badge, Toggle, Slider } from '../ui'
+import { Card, Button, Badge } from '../ui'
 import { formatNaira } from '../../lib/format'
 
 interface FilterOption {
@@ -67,68 +67,55 @@ export default function AdvancedFilters({
     discount: false
   })
 
-  // Filter options (mock data)
+  // Mock filter options for MVP
   const filterOptions = {
     categories: [
-      { id: 'women', label: "Women's Fashion", count: 1234 },
-      { id: 'men', label: "Men's Fashion", count: 987 },
-      { id: 'kids', label: "Kids & Baby", count: 456 },
-      { id: 'accessories', label: 'Accessories', count: 789 },
-      { id: 'shoes', label: 'Shoes', count: 654 },
-      { id: 'bags', label: 'Bags', count: 321 }
+      { id: 'women', label: "Women's Fashion", count: 150 },
+      { id: 'men', label: "Men's Fashion", count: 120 },
+      { id: 'accessories', label: 'Accessories', count: 80 },
+      { id: 'shoes', label: 'Shoes', count: 60 }
     ],
     brands: [
-      { id: 'nike', label: 'Nike', count: 234 },
-      { id: 'adidas', label: 'Adidas', count: 189 },
-      { id: 'zara', label: 'Zara', count: 156 },
-      { id: 'hm', label: 'H&M', count: 145 },
-      { id: 'gucci', label: 'Gucci', count: 89 },
-      { id: 'prada', label: 'Prada', count: 67 },
-      { id: 'versace', label: 'Versace', count: 45 },
-      { id: 'local', label: 'Local Brands', count: 234 }
+      { id: 'nike', label: 'Nike', count: 45 },
+      { id: 'adidas', label: 'Adidas', count: 38 },
+      { id: 'zara', label: 'Zara', count: 32 },
+      { id: 'local', label: 'Local Brands', count: 89 }
     ],
     sizes: [
-      { id: 'xs', label: 'XS', count: 123 },
-      { id: 's', label: 'S', count: 234 },
-      { id: 'm', label: 'M', count: 345 },
-      { id: 'l', label: 'L', count: 321 },
-      { id: 'xl', label: 'XL', count: 210 },
-      { id: 'xxl', label: 'XXL', count: 98 }
+      { id: 'xs', label: 'XS', count: 23 },
+      { id: 's', label: 'S', count: 45 },
+      { id: 'm', label: 'M', count: 67 },
+      { id: 'l', label: 'L', count: 54 },
+      { id: 'xl', label: 'XL', count: 32 },
+      { id: 'xxl', label: 'XXL', count: 18 }
     ],
     colors: [
-      { id: 'black', label: 'Black', hex: '#000000', count: 456 },
-      { id: 'white', label: 'White', hex: '#FFFFFF', count: 432 },
-      { id: 'blue', label: 'Blue', hex: '#0000FF', count: 321 },
-      { id: 'red', label: 'Red', hex: '#FF0000', count: 234 },
-      { id: 'green', label: 'Green', hex: '#00FF00', count: 189 },
-      { id: 'yellow', label: 'Yellow', hex: '#FFFF00', count: 156 },
-      { id: 'pink', label: 'Pink', hex: '#FFC0CB', count: 145 },
-      { id: 'gray', label: 'Gray', hex: '#808080', count: 198 },
-      { id: 'brown', label: 'Brown', hex: '#964B00', count: 167 },
-      { id: 'purple', label: 'Purple', hex: '#800080', count: 134 }
+      { id: 'black', label: 'Black', hex: '#000000', count: 89 },
+      { id: 'white', label: 'White', hex: '#FFFFFF', count: 76 },
+      { id: 'blue', label: 'Blue', hex: '#0000FF', count: 45 },
+      { id: 'red', label: 'Red', hex: '#FF0000', count: 34 },
+      { id: 'green', label: 'Green', hex: '#00FF00', count: 23 }
     ],
     materials: [
-      { id: 'cotton', label: 'Cotton', count: 543 },
-      { id: 'polyester', label: 'Polyester', count: 432 },
-      { id: 'silk', label: 'Silk', count: 123 },
-      { id: 'wool', label: 'Wool', count: 98 },
-      { id: 'leather', label: 'Leather', count: 87 },
-      { id: 'denim', label: 'Denim', count: 234 },
-      { id: 'linen', label: 'Linen', count: 156 }
+      { id: 'cotton', label: 'Cotton', count: 95 },
+      { id: 'polyester', label: 'Polyester', count: 67 },
+      { id: 'silk', label: 'Silk', count: 23 },
+      { id: 'leather', label: 'Leather', count: 15 }
     ],
     availability: [
-      { id: 'in-stock', label: 'In Stock', count: 2345 },
-      { id: 'pre-order', label: 'Pre-order', count: 123 },
-      { id: 'coming-soon', label: 'Coming Soon', count: 45 }
+      { id: 'in_stock', label: 'In Stock', count: 234 },
+      { id: 'pre_order', label: 'Pre-order', count: 12 },
+      { id: 'coming_soon', label: 'Coming Soon', count: 5 }
     ],
     discounts: [
-      { id: '10', label: '10% off & above', count: 234 },
-      { id: '20', label: '20% off & above', count: 189 },
-      { id: '30', label: '30% off & above', count: 145 },
-      { id: '40', label: '40% off & above', count: 98 },
-      { id: '50', label: '50% off & above', count: 67 }
+      { id: '10', label: '10% off & above', count: 45 },
+      { id: '20', label: '20% off & above', count: 23 },
+      { id: '30', label: '30% off & above', count: 12 },
+      { id: '50', label: '50% off & above', count: 3 }
     ]
   }
+
+  // For MVP, keep filters simple
 
   useEffect(() => {
     onFiltersChange(filters)

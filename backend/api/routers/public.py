@@ -54,6 +54,222 @@ async def order_tracking(order_id: int, db: AsyncSession = Depends(get_db)):
     return {"order_id": order.id, "status": order.status.value if hasattr(order.status, 'value') else order.status, "timeline": timeline}
 
 
+@router.get("/api/search/suggestions")
+async def get_search_suggestions(
+    q: str = Query(..., min_length=1),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get search suggestions for autocomplete"""
+    if len(q) < 2:
+        return {"suggestions": []}
+    
+    # Search in product titles
+    like_pattern = f"%{q.lower()}%"
+    
+    # Get product suggestions
+    product_stmt = (
+        select(Product)
+        .where(func.lower(Product.title).like(like_pattern))
+        .limit(5)
+    )
+    product_results = await db.execute(product_stmt)
+    products = product_results.scalars().all()
+    
+    suggestions = []
+    
+    # Add query suggestions
+    suggestions.append({
+        "id": f"query_{q}",
+        "type": "query",
+        "title": q,
+        "url": f"/search?q={q}"
+    })
+    
+    # Add product suggestions
+    for product in products:
+        # Get first variant price
+        variant_stmt = select(Variant).where(Variant.product_id == product.id).limit(1)
+        variant_result = await db.execute(variant_stmt)
+        variant = variant_result.scalar_one_or_none()
+        
+        # Get first image
+        image_stmt = (
+            select(ProductImage.url)
+            .where(ProductImage.product_id == product.id)
+            .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+            .limit(1)
+        )
+        image_result = await db.execute(image_stmt)
+        image_url = image_result.scalar_one_or_none()
+        
+        suggestions.append({
+            "id": f"product_{product.id}",
+            "type": "product",
+            "title": product.title,
+            "subtitle": product.description[:50] + "..." if product.description and len(product.description) > 50 else product.description,
+            "image": image_url,
+            "url": f"/product/{product.slug}",
+            "price": float(variant.price) if variant else None
+        })
+    
+    return {"suggestions": suggestions}
+
+
+@router.get("/api/search/trending")
+async def get_trending_searches():
+    """Get trending search terms"""
+    # For MVP, return some static trending searches
+    # In production, this would come from analytics data
+    trending = [
+        {"query": "summer dresses", "count": 2345, "trend": "up"},
+        {"query": "sneakers", "count": 1890, "trend": "up"},
+        {"query": "handbags", "count": 1567, "trend": "stable"},
+        {"query": "sunglasses", "count": 1234, "trend": "down"},
+        {"query": "watches", "count": 987, "trend": "up"}
+    ]
+    return {"trending": trending}
+
+
+@router.get("/api/search/popular")
+async def get_popular_products(db: AsyncSession = Depends(get_db)):
+    """Get popular products for search suggestions"""
+    # Get recent products as "popular" for MVP
+    stmt = (
+        select(Product)
+        .order_by(Product.id.desc())
+        .limit(5)
+    )
+    results = await db.execute(stmt)
+    products = results.scalars().all()
+    
+    popular = []
+    for product in products:
+        # Get first variant price
+        variant_stmt = select(Variant).where(Variant.product_id == product.id).limit(1)
+        variant_result = await db.execute(variant_stmt)
+        variant = variant_result.scalar_one_or_none()
+        
+        # Get first image
+        image_stmt = (
+            select(ProductImage.url)
+            .where(ProductImage.product_id == product.id)
+            .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+            .limit(1)
+        )
+        image_result = await db.execute(image_stmt)
+        image_url = image_result.scalar_one_or_none()
+        
+        popular.append({
+            "id": str(product.id),
+            "type": "product",
+            "title": product.title,
+            "subtitle": "Popular",
+            "image": image_url,
+            "url": f"/product/{product.slug}",
+            "price": float(variant.price) if variant else None,
+            "badge": "Popular"
+        })
+    
+    return {"popular": popular}
+
+
+@router.get("/api/products/filters")
+async def get_product_filters(db: AsyncSession = Depends(get_db)):
+    """Get available filter options for products"""
+    
+    # Get available sizes from variants
+    size_stmt = (
+        select(Variant.size, func.count(Variant.id).label('count'))
+        .where(Variant.size.isnot(None))
+        .group_by(Variant.size)
+        .order_by(func.count(Variant.id).desc())
+    )
+    size_results = await db.execute(size_stmt)
+    sizes = [{
+        "id": row.size.lower().replace(' ', '_'),
+        "label": row.size,
+        "count": row.count
+    } for row in size_results.all() if row.size]
+    
+    # Get available colors from variants
+    color_stmt = (
+        select(Variant.color, func.count(Variant.id).label('count'))
+        .where(Variant.color.isnot(None))
+        .group_by(Variant.color)
+        .order_by(func.count(Variant.id).desc())
+    )
+    color_results = await db.execute(color_stmt)
+    colors = []
+    color_map = {
+        'black': '#000000',
+        'white': '#FFFFFF',
+        'blue': '#0000FF',
+        'red': '#FF0000',
+        'green': '#00FF00',
+        'yellow': '#FFFF00',
+        'pink': '#FFC0CB',
+        'gray': '#808080',
+        'grey': '#808080',
+        'brown': '#964B00',
+        'purple': '#800080'
+    }
+    
+    for row in color_results.all():
+        if row.color:
+            hex_color = color_map.get(row.color.lower(), '#808080')
+            colors.append({
+                "id": row.color.lower().replace(' ', '_'),
+                "label": row.color,
+                "hex": hex_color,
+                "count": row.count
+            })
+    
+    # Mock categories and brands for now (would come from product data in real implementation)
+    categories = [
+        {"id": "women", "label": "Women's Fashion", "count": 150},
+        {"id": "men", "label": "Men's Fashion", "count": 120},
+        {"id": "accessories", "label": "Accessories", "count": 80},
+        {"id": "shoes", "label": "Shoes", "count": 60}
+    ]
+    
+    brands = [
+        {"id": "nike", "label": "Nike", "count": 45},
+        {"id": "adidas", "label": "Adidas", "count": 38},
+        {"id": "zara", "label": "Zara", "count": 32},
+        {"id": "local", "label": "Local Brands", "count": 89}
+    ]
+    
+    materials = [
+        {"id": "cotton", "label": "Cotton", "count": 95},
+        {"id": "polyester", "label": "Polyester", "count": 67},
+        {"id": "silk", "label": "Silk", "count": 23},
+        {"id": "leather", "label": "Leather", "count": 15}
+    ]
+    
+    availability = [
+        {"id": "in_stock", "label": "In Stock", "count": 234},
+        {"id": "pre_order", "label": "Pre-order", "count": 12},
+        {"id": "coming_soon", "label": "Coming Soon", "count": 5}
+    ]
+    
+    discounts = [
+        {"id": "10", "label": "10% off & above", "count": 45},
+        {"id": "20", "label": "20% off & above", "count": 23},
+        {"id": "30", "label": "30% off & above", "count": 12},
+        {"id": "50", "label": "50% off & above", "count": 3}
+    ]
+    
+    return {
+        "categories": categories,
+        "brands": brands,
+        "sizes": sizes,
+        "colors": colors,
+        "materials": materials,
+        "availability": availability,
+        "discounts": discounts
+    }
+
+
 @router.get("/api/products", response_model=Paginated)
 async def list_products(
     q: str | None = None,
