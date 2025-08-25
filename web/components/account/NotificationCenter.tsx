@@ -348,7 +348,7 @@ export default function NotificationCenter() {
 
   const getPriorityBadge = (priority: string) => {
     const variants: Record<string, any> = {
-      high: 'error',
+      high: 'danger',
       medium: 'warning',
       low: 'secondary'
     }
@@ -393,7 +393,7 @@ export default function NotificationCenter() {
           <p className="text-neutral-600">Stay updated with your orders and account activity</p>
         </div>
         {stats.unread > 0 && (
-          <Badge variant="error" size="lg">
+          <Badge variant="danger" size="md">
             {stats.unread} unread
           </Badge>
         )}
