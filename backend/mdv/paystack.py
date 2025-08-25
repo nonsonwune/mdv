@@ -10,7 +10,13 @@ from sqlalchemy import and_, select
 
 from .config import settings
 from .db import session_scope
-from .models import Order, OrderStatus, OrderItem, Fulfillment, FulfillmentStatus, Inventory, StockLedger, Reservation, ReservationStatus, CartItem
+from .models import (
+    Order, OrderStatus, OrderItem, Fulfillment, FulfillmentStatus, 
+    Inventory, StockLedger, Reservation, ReservationStatus, CartItem,
+    Address, Product, Variant, User
+)
+from .emailer import send_email
+from .email_templates import order_confirmation_email
 
 
 def verify_signature(raw_body: bytes, signature_header: str | None) -> None:
@@ -63,6 +69,64 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                     CartItem.__table__.delete()
                     .where(CartItem.cart_id == order.cart_id)
                 )
+            
+            # Send order confirmation email
+            try:
+                # Get order details for email
+                address = (await db.execute(select(Address).where(Address.order_id == order.id))).scalar_one_or_none()
+                user = None
+                if order.user_id:
+                    user = (await db.execute(select(User).where(User.id == order.user_id))).scalar_one_or_none()
+                
+                # Build items data for email
+                email_items = []
+                for item in items:
+                    variant = (await db.execute(select(Variant).where(Variant.id == item.variant_id))).scalar_one()
+                    product = (await db.execute(select(Product).where(Product.id == variant.product_id))).scalar_one()
+                    
+                    variant_desc = []
+                    if variant.size:
+                        variant_desc.append(f"Size: {variant.size}")
+                    if variant.color:
+                        variant_desc.append(f"Color: {variant.color}")
+                    
+                    email_items.append({
+                        "title": product.title,
+                        "variant": " | ".join(variant_desc),
+                        "qty": item.qty,
+                        "price": float(item.unit_price),
+                        "subtotal": float(item.unit_price * item.qty)
+                    })
+                
+                # Prepare email data
+                email_data = {
+                    "id": order.id,
+                    "customer_name": address.name if address else "Customer",
+                    "email": data.get("customer", {}).get("email", "") or (user.email if user else ""),
+                    "items": email_items,
+                    "totals": order.totals or {},
+                    "address": {
+                        "name": address.name if address else "",
+                        "street": address.street if address else "",
+                        "city": address.city if address else "",
+                        "state": address.state if address else "",
+                        "phone": address.phone if address else ""
+                    },
+                    "created_at": datetime.now().strftime("%B %d, %Y at %I:%M %p"),
+                    "app_url": settings.app_url
+                }
+                
+                # Generate and send email
+                if email_data["email"]:
+                    subject, html = order_confirmation_email(email_data)
+                    await send_email(
+                        to_email=email_data["email"],
+                        subject=subject,
+                        html=html
+                    )
+            except Exception as e:
+                # Log error but don't fail the payment processing
+                print(f"Failed to send order confirmation email: {e}")
 
     elif kind in ("charge.failed", "transfer.failed"):
         # Release reservations on failure

@@ -11,6 +11,9 @@ from pydantic import BaseModel, EmailStr
 from backend.mdv.auth import create_access_token
 from backend.mdv.models import User, Role
 from backend.mdv.password import hash_password, verify_password, needs_rehash
+from backend.mdv.emailer import send_email
+from backend.mdv.email_templates import welcome_email
+from backend.mdv.config import settings
 from ..deps import get_db
 from backend.mdv.schemas import AuthLoginRequest, AuthLoginResponse
 
@@ -111,6 +114,23 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.flush()
     await db.commit()
+    
+    # Send welcome email
+    try:
+        email_data = {
+            "name": body.name,
+            "email": body.email,
+            "app_url": settings.app_url
+        }
+        subject, html = welcome_email(email_data)
+        await send_email(
+            to_email=body.email,
+            subject=subject,
+            html=html
+        )
+    except Exception as e:
+        # Log error but don't fail registration
+        print(f"Failed to send welcome email: {e}")
     
     # Create access token
     token = create_access_token(subject=str(user.id), role=user.role)

@@ -60,11 +60,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <div className="hidden md:flex items-center gap-4 text-sm">
                     {isStaff ? (
                       <>
+                        <Link href="/account" className="hover:text-maroon-700 transition-colors">My Account</Link>
                         <Link href="/admin" className="hover:text-maroon-700 transition-colors">Admin</Link>
                         <Link href="/logout" className="hover:text-maroon-700 transition-colors">Sign out</Link>
                       </>
                     ) : (
                       <>
+                        <Link href="/account" className="hover:text-maroon-700 transition-colors">My Account</Link>
+                        <span className="text-neutral-400">|</span>
                         <Link href="/login" className="hover:text-maroon-700 transition-colors">Sign in</Link>
                         <span className="text-neutral-400">|</span>
                         <Link href="/register" className="hover:text-maroon-700 transition-colors">Register</Link>

@@ -2,12 +2,17 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY web/package.json web/package-lock.json ./
+# Install ALL dependencies (including devDependencies) for build
 RUN npm ci
 
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY web/package.json web/package-lock.json ./
 COPY web ./
+# Copy docs directory for API contract generation
+COPY docs ../docs
+# Run build (which includes prebuild for type generation)
 RUN npm run build
 
 FROM node:20-alpine AS runner
