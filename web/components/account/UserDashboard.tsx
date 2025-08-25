@@ -102,8 +102,8 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         slug: 'summer-dress',
         title: 'Summer Floral Dress',
         description: 'Light and breezy for warm days',
-        images: [{ url: '/api/placeholder/200/200', alt_text: 'Summer Dress' }],
-        variants: [{ id: 1, price: 45000, size: 'M' }],
+        images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Summer Dress' }],
+        variants: [{ id: 1, sku: 'SFD-001-M', price: 45000, size: 'M' }],
         compare_at_price: 55000
       },
       {
@@ -111,16 +111,16 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         slug: 'casual-shirt',
         title: 'Casual Button Shirt',
         description: 'Perfect for any occasion',
-        images: [{ url: '/api/placeholder/200/200', alt_text: 'Casual Shirt' }],
-        variants: [{ id: 2, price: 28000, size: 'L' }]
+        images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Casual Shirt' }],
+        variants: [{ id: 2, sku: 'CBS-001-L', price: 28000, size: 'L' }]
       },
       {
         id: 3,
         slug: 'denim-jacket',
         title: 'Classic Denim Jacket',
         description: 'Timeless style',
-        images: [{ url: '/api/placeholder/200/200', alt_text: 'Denim Jacket' }],
-        variants: [{ id: 3, price: 65000, size: 'L' }]
+        images: [{ id: 3, url: '/api/placeholder/200/200', alt_text: 'Denim Jacket' }],
+        variants: [{ id: 3, sku: 'CDJ-001-L', price: 65000, size: 'L' }]
       }
     ]
   }
@@ -133,7 +133,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
   }
 
   const getTierProgress = () => {
-    const tiers = {
+    const tiers: Record<string, { min: number; max: number; next: string | null }> = {
       bronze: { min: 0, max: 100000, next: 'Silver' },
       silver: { min: 100000, max: 500000, next: 'Gold' },
       gold: { min: 500000, max: 1000000, next: 'Platinum' },
@@ -235,7 +235,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
             <div>
               <p className="text-sm text-neutral-600">Saved Items</p>
               <p className="text-2xl font-bold mt-1">{stats.savedItems}</p>
-              <Link href="/wishlist" className="text-xs text-maroon-700 mt-1 hover:underline">
+              <Link href="/women" className="text-xs text-maroon-700 mt-1 hover:underline">
                 View wishlist →
               </Link>
             </div>
@@ -323,7 +323,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Recent Orders</h3>
-              <Link href="/account/orders" className="text-sm text-maroon-700 hover:underline">
+              <Link href="/account" className="text-sm text-maroon-700 hover:underline">
                 View all →
               </Link>
             </div>
@@ -397,7 +397,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Recommended for You</h3>
-            <Link href="/shop" className="text-sm text-maroon-700 hover:underline">
+            <Link href="/women" className="text-sm text-maroon-700 hover:underline">
               Shop all →
             </Link>
           </div>
@@ -440,7 +440,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Link href="/account/addresses">
+        <Link href="/account">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="text-center">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -456,7 +456,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
           </Card>
         </Link>
 
-        <Link href="/account/payment">
+        <Link href="/account">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="text-center">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -470,7 +470,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
           </Card>
         </Link>
 
-        <Link href="/account/notifications">
+        <Link href="/account">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="text-center">
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
@@ -484,7 +484,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
           </Card>
         </Link>
 
-        <Link href="/help">
+        <Link href="/faq">
           <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
             <div className="text-center">
               <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">

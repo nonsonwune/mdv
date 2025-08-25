@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
-import { Card, Button, Badge, Modal, Toast } from '../ui'
+import { Card, Button, Badge, Modal } from '../ui'
 import { formatNaira } from '../../lib/format'
 import type { Product } from '../../lib/types'
 
@@ -626,10 +626,9 @@ export default function VirtualTryOn({ product, onClose }: VirtualTryOnProps) {
 
         {/* Toast */}
         {showToast && (
-          <Toast
-            message={toastMessage}
-            onClose={() => setShowToast(false)}
-          />
+          <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 z-50 animate-pulse">
+            <p className="text-sm">{toastMessage}</p>
+          </div>
         )}
       </Card>
     </div>

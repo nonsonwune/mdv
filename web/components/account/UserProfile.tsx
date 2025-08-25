@@ -167,13 +167,13 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
                             value={editData.firstName || ''}
                             onChange={(e) => setEditData({ ...editData, firstName: e.target.value })}
                             placeholder="First Name"
-                            size="sm"
+                            inputSize="sm"
                           />
                           <Input
                             value={editData.lastName || ''}
                             onChange={(e) => setEditData({ ...editData, lastName: e.target.value })}
                             placeholder="Last Name"
-                            size="sm"
+                            inputSize="sm"
                           />
                         </div>
                       ) : (
@@ -197,7 +197,7 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
                       onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                       placeholder="Phone Number"
                       className="mt-2"
-                      size="sm"
+                      inputSize="sm"
                     />
                   ) : (
                     user.phone && <p className="text-neutral-600">{user.phone}</p>
@@ -284,7 +284,7 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
                   type="date"
                   value={editData.dateOfBirth || ''}
                   onChange={(e) => setEditData({ ...editData, dateOfBirth: e.target.value })}
-                  size="sm"
+                  inputSize="sm"
                 />
               ) : (
                 <p className="text-neutral-900">

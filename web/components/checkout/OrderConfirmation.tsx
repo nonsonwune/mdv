@@ -364,7 +364,7 @@ export default function OrderConfirmation({ order }: OrderConfirmationProps) {
                 Continue Shopping
               </Button>
             </Link>
-            <Link href="/account/orders" className="flex-1">
+            <Link href="/account" className="flex-1">
               <Button variant="secondary" className="w-full">
                 View Order History
               </Button>

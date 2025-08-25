@@ -154,7 +154,7 @@ export default function OrderSummary({
                   value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value)}
                   placeholder="Enter code"
-                  size="sm"
+                  inputSize="sm"
                   error={promoError}
                   className="flex-1"
                 />

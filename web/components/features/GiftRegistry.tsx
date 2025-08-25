@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Card, Button, Badge, Modal, Input, TextArea, Toast, EmptyState } from '../ui'
+import { Card, Button, Badge, Modal, Input, EmptyState } from '../ui'
 import { formatNaira } from '../../lib/format'
 import type { Product } from '../../lib/types'
 
@@ -59,6 +59,15 @@ export default function GiftRegistry() {
     loadRegistries()
   }, [])
 
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
+
   const loadRegistries = () => {
     const saved = localStorage.getItem('mdv_registries')
     if (saved) {
@@ -83,8 +92,8 @@ export default function GiftRegistry() {
               slug: 'luxury-bedding',
               title: 'Luxury Bedding Set',
               description: 'Premium cotton bedding',
-              images: [{ url: '/api/placeholder/200/200', alt_text: 'Bedding' }],
-              variants: [{ id: 1, price: 85000, size: 'Queen' }]
+              images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Bedding' }],
+              variants: [{ id: 1, sku: 'LBS-001', price: 85000, size: 'Queen' }]
             },
             quantity: 1,
             quantityPurchased: 0,
@@ -98,8 +107,8 @@ export default function GiftRegistry() {
               slug: 'dinnerware-set',
               title: 'Dinnerware Set',
               description: '12-piece ceramic set',
-              images: [{ url: '/api/placeholder/200/200', alt_text: 'Dinnerware' }],
-              variants: [{ id: 2, price: 45000 }]
+              images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Dinnerware' }],
+              variants: [{ id: 2, sku: 'DWS-001', price: 45000 }]
             },
             quantity: 2,
             quantityPurchased: 1,
@@ -265,7 +274,7 @@ export default function GiftRegistry() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'error'
+      case 'high': return 'danger'
       case 'medium': return 'warning'
       case 'low': return 'secondary'
       default: return 'secondary'
@@ -637,12 +646,15 @@ export default function GiftRegistry() {
             required
           />
           
-          <TextArea
-            name="description"
-            label="Description (Optional)"
-            placeholder="Tell your guests about your special day..."
-            rows={3}
-          />
+          <div>
+            <label className="block text-sm font-medium mb-2">Description (Optional)</label>
+            <textarea
+              name="description"
+              placeholder="Tell your guests about your special day..."
+              rows={3}
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500"
+            />
+          </div>
           
           <label className="flex items-center gap-2">
             <input type="checkbox" name="isPublic" defaultChecked />
@@ -715,10 +727,9 @@ export default function GiftRegistry() {
 
       {/* Toast */}
       {showToast && (
-        <Toast
-          message={toastMessage}
-          onClose={() => setShowToast(false)}
-        />
+        <div className="fixed bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 z-50 animate-pulse">
+          <p className="text-sm">{toastMessage}</p>
+        </div>
       )}
     </div>
   )

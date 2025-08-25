@@ -527,7 +527,7 @@ export default function ReviewsRatings() {
                             <Badge 
                               variant={
                                 review.status === 'published' ? 'success' : 
-                                review.status === 'pending' ? 'warning' : 'error'
+                                review.status === 'pending' ? 'warning' : 'danger'
                               } 
                               size="sm"
                             >

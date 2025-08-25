@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Card, Button, Badge, Modal, ProgressBar } from '../ui'
+import { Card, Button, Badge, Modal } from '../ui'
 import type { Product, ProductVariant } from '../../lib/types'
 
 interface SizeRecommendationProps {
@@ -191,11 +191,14 @@ export default function SizeRecommendation({ product, onSizeSelect }: SizeRecomm
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <ProgressBar 
-                        value={score} 
-                        className="w-24"
-                        color={score >= 90 ? 'green' : score >= 60 ? 'yellow' : 'red'}
-                      />
+                      <div className="w-24 bg-neutral-200 rounded-full h-2">
+                        <div 
+                          className={`h-2 rounded-full transition-all ${
+                            score >= 90 ? 'bg-green-600' : score >= 60 ? 'bg-yellow-600' : 'bg-red-600'
+                          }`}
+                          style={{ width: `${score}%` }}
+                        />
+                      </div>
                       <span className="text-sm text-neutral-600 w-10 text-right">
                         {score}%
                       </span>
