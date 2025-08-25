@@ -1,22 +1,30 @@
+"""
+Enhanced authentication router with bcrypt password hashing.
+"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel, EmailStr
 
 from backend.mdv.auth import create_access_token
 from backend.mdv.models import User, Role
 from backend.mdv.password import hash_password, verify_password, needs_rehash
-from backend.mdv.rate_limit import limiter, RATE_LIMITS
 from ..deps import get_db
 from backend.mdv.schemas import AuthLoginRequest, AuthLoginResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+
 @router.post("/login", response_model=AuthLoginResponse)
-@limiter.limit(RATE_LIMITS["login"])
-async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(body: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Authenticate user with email and password.
     Supports both bcrypt and legacy SHA256 hashes.
@@ -42,7 +50,7 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
             await db.commit()
         else:
             raise HTTPException(
-                status_code=401,
+                status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
             )
     
@@ -51,7 +59,7 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
         # Verify password
         if not verify_password(body.password, user.password_hash):
             raise HTTPException(
-                status_code=401,
+                status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password"
             )
         
@@ -77,3 +85,38 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
         role=user.role.value
     )
 
+
+@router.post("/register", response_model=AuthLoginResponse)
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Register a new user with bcrypt password hashing.
+    """
+    # Check if email already exists
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create new user with hashed password
+    user = User(
+        name=body.name,
+        email=body.email,
+        role=Role.operations,  # Default role for new users
+        active=True,
+        password_hash=hash_password(body.password)
+    )
+    
+    db.add(user)
+    await db.flush()
+    await db.commit()
+    
+    # Create access token
+    token = create_access_token(subject=str(user.id), role=user.role)
+    
+    return AuthLoginResponse(
+        access_token=token,
+        token=token,
+        role=user.role.value
+    )

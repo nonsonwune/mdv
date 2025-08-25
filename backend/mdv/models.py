@@ -69,6 +69,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Hashed password for customers
     role: Mapped[Role] = mapped_column(SAEnum(Role, name="role"), default=Role.operations, index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -325,5 +326,92 @@ class Refund(Base):
     refund_method: Mapped[RefundMethod] = mapped_column(SAEnum(RefundMethod, name="refund_method"), default=RefundMethod.paystack)
     paystack_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     manual_ref: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# Customer Features
+class UserAddress(Base):
+    """User saved addresses for shipping."""
+    __tablename__ = "user_addresses"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    label: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)  # e.g., "Home", "Office"
+    name: Mapped[str] = mapped_column(String(160))
+    phone: Mapped[str] = mapped_column(String(32))
+    state: Mapped[str] = mapped_column(String(80))
+    city: Mapped[str] = mapped_column(String(120))
+    street: Mapped[str] = mapped_column(String(255))
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Wishlist(Base):
+    """User wishlist."""
+    __tablename__ = "wishlists"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    items: Mapped[list["WishlistItem"]] = relationship("WishlistItem", cascade="all, delete-orphan", lazy="selectin")
+
+
+class WishlistItem(Base):
+    """Individual wishlist items."""
+    __tablename__ = "wishlist_items"
+    __table_args__ = (UniqueConstraint("wishlist_id", "product_id", "variant_id", name="uq_wishlist_product_variant"),)
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    wishlist_id: Mapped[int] = mapped_column(Integer, ForeignKey("wishlists.id", ondelete="CASCADE"), index=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    variant_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    product: Mapped["Product"] = relationship("Product", lazy="selectin")
+    variant: Mapped[Optional["Variant"]] = relationship("Variant", lazy="selectin")
+
+
+class Review(Base):
+    """Product reviews."""
+    __tablename__ = "reviews"
+    __table_args__ = (
+        UniqueConstraint("product_id", "user_id", name="uq_review_product_user"),
+        CheckConstraint("rating >= 1 AND rating <= 5", name="check_rating_range"),
+    )
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    variant_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("variants.id", ondelete="SET NULL"), nullable=True)
+    rating: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(200))
+    comment: Mapped[str] = mapped_column(Text)
+    would_recommend: Mapped[bool] = mapped_column(Boolean, default=True)
+    verified_purchase: Mapped[bool] = mapped_column(Boolean, default=False)
+    helpful_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User", lazy="selectin")
+    product: Mapped["Product"] = relationship("Product", lazy="selectin")
+    variant: Mapped[Optional["Variant"]] = relationship("Variant", lazy="selectin")
+    votes: Mapped[list["ReviewVote"]] = relationship("ReviewVote", cascade="all, delete-orphan")
+
+
+class ReviewVote(Base):
+    """Track helpful votes on reviews."""
+    __tablename__ = "review_votes"
+    __table_args__ = (UniqueConstraint("review_id", "user_id", name="uq_review_vote_user"),)
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    review_id: Mapped[int] = mapped_column(Integer, ForeignKey("reviews.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    is_helpful: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

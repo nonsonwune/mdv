@@ -30,8 +30,13 @@ target_metadata = Base.metadata
 
 
 def get_database_url() -> str:
-    # Use psycopg3 driver for sync engine as well
-    return settings.database_url
+    # Convert async URL to sync for alembic
+    db_url = settings.database_url
+    if 'aiosqlite' in db_url:
+        return db_url.replace('sqlite+aiosqlite', 'sqlite')
+    if 'asyncpg' in db_url:
+        return db_url.replace('postgresql+asyncpg', 'postgresql')
+    return db_url
 
 
 def run_migrations_offline() -> None:

@@ -80,7 +80,8 @@
           "NEXT_PUBLIC_API_URL",
           "NEXT_PUBLIC_APP_URL",
           "ALLOW_MOCKS",
-          "NEXT_PUBLIC_ALLOW_MOCKS"
+          "NEXT_PUBLIC_ALLOW_MOCKS",
+          "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"
         ]
     }
   ]
