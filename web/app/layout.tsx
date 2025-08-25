@@ -64,7 +64,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                         <Link href="/logout" className="hover:text-maroon-700 transition-colors">Sign out</Link>
                       </>
                     ) : (
-                      <Link href="/login" className="hover:text-maroon-700 transition-colors">Sign in</Link>
+                      <>
+                        <Link href="/login" className="hover:text-maroon-700 transition-colors">Sign in</Link>
+                        <span className="text-neutral-400">|</span>
+                        <Link href="/register" className="hover:text-maroon-700 transition-colors">Register</Link>
+                      </>
                     )}
                   </div>
                 </div>

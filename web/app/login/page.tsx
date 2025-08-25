@@ -42,8 +42,16 @@ export default function LoginPage() {
         {error ? <p className="text-red-600 text-sm">{error}</p> : null}
         <button className="btn-primary w-full" disabled={loading}>{loading ? "Signing in…" : "Sign In"}</button>
       </form>
-      <div className="mt-6 text-sm">
-        <Link href="/" className="underline">← Back to store</Link>
+      <div className="mt-6 space-y-2 text-sm">
+        <div>
+          <span className="text-neutral-600">Don't have an account? </span>
+          <Link href="/register" className="text-maroon-700 hover:text-maroon-800 font-medium">
+            Create one here
+          </Link>
+        </div>
+        <div>
+          <Link href="/" className="underline">← Back to store</Link>
+        </div>
       </div>
     </div>
   )
