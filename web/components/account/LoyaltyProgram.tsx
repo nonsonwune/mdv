@@ -637,7 +637,7 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Points History</h3>
-              <Button variant="outline" size="sm">
+              <Button variant="secondary" size="sm">
                 Export
               </Button>
             </div>
@@ -842,7 +842,7 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
             
             <div className="flex gap-3">
               <Button
-                variant="outline"
+                variant="secondary"
                 onClick={() => setShowRedeemModal(false)}
                 className="flex-1"
               >

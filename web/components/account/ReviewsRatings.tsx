@@ -913,7 +913,7 @@ export default function ReviewsRatings() {
 
           <div className="flex gap-3">
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowReviewModal(false)}
               className="flex-1"
             >

@@ -85,7 +85,8 @@ async def login(body: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
     return AuthLoginResponse(
         access_token=token,
         token=token,
-        role=user.role.value
+        role=user.role.value,
+        token_type="bearer"
     )
 
 
@@ -138,5 +139,6 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     return AuthLoginResponse(
         access_token=token,
         token=token,
-        role=user.role.value
+        role=user.role.value,
+        token_type="bearer"
     )

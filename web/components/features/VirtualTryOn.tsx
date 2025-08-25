@@ -225,7 +225,7 @@ export default function VirtualTryOn({ product, onClose }: VirtualTryOnProps) {
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">Your Try-On</h3>
                   {uploadedImage && (
-                    <Button variant="outline" size="sm" onClick={saveLook}>
+                    <Button variant="secondary" size="sm" onClick={saveLook}>
                       Save Look
                     </Button>
                   )}
@@ -292,7 +292,7 @@ export default function VirtualTryOn({ product, onClose }: VirtualTryOnProps) {
                 {uploadedImage && (
                   <div className="flex gap-2">
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       className="flex-1"
                       onClick={() => fileInputRef.current?.click()}
@@ -300,7 +300,7 @@ export default function VirtualTryOn({ product, onClose }: VirtualTryOnProps) {
                       Change Photo
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       size="sm"
                       className="flex-1"
                       onClick={() => setUploadedImage(null)}

@@ -74,6 +74,7 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
     return AuthLoginResponse(
         access_token=token,
         token=token,
-        role=user.role.value
+        role=user.role.value,
+        token_type="bearer"
     )
 

@@ -21,6 +21,9 @@ venv/
 # OS
 .DS_Store
 
+# Backup files
+*.bak
+
 # DB
 /data/
 

@@ -379,7 +379,7 @@ export default function GiftRegistry() {
                         View Registry
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         size="sm"
                         onClick={() => {
                           setActiveRegistry(registry)
@@ -458,7 +458,7 @@ export default function GiftRegistry() {
                 )}
               </div>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 onClick={() => setShowAddItemModal(true)}
               >
@@ -652,7 +652,7 @@ export default function GiftRegistry() {
           <div className="flex gap-3">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowCreateModal(false)}
               className="flex-1"
             >
@@ -686,7 +686,7 @@ export default function GiftRegistry() {
             
             <div className="space-y-2">
               <Button
-                variant="outline"
+                variant="secondary"
                 className="w-full"
                 onClick={() => {
                   navigator.clipboard.writeText(activeRegistry.shareCode)
@@ -697,7 +697,7 @@ export default function GiftRegistry() {
                 Copy Code
               </Button>
               <Button
-                variant="outline"
+                variant="secondary"
                 className="w-full"
                 onClick={() => {
                   const url = `${window.location.origin}/registry/${activeRegistry.shareCode}`

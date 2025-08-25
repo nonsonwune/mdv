@@ -127,7 +127,7 @@ export default function SizeRecommendation({ product, onSizeSelect }: SizeRecomm
           </div>
           {!fitProfile && (
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               onClick={() => setShowProfileModal(true)}
             >
@@ -357,7 +357,7 @@ export default function SizeRecommendation({ product, onSizeSelect }: SizeRecomm
           <div className="flex gap-3">
             <Button
               type="button"
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowProfileModal(false)}
               className="flex-1"
             >

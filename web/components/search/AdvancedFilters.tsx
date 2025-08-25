@@ -210,7 +210,7 @@ export default function AdvancedFilters({
       {showMobileToggle && (
         <div className="lg:hidden mb-4">
           <Button
-            variant="outline"
+            variant="secondary"
             onClick={() => setIsOpen(!isOpen)}
             className="w-full flex items-center justify-between"
           >
@@ -345,7 +345,7 @@ export default function AdvancedFilters({
                   </span>
                 </div>
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   onClick={applyPriceFilter}
                   className="w-full"

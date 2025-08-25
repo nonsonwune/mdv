@@ -165,7 +165,7 @@ export default function RegisterPage() {
 
           {/* General Error Alert */}
           {generalError && (
-            <Alert variant="error" className="mb-4">
+            <Alert variant="danger" className="mb-4">
               {generalError}
             </Alert>
           )}
@@ -331,7 +331,7 @@ export default function RegisterPage() {
           {/* Sign In Link */}
           <div className="text-center">
             <Link
-              href={`/login${sp.get("next") ? `?next=${sp.get("next")}` : ""}`}
+              href={sp.get("next") ? `/login?next=${sp.get("next")}` : "/login"}
               className="text-sm text-maroon-700 hover:text-maroon-800 font-medium"
             >
               Sign in instead

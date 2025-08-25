@@ -132,7 +132,7 @@ export default function SearchResults({
         title="No results found"
         description={searchQuery ? `We couldn't find any products matching "${searchQuery}"` : 'Try adjusting your filters or search terms'}
         action={
-          <Button variant="outline" onClick={() => window.location.href = '/shop'}>
+          <Button variant="secondary" onClick={() => window.location.href = '/shop'}>
             Browse All Products
           </Button>
         }

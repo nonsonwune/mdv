@@ -98,7 +98,7 @@ class AuthLoginRequest(BaseModel):
 
 class AuthLoginResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token: Optional[str] = None  # For backward compatibility
     role: str
-    token: Optional[str] = None
+    token_type: str = "bearer"
 

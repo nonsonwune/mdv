@@ -597,7 +597,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
                     <p className="font-medium">Download Your Data</p>
                     <p className="text-sm text-neutral-600">Get a copy of all your account data</p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="secondary" size="sm">
                     Download
                   </Button>
                 </div>
@@ -606,7 +606,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
                     <p className="font-medium">Clear Search History</p>
                     <p className="text-sm text-neutral-600">Remove all search history</p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="secondary" size="sm">
                     Clear
                   </Button>
                 </div>
@@ -616,7 +616,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
                     <p className="text-sm text-neutral-600">Permanently delete your account</p>
                   </div>
                   <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="sm"
                     onClick={() => setShowDeleteModal(true)}
                     className="border-red-600 text-red-600 hover:bg-red-50"
@@ -643,7 +643,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
                     <p className="text-sm text-neutral-600">Last changed 30 days ago</p>
                   </div>
                   <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="sm"
                     onClick={() => setShowPasswordModal(true)}
                   >
@@ -658,7 +658,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
                     </p>
                   </div>
                   <Button 
-                    variant={security.twoFactorEnabled ? "outline" : "primary"}
+                    variant={security.twoFactorEnabled ? "secondary" : "primary"}
                     size="sm"
                     onClick={toggle2FA}
                   >
@@ -904,7 +904,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
           />
           <div className="flex gap-3 justify-end">
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowPasswordModal(false)}
             >
               Cancel
@@ -950,7 +950,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
           />
           <div className="flex gap-3 justify-end">
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setShow2FAModal(false)}
             >
               Cancel
@@ -983,7 +983,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
           />
           <div className="flex gap-3 justify-end">
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowDeleteModal(false)}
             >
               Cancel

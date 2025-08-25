@@ -467,13 +467,13 @@ export default function NotificationCenter() {
               </div>
               <div className="flex gap-2">
                 {stats.unread > 0 && (
-                  <Button variant="outline" size="sm" onClick={markAllAsRead}>
+                  <Button variant="secondary" size="sm" onClick={markAllAsRead}>
                     Mark All Read
                   </Button>
                 )}
                 {stats.total > 0 && (
                   <Button 
-                    variant="outline" 
+                    variant="secondary" 
                     size="sm" 
                     onClick={() => setShowClearModal(true)}
                     className="text-red-600 hover:bg-red-50"
@@ -762,7 +762,7 @@ export default function NotificationCenter() {
           </p>
           <div className="flex gap-3">
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => setShowClearModal(false)}
               className="flex-1"
             >

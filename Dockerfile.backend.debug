@@ -1,0 +1,20 @@
+# Debug Dockerfile for Railway
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install only essential packages for testing
+RUN pip install fastapi uvicorn
+
+# Copy backend directory
+COPY backend /app/backend
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app:/app/backend
+
+# Expose port
+EXPOSE 8000
+
+# Run the test app to verify deployment works
+CMD ["python", "/app/backend/test_app.py"]
