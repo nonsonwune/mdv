@@ -173,7 +173,7 @@ export default function UserDashboard({ user }: UserDashboardProps) {
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-maroon-700 to-maroon-800 text-white rounded-lg p-6">
         <h1 className="text-2xl font-bold mb-2">
-          {getGreeting()}, {user.firstName}! 👋
+          {getGreeting()}, {user.firstName || user.name?.split(' ')[0] || 'User'}! 👋
         </h1>
         <p className="opacity-90">
           Welcome back to your dashboard. Here's what's happening with your account.

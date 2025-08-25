@@ -6,20 +6,22 @@ import { Card, Button, Input, Badge, Modal } from '../ui'
 import { useToast } from '../../app/_components/ToastProvider'
 
 export interface UserData {
-  id: string
+  id: number
   firstName: string
   lastName: string
   email: string
   phone: string
+  name?: string
   avatar?: string
   dateOfBirth?: string
   gender?: 'male' | 'female' | 'other'
   bio?: string
-  joinedDate: string
-  verified: boolean
-  loyaltyTier?: 'bronze' | 'silver' | 'gold' | 'platinum'
-  totalOrders: number
-  totalSpent: number
+  joinedDate?: string
+  createdAt?: string
+  verified?: boolean
+  loyaltyTier?: string
+  totalOrders?: number
+  totalSpent?: number
 }
 
 interface UserProfileProps {
@@ -112,7 +114,9 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
   }
 
   const getInitials = () => {
-    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    const first = user.firstName?.[0] || user.name?.[0] || 'U'
+    const last = user.lastName?.[0] || ''
+    return `${first}${last}`.toUpperCase()
   }
 
   return (
@@ -241,19 +245,19 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
             <div>
               <p className="text-sm text-neutral-600">Member Since</p>
               <p className="font-semibold">
-                {new Date(user.joinedDate).toLocaleDateString('en-US', { 
+                {user.joinedDate ? new Date(user.joinedDate).toLocaleDateString('en-US', { 
                   month: 'short', 
                   year: 'numeric' 
-                })}
+                }) : 'N/A'}
               </p>
             </div>
             <div>
               <p className="text-sm text-neutral-600">Total Orders</p>
-              <p className="font-semibold">{user.totalOrders}</p>
+              <p className="font-semibold">{user.totalOrders || 0}</p>
             </div>
             <div>
               <p className="text-sm text-neutral-600">Total Spent</p>
-              <p className="font-semibold">₦{user.totalSpent.toLocaleString()}</p>
+              <p className="font-semibold">₦{(user.totalSpent || 0).toLocaleString()}</p>
             </div>
             <div>
               <p className="text-sm text-neutral-600">Loyalty Tier</p>
