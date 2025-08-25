@@ -51,6 +51,15 @@ app.add_middleware(
     allow_credentials=True,
 )
 
+# Health check endpoint (no database required)
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "mdv-api", "version": "0.1.0"}
+
+@app.get("/")
+async def root():
+    return {"message": "MDV API is running", "version": "0.1.0"}
+
 # Routes
 app.include_router(public.router)
 app.include_router(payments.router)
