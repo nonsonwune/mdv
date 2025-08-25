@@ -8,7 +8,7 @@ import os
 from typing import Any
 from arq import cron
 from arq.connections import RedisSettings
-from worker.worker import expire_reservations, send_email
+from backend.worker.worker import expire_reservations, send_email
 
 
 # Redis connection settings
