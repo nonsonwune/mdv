@@ -7,10 +7,10 @@ import { useToast } from '../../app/_components/ToastProvider'
 
 export interface UserData {
   id: number
-  firstName: string
-  lastName: string
+  firstName?: string
+  lastName?: string
   email: string
-  phone: string
+  phone?: string
   name?: string
   avatar?: string
   dateOfBirth?: string
@@ -131,7 +131,7 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
                 {user.avatar ? (
                   <Image
                     src={user.avatar}
-                    alt={`${user.firstName} ${user.lastName}`}
+                    alt={`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Profile'}
                     width={96}
                     height={96}
                     className="w-full h-full object-cover"
@@ -164,20 +164,20 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
                       {isEditing ? (
                         <div className="flex gap-2">
                           <Input
-                            value={editData.firstName}
+                            value={editData.firstName || ''}
                             onChange={(e) => setEditData({ ...editData, firstName: e.target.value })}
                             placeholder="First Name"
                             size="sm"
                           />
                           <Input
-                            value={editData.lastName}
+                            value={editData.lastName || ''}
                             onChange={(e) => setEditData({ ...editData, lastName: e.target.value })}
                             placeholder="Last Name"
                             size="sm"
                           />
                         </div>
                       ) : (
-                        `${user.firstName} ${user.lastName}`
+                        `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'User'
                       )}
                     </h2>
                     {user.verified && (
@@ -193,7 +193,7 @@ export default function UserProfile({ user: initialUser, onUpdate }: UserProfile
                   
                   {isEditing ? (
                     <Input
-                      value={editData.phone}
+                      value={editData.phone || ''}
                       onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                       placeholder="Phone Number"
                       className="mt-2"
