@@ -1,0 +1,220 @@
+name: CI - Test & Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Backend Python Tests
+  test-backend:
+    name: Test Backend (Python)
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
+      
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://testuser:testpass@localhost:5432/testdb
+        run: |
+          cd backend
+          alembic upgrade head
+      
+      - name: Run backend tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://testuser:testpass@localhost:5432/testdb
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: test-secret-key
+          ENV: test
+        run: |
+          pytest backend/tests -v --cov=backend --cov-report=xml --cov-report=term
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: backend
+          name: backend-coverage
+
+  # Frontend Next.js Tests
+  test-frontend:
+    name: Test Frontend (Next.js)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./web
+        run: npm ci
+      
+      - name: Run linter
+        working-directory: ./web
+        run: npm run lint
+      
+      - name: Type check
+        working-directory: ./web
+        run: npx tsc --noEmit
+      
+      - name: Build application
+        working-directory: ./web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+        run: npm run build
+      
+      - name: Run E2E tests
+        working-directory: ./web
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
+  # Docker Build Validation
+  validate-docker:
+    name: Validate Docker Builds
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Backend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.backend
+          push: false
+          tags: mdv-backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build Frontend Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.web
+          push: false
+          tags: mdv-web:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Security Scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Trivy security scan on backend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './backend'
+          format: 'sarif'
+          output: 'backend-security.sarif'
+      
+      - name: Run Trivy security scan on frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './web'
+          format: 'sarif'
+          output: 'frontend-security.sarif'
+      
+      - name: Upload Backend Security Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'backend-security.sarif'
+          category: 'backend-security'
+      
+      - name: Upload Frontend Security Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'frontend-security.sarif'
+          category: 'frontend-security'
+
+  # Code Quality Check
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      
+      - name: Install Python linters
+        run: |
+          pip install black flake8 mypy
+      
+      - name: Run Black formatter check
+        run: black --check backend/
+      
+      - name: Run Flake8 linter
+        run: flake8 backend/ --max-line-length=120 --extend-ignore=E203,W503
+      
+      - name: Run mypy type checker
+        run: mypy backend/ --ignore-missing-imports
+
+  # All checks passed
+  ci-success:
+    name: CI Success
+    needs: [test-backend, test-frontend, validate-docker, security-scan, code-quality]
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI Passed
+        run: echo "All CI checks passed successfully!"

@@ -1,0 +1,166 @@
+name: Deploy to Railway
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+# Only allow one deployment at a time
+concurrency:
+  group: railway-deployment
+  cancel-in-progress: false
+
+jobs:
+  # Run CI tests first
+  test:
+    name: Run Tests
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # Deploy to Railway after tests pass
+  deploy:
+    name: Deploy to Railway
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ steps.deploy-web.outputs.url }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      
+      - name: Deploy Backend API to Railway
+        id: deploy-api
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway up --service mdv-api --detach
+          echo "Waiting for API deployment to complete..."
+          railway logs --service mdv-api --tail 20
+          
+          # Get the deployment URL
+          API_URL=$(railway status --service mdv-api --json | jq -r '.url')
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+      
+      - name: Deploy Worker to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service mdv-worker --detach
+          echo "Worker service deployed"
+      
+      - name: Deploy Web Frontend to Railway
+        id: deploy-web
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service mdv-web --detach
+          echo "Waiting for Web deployment to complete..."
+          railway logs --service mdv-web --tail 20
+          
+          # Get the deployment URL
+          WEB_URL=$(railway status --service mdv-web --json | jq -r '.url')
+          echo "url=$WEB_URL" >> $GITHUB_OUTPUT
+      
+      - name: Run Database Migrations
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Running database migrations..."
+          railway run --service mdv-api python -m alembic upgrade head
+      
+      - name: Health Check - API
+        run: |
+          echo "Checking API health..."
+          for i in {1..30}; do
+            if curl -f "${{ steps.deploy-api.outputs.api_url }}/health" 2>/dev/null; then
+              echo "API is healthy!"
+              break
+            fi
+            echo "Waiting for API to be ready... (attempt $i/30)"
+            sleep 10
+          done
+      
+      - name: Health Check - Web
+        run: |
+          echo "Checking Web app..."
+          for i in {1..30}; do
+            if curl -f "${{ steps.deploy-web.outputs.url }}" 2>/dev/null; then
+              echo "Web app is live!"
+              break
+            fi
+            echo "Waiting for Web app to be ready... (attempt $i/30)"
+            sleep 10
+          done
+      
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### URLs:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web App**: ${{ steps.deploy-web.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **API**: ${{ steps.deploy-api.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Docs**: ${{ steps.deploy-api.outputs.api_url }}/docs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Notify Deployment Status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}' === 'success' ? '✅' : '❌';
+            const message = `${status} Railway Deployment: ${{ job.status }}
+            
+            **Environment**: ${{ github.event.inputs.environment || 'production' }}
+            **Commit**: ${{ github.sha }}
+            **Web URL**: ${{ steps.deploy-web.outputs.url }}
+            **API URL**: ${{ steps.deploy-api.outputs.api_url }}`;
+            
+            // Create a deployment status
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: context.payload.deployment?.id || 1,
+              state: '${{ job.status }}' === 'success' ? 'success' : 'failure',
+              environment_url: '${{ steps.deploy-web.outputs.url }}',
+              description: 'Railway deployment ' + '${{ job.status }}'
+            });
+
+  # Rollback on failure
+  rollback:
+    name: Rollback on Failure
+    needs: deploy
+    if: failure()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      
+      - name: Rollback Deployments
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          
+          echo "Rolling back services to previous version..."
+          railway rollback --service mdv-api --yes
+          railway rollback --service mdv-web --yes
+          railway rollback --service mdv-worker --yes
+          
+          echo "⚠️ Deployment failed and was rolled back" >> $GITHUB_STEP_SUMMARY
