@@ -550,7 +550,7 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     subtotal_eligible = 0.0
     order = Order(
         cart_id=cart.id,
-        status=OrderStatus.pending_payment.value  # HOTFIX: Force explicit enum value
+        status="PendingPayment"  # HOTFIX: Use hardcoded string value to ensure correct DB enum
     )
     db.add(order)
     await db.flush()
