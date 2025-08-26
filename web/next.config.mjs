@@ -14,7 +14,11 @@ const nextConfig = {
   },
   output: 'standalone',
   images: {
-    domains: imageDomains,
+    remotePatterns: imageDomains.map(hostname => ({
+      protocol: 'https',
+      hostname,
+      pathname: '/**',
+    })),
   },
 }
 

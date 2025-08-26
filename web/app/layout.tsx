@@ -1,5 +1,5 @@
 import "./globals.css"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import Link from "next/link"
 import { cookies } from "next/headers"
 import HeaderCart from "./_components/HeaderCart"
@@ -19,6 +19,13 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#800000',
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const role = cookies().get("mdv_role")?.value
   const isStaff = role === "staff" || role === "admin"
@@ -26,8 +33,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-        <meta name="theme-color" content="#800000" />
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
