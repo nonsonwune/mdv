@@ -105,7 +105,7 @@ async def get_user_orders(
         
         order_list.append(OrderListItem(
             id=order.id,
-            status=order.status.value,
+            status=order.status,
             total=total,
             item_count=item_count,
             created_at=order.created_at
@@ -175,13 +175,13 @@ async def get_order_details(
         )
     
     # Determine capabilities
-    can_cancel = order.status == OrderStatus.pending_payment.value
-    can_return = order.status == OrderStatus.paid.value and order.fulfillment and order.fulfillment.status == FulfillmentStatus.ready_to_ship.value
-    tracking_available = order.status in [OrderStatus.paid.value, OrderStatus.refunded.value]
+    can_cancel = order.status == OrderStatus.pending_payment
+    can_return = order.status == OrderStatus.paid and order.fulfillment and order.fulfillment.status == FulfillmentStatus.ready_to_ship
+    tracking_available = order.status in [OrderStatus.paid, OrderStatus.refunded]
     
     return OrderResponse(
         id=order.id,
-        status=order.status.value,
+        status=order.status,
         totals=order.totals,
         created_at=order.created_at,
         items=items_response,
@@ -211,14 +211,14 @@ async def cancel_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.status != OrderStatus.pending_payment.value:
+    if order.status != OrderStatus.pending_payment:
         raise HTTPException(
             status_code=400,
             detail="Order can only be cancelled if payment is pending"
         )
     
     # Update order status
-    order.status = OrderStatus.cancelled.value
+    order.status = OrderStatus.cancelled
     await db.commit()
     
     return {"message": "Order cancelled successfully", "order_id": order_id}
@@ -246,7 +246,7 @@ async def request_return(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.status != OrderStatus.paid.value:
+    if order.status != OrderStatus.paid:
         raise HTTPException(
             status_code=400,
             detail="Returns can only be requested for paid orders"
@@ -353,7 +353,7 @@ async def get_order_tracking(
         }
     ]
     
-    if order.status == OrderStatus.paid.value:
+    if order.status == OrderStatus.paid:
         timeline.append({
             "code": "payment_confirmed",
             "at": order.created_at.isoformat(),  # Would need payment timestamp
@@ -386,6 +386,6 @@ async def get_order_tracking(
     
     return {
         "order_id": order_id,
-        "status": order.status.value,
+        "status": order.status,
         "timeline": sorted(timeline, key=lambda x: x["at"])
     }

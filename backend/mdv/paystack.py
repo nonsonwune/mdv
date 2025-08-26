@@ -31,22 +31,33 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
     kind = event.get("event")
     data = event.get("data", {})
     reference = data.get("reference") or data.get("ref")
+    
+    print(f"[WEBHOOK] Received event: {kind}, reference: {reference}")
+    
     if not reference:
+        print(f"[WEBHOOK] No reference found in event: {event}")
         return
 
     if kind in ("charge.success", "transfer.success", "paymentrequest.success"):
         async with session_scope() as db:
             order = (await db.execute(select(Order).where(Order.payment_ref == reference))).scalar_one_or_none()
             if not order:
+                print(f"[WEBHOOK] No order found with reference: {reference}")
                 return
-            if order.status in (OrderStatus.paid.value, OrderStatus.refunded.value, OrderStatus.cancelled.value):
+            
+            print(f"[WEBHOOK] Found order {order.id}, current status: {order.status}")
+            
+            if order.status in (OrderStatus.paid, OrderStatus.refunded, OrderStatus.cancelled):
+                print(f"[WEBHOOK] Order {order.id} already processed (status: {order.status})")
                 return  # idempotent
-            order.status = OrderStatus.paid.value
+            
+            print(f"[WEBHOOK] Updating order {order.id} from {order.status} to Paid")
+            order.status = OrderStatus.paid
 
             # Create fulfillment if missing
             ful = (await db.execute(select(Fulfillment).where(Fulfillment.order_id == order.id))).scalar_one_or_none()
             if not ful:
-                ful = Fulfillment(order_id=order.id, status=FulfillmentStatus.processing.value)
+                ful = Fulfillment(order_id=order.id, status=FulfillmentStatus.processing)
                 db.add(ful)
 
             # Reduce inventory and ledger entries
@@ -59,8 +70,8 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                 # consume reservations for this cart/variant
                 await db.execute(
                     Reservation.__table__.update()
-                    .where(and_(Reservation.variant_id == it.variant_id, Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active.value))
-                    .values(status=ReservationStatus.consumed.value)
+                    .where(and_(Reservation.variant_id == it.variant_id, Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active))
+                    .values(status=ReservationStatus.consumed)
                 )
             
             # Clear cart items after successful payment
@@ -136,7 +147,7 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                 return
             await db.execute(
                 Reservation.__table__.update()
-                .where(and_(Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active.value))
-                .values(status=ReservationStatus.released.value)
+                .where(and_(Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active))
+                .values(status=ReservationStatus.released)
             )
 
