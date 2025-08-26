@@ -590,7 +590,9 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
         for it in items:
             inv = (await db.execute(select(Inventory).where(Inventory.variant_id == it.variant_id))).scalar_one_or_none()
             if not inv:
-                raise HTTPException(status_code=409, detail="Inventory missing for variant")
+                # Skip reservation if inventory doesn't exist (allows checkout without inventory setup)
+                print(f"Warning: No inventory record for variant {it.variant_id}, skipping reservation")
+                continue
             # compute already reserved
             active_reserved = (await db.execute(select(func.coalesce(func.sum(Reservation.qty), 0)).where(and_(Reservation.variant_id == it.variant_id, Reservation.status == ReservationStatus.active.value, Reservation.expires_at > datetime.now(timezone.utc))))).scalar_one()
             available = (inv.quantity - inv.safety_stock) - int(active_reserved)
