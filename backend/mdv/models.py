@@ -194,7 +194,7 @@ class Reservation(Base):
     cart_id: Mapped[int] = mapped_column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), index=True)
     variant_id: Mapped[int] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), index=True)
     qty: Mapped[int] = mapped_column(Integer)
-    status: Mapped[ReservationStatus] = mapped_column(SAEnum(ReservationStatus, name="reservation_status"), default=ReservationStatus.active)
+    status: Mapped[ReservationStatus] = mapped_column(SAEnum(ReservationStatus, name="reservation_status"), default=ReservationStatus.active.value)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -206,7 +206,7 @@ class Order(Base):
     user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     cart_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carts.id"), nullable=True)
     totals: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    status: Mapped[OrderStatus] = mapped_column(SAEnum(OrderStatus, name="order_status"), default=OrderStatus.pending_payment, index=True)
+    status: Mapped[OrderStatus] = mapped_column(SAEnum(OrderStatus, name="order_status"), default=OrderStatus.pending_payment.value, index=True)
     payment_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -252,7 +252,7 @@ class Fulfillment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), unique=True)
-    status: Mapped[FulfillmentStatus] = mapped_column(SAEnum(FulfillmentStatus, name="fulfillment_status"), default=FulfillmentStatus.processing, index=True)
+    status: Mapped[FulfillmentStatus] = mapped_column(SAEnum(FulfillmentStatus, name="fulfillment_status"), default=FulfillmentStatus.processing.value, index=True)
     packed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     packed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -278,7 +278,7 @@ class Shipment(Base):
     fulfillment_id: Mapped[int] = mapped_column(Integer, ForeignKey("fulfillments.id", ondelete="CASCADE"), unique=True)
     courier: Mapped[str] = mapped_column(String(80))
     tracking_id: Mapped[str] = mapped_column(String(160), index=True)
-    status: Mapped[ShipmentStatus] = mapped_column(SAEnum(ShipmentStatus, name="shipment_status"), default=ShipmentStatus.dispatched, index=True)
+    status: Mapped[ShipmentStatus] = mapped_column(SAEnum(ShipmentStatus, name="shipment_status"), default=ShipmentStatus.dispatched.value, index=True)
     dispatched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
