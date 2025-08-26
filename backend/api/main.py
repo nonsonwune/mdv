@@ -48,14 +48,54 @@ async def startup_seed_reference():
         print("Continuing without seeding - database might not be ready yet")
         # Don't fail startup if database is not ready
 
-# CORS
-allowed_origins = [settings.app_url] if settings.app_url else ["*"]
+# CORS Configuration - Fixed to properly handle frontend origins
+# The APP_URL should point to the frontend URL, not the API URL
+def get_allowed_origins():
+    """Get the list of allowed origins for CORS"""
+    origins = []
+    
+    # In production, use specific origins
+    if settings.env == "production":
+        # Add the production frontend URL
+        origins.append("https://mdv-web-production.up.railway.app")
+        
+        # Also check if APP_URL is properly set (it should be the frontend URL)
+        if settings.app_url and not settings.app_url.startswith("mdv-api"):
+            # Ensure it has a protocol
+            if not settings.app_url.startswith("http"):
+                origins.append(f"https://{settings.app_url}")
+            else:
+                origins.append(settings.app_url)
+    else:
+        # In development, allow localhost origins
+        origins.extend([
+            "http://localhost:3000",
+            "http://localhost:8080",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8080"
+        ])
+        
+        # Also add the configured APP_URL if it's not an API URL
+        if settings.app_url and not settings.app_url.startswith("mdv-api"):
+            if not settings.app_url.startswith("http"):
+                origins.append(f"http://{settings.app_url}")
+            else:
+                origins.append(settings.app_url)
+    
+    # Remove duplicates and return
+    return list(set(origins))
+
+allowed_origins = get_allowed_origins()
+print(f"CORS: Allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
     allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Health check endpoint (no database required)
@@ -66,6 +106,15 @@ async def health_check():
 @app.get("/")
 async def root():
     return {"message": "MDV API is running", "version": "0.1.0"}
+
+# Debug endpoint to check CORS configuration (remove in production)
+@app.get("/debug/cors")
+async def debug_cors():
+    return {
+        "allowed_origins": allowed_origins,
+        "app_url": settings.app_url,
+        "env": settings.env
+    }
 
 # Routes
 app.include_router(public.router)
@@ -78,4 +127,3 @@ app.include_router(users.router)
 app.include_router(orders.router)
 app.include_router(wishlist.router)
 app.include_router(reviews.router)
-
