@@ -218,7 +218,7 @@ async def cancel_order(
         )
     
     # Update order status
-    order.status = OrderStatus.cancelled
+    order.status = OrderStatus.cancelled.value
     await db.commit()
     
     return {"message": "Order cancelled successfully", "order_id": order_id}
@@ -353,7 +353,7 @@ async def get_order_tracking(
         }
     ]
     
-    if order.status == OrderStatus.paid:
+    if order.status == OrderStatus.paid.value:
         timeline.append({
             "code": "payment_confirmed",
             "at": order.created_at.isoformat(),  # Would need payment timestamp

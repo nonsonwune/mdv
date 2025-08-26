@@ -50,7 +50,7 @@ async def set_ready_to_ship(fid: int, db: AsyncSession = Depends(get_db), claims
     if order.status != OrderStatus.paid.value:
         raise HTTPException(status_code=409, detail="Order not Paid")
     before = {"status": ful.status.value}
-    ful.status = FulfillmentStatus.ready_to_ship
+    ful.status = FulfillmentStatus.ready_to_ship.value
     ful.packed_by = actor_id
     ful.packed_at = datetime.now(timezone.utc)
     await audit(db, actor_id, "fulfillment.ready", "Fulfillment", ful.id, before=before, after={"status": ful.status.value})
@@ -64,12 +64,12 @@ async def create_shipment(fulfillment_id: int, courier: str, tracking_id: str, d
     ful = (await db.execute(select(Fulfillment).where(Fulfillment.id == fulfillment_id))).scalar_one_or_none()
     if not ful:
         raise HTTPException(status_code=404, detail="Fulfillment not found")
-    if ful.status != FulfillmentStatus.ready_to_ship:
+    if ful.status != FulfillmentStatus.ready_to_ship.value:
         raise HTTPException(status_code=409, detail="Fulfillment not ReadyToShip")
     if not tracking_id:
         raise HTTPException(status_code=400, detail="tracking_id required")
     # Create shipment
-    shp = Shipment(fulfillment_id=ful.id, courier=courier, tracking_id=tracking_id, status=ShipmentStatus.dispatched, dispatched_at=datetime.now(timezone.utc))
+    shp = Shipment(fulfillment_id=ful.id, courier=courier, tracking_id=tracking_id, status=ShipmentStatus.dispatched.value, dispatched_at=datetime.now(timezone.utc))
     db.add(shp)
     await db.flush()
     db.add(ShipmentEvent(shipment_id=shp.id, code="Dispatched", message="Shipment dispatched", occurred_at=datetime.now(timezone.utc), meta={"tracking_id": tracking_id}))
@@ -95,7 +95,7 @@ async def update_shipment_status(sid: int, status: ShipmentStatus, db: AsyncSess
     if status not in ALLOWED_TRANSITIONS.get(shp.status, set()):
         raise HTTPException(status_code=409, detail="Invalid transition")
     before = {"status": shp.status.value}
-    shp.status = status
+    shp.status = status.value
     code = status.value
     db.add(ShipmentEvent(shipment_id=shp.id, code=code, message=f"{code}", occurred_at=datetime.now(timezone.utc)))
     await audit(db, actor_id, "shipment.status", "Shipment", shp.id, before=before, after={"status": shp.status.value})
@@ -118,7 +118,7 @@ async def cancel_order(oid: int, db: AsyncSession = Depends(get_db), claims=Depe
         if shp:
             raise HTTPException(status_code=409, detail="Cannot cancel: shipment exists")
     before = {"status": order.status.value}
-    order.status = OrderStatus.cancelled
+    order.status = OrderStatus.cancelled.value
     await audit(db, actor_id, "order.cancel", "Order", order.id, before=before, after={"status": order.status.value})
     await db.commit()
     return {"id": order.id, "status": order.status.value}

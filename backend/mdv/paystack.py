@@ -59,7 +59,7 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                 # consume reservations for this cart/variant
                 await db.execute(
                     Reservation.__table__.update()
-                    .where(and_(Reservation.variant_id == it.variant_id, Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active))
+                    .where(and_(Reservation.variant_id == it.variant_id, Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active.value))
                     .values(status=ReservationStatus.consumed.value)
                 )
             
