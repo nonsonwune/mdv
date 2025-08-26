@@ -74,16 +74,16 @@ def test_role_values():
 def test_enum_str_inheritance():
     """Verify that all enums properly inherit from str for SQLAlchemy compatibility"""
     # When enums inherit from str, they should be directly usable as strings
-    assert str(OrderStatus.pending_payment) == "PendingPayment"
+    assert OrderStatus.pending_payment.value == "PendingPayment"
     assert OrderStatus.pending_payment == "PendingPayment"  # This works because of str inheritance
-    
-    assert str(FulfillmentStatus.processing) == "Processing"
+
+    assert FulfillmentStatus.processing.value == "Processing"
     assert FulfillmentStatus.processing == "Processing"
-    
-    assert str(ShipmentStatus.dispatched) == "Dispatched"
+
+    assert ShipmentStatus.dispatched.value == "Dispatched"
     assert ShipmentStatus.dispatched == "Dispatched"
     
-    assert str(ReservationStatus.active) == "Active"
+    assert ReservationStatus.active.value == "Active"
     assert ReservationStatus.active == "Active"
 
 def test_enum_values_are_strings():
