@@ -13,10 +13,10 @@ from datetime import datetime
 import hashlib
 import secrets
 
-from backend.mdv.auth import require_roles, get_current_claims
-from backend.mdv.rbac import ADMINS, SUPERVISORS
-from backend.mdv.models import User, Role
-from backend.mdv.utils import audit, parse_actor_id
+from mdv.auth import require_roles, get_current_claims
+from mdv.rbac import ADMINS, SUPERVISORS
+from mdv.models import User, Role
+from mdv.utils import audit, parse_actor_id
 from ..deps import get_db
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])

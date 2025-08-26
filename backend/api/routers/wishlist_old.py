@@ -11,8 +11,8 @@ from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 from datetime import datetime
 
-from backend.mdv.auth import get_current_claims
-from backend.mdv.models import (
+from mdv.auth import get_current_claims
+from mdv.models import (
     User, Product, Variant, Cart, CartItem,
     Wishlist, WishlistItem, ProductImage
 )

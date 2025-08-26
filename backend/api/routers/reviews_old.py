@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from backend.mdv.auth import get_current_claims
-from backend.mdv.models import User, Product, Order, OrderItem, Variant, OrderStatus
+from mdv.auth import get_current_claims
+from mdv.models import User, Product, Order, OrderItem, Variant, OrderStatus
 from ..deps import get_db
 
 router = APIRouter(prefix="/api/reviews", tags=["reviews"])

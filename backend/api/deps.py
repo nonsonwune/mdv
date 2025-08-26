@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.mdv.db import get_session_factory
+from mdv.db import get_session_factory
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

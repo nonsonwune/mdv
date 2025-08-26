@@ -5,7 +5,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import joinedload
 import httpx
 
-from backend.mdv.schemas import (
+from mdv.schemas import (
     HealthResponse,
     Paginated,
     ProductOut,
@@ -19,8 +19,8 @@ from backend.mdv.schemas import (
     CartItemQtyUpdate,
     ShippingEstimate,
 )
-from backend.mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage
-from backend.mdv.config import settings
+from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage
+from mdv.config import settings
 from ..deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone

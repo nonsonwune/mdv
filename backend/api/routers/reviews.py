@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from backend.mdv.auth import get_current_claims, get_current_user_optional, bearer_scheme
-from backend.mdv.models import (
+from mdv.auth import get_current_claims, get_current_user_optional, bearer_scheme
+from mdv.models import (
     User, Product, Order, OrderItem, Variant, OrderStatus,
     Review, ReviewVote, ProductImage
 )

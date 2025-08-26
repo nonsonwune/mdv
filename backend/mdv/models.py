@@ -210,6 +210,12 @@ class Order(Base):
     payment_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Relationships
+    items: Mapped[list["OrderItem"]] = relationship("OrderItem", back_populates="order", lazy="selectin")
+    address: Mapped[Optional["Address"]] = relationship("Address", back_populates="order", uselist=False, lazy="selectin")
+    user: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
+    fulfillment: Mapped[Optional["Fulfillment"]] = relationship("Fulfillment", back_populates="order", uselist=False, lazy="selectin")
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -220,6 +226,9 @@ class OrderItem(Base):
     qty: Mapped[int] = mapped_column(Integer)
     unit_price: Mapped[Numeric] = mapped_column(Numeric(12, 2))
     on_sale: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Relationships
+    order: Mapped["Order"] = relationship("Order", back_populates="items")
 
 
 class Address(Base):
@@ -232,6 +241,9 @@ class Address(Base):
     state: Mapped[str] = mapped_column(String(80))
     city: Mapped[str] = mapped_column(String(120))
     street: Mapped[str] = mapped_column(String(255))
+    
+    # Relationships
+    order: Mapped["Order"] = relationship("Order", back_populates="address")
 
 
 # Fulfillment
@@ -244,6 +256,9 @@ class Fulfillment(Base):
     packed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     packed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Relationships
+    order: Mapped["Order"] = relationship("Order", back_populates="fulfillment")
 
 
 class FulfillmentItem(Base):

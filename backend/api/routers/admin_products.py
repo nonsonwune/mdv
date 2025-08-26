@@ -16,14 +16,14 @@ import logging
 import json
 from decimal import Decimal
 
-from backend.mdv.auth import require_roles
-from backend.mdv.rbac import ADMINS, SUPERVISORS
-from backend.mdv.models import (
+from mdv.auth import require_roles
+from mdv.rbac import ADMINS, SUPERVISORS
+from mdv.models import (
     Product, Variant, Category, ProductImage, 
     Inventory, StockLedger, Reservation, ReservationStatus,
     AuditLog, User, OrderItem
 )
-from backend.mdv.schemas.admin_products import (
+from mdv.schemas.admin_products import (
     ProductCreateRequest, ProductUpdateRequest, ProductDetailResponse, ProductListResponse,
     VariantCreateRequest, VariantUpdateRequest, VariantDetailResponse,
     InventoryUpdateRequest, BulkInventoryAdjustRequest, InventorySyncRequest, LowStockAlert,
@@ -31,9 +31,9 @@ from backend.mdv.schemas.admin_products import (
     ImageUploadResponse, ImageResponse,
     OperationResponse, PaginatedResponse, BulkDeleteRequest
 )
-from backend.mdv.cloudinary_utils import cloudinary_manager
-from backend.mdv.utils import parse_actor_id
-from backend.api.deps import get_db
+from mdv.cloudinary_utils import cloudinary_manager
+from mdv.utils import parse_actor_id
+from ..deps import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ async def delete_product(
     
     # Check for existing orders unless forced
     if not force:
-        from backend.mdv.models import OrderItem
+        from mdv.models import OrderItem
         order_items = await db.execute(
             select(OrderItem)
             .join(Variant)
@@ -595,7 +595,7 @@ async def delete_variant(
         )
     
     # Check for orders
-    from backend.mdv.models import OrderItem
+    from mdv.models import OrderItem
     order_items = await db.execute(
         select(OrderItem).where(OrderItem.variant_id == variant_id).limit(1)
     )

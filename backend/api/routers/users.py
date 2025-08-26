@@ -12,8 +12,8 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 
-from backend.mdv.auth import get_current_claims, create_access_token
-from backend.mdv.models import User, Role, Address as AddressModel, Order
+from mdv.auth import get_current_claims, create_access_token
+from mdv.models import User, Role, Address as AddressModel, Order
 from ..deps import get_db
 
 # Password hashing

@@ -5,8 +5,8 @@ import json
 from fastapi import APIRouter, Header, Request, HTTPException, Query
 import httpx
 
-from backend.mdv.paystack import verify_signature, handle_paystack_event
-from backend.mdv.config import settings
+from mdv.paystack import verify_signature, handle_paystack_event
+from mdv.config import settings
 
 router = APIRouter(prefix="/api/paystack", tags=["payments"]) 
 

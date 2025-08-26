@@ -61,7 +61,20 @@ class CloudinaryManager:
             Exception: For upload failures
         """
         if not self.configured:
-            raise ValueError("Cloudinary is not configured. Please set CLOUDINARY_URL environment variable.")
+            # Return mock data for development when Cloudinary is not configured
+            import uuid
+            import time
+            mock_id = str(uuid.uuid4())[:8]
+            logger.warning(f"Cloudinary not configured, using mock upload for development: {filename}")
+            return {
+                "public_id": f"dev/{folder}/{mock_id}",
+                "url": f"https://via.placeholder.com/600x400?text={filename}",
+                "width": 600,
+                "height": 400,
+                "format": "jpg",
+                "size": len(file_data),
+                "version": int(time.time()),
+            }
         
         # Default transformation for optimization
         default_transformation = {
@@ -129,7 +142,8 @@ class CloudinaryManager:
             ValueError: If Cloudinary is not configured
         """
         if not self.configured:
-            raise ValueError("Cloudinary is not configured")
+            logger.warning(f"Cloudinary not configured, mock delete for: {public_id}")
+            return True  # Return success in development
         
         try:
             result = cloudinary.uploader.destroy(public_id)
@@ -163,6 +177,15 @@ class CloudinaryManager:
         Returns:
             Dictionary mapping size names to URLs
         """
+        if not self.configured:
+            # Return mock URLs for development
+            return {
+                "original": base_url,
+                "thumbnail": base_url,
+                "small": base_url,
+                "medium": base_url
+            }
+            
         if not sizes:
             sizes = [320, 640, 768, 1024, 1280, 1920]
         
@@ -214,7 +237,8 @@ class CloudinaryManager:
             Dictionary mapping public_id to deletion success status
         """
         if not self.configured:
-            raise ValueError("Cloudinary is not configured")
+            logger.warning(f"Cloudinary not configured, mock bulk delete for {len(public_ids)} images")
+            return {pid: True for pid in public_ids}  # Return success for all in development
         
         results = {}
         

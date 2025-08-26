@@ -5,11 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from backend.mdv.config import settings
-from backend.mdv.rate_limit import limiter
-from backend.mdv.observability import init_observability
-from backend.mdv.db import get_session_factory
-from backend.mdv.models import Zone, StateZone
+from mdv.config import settings
+from mdv.rate_limit import limiter
+from mdv.observability import init_observability
+from mdv.db import get_session_factory
+from mdv.models import Zone, StateZone
 from sqlalchemy import select
 from .routers import public, admin, payments
 from .routers import auth as auth_router
