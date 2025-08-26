@@ -13,12 +13,13 @@ Run with: pytest backend/tests/test_enum_database_validation.py -v
 import pytest
 import asyncio
 from typing import Dict, List, Any
+from datetime import datetime, timezone
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mdv.db import get_session_factory
 from mdv.models import (
-    OrderStatus, FulfillmentStatus, ShipmentStatus, ReservationStatus, 
+    OrderStatus, FulfillmentStatus, ShipmentStatus, ReservationStatus,
     RefundMethod, Role, Order, Fulfillment, Shipment, Reservation
 )
 
@@ -225,10 +226,77 @@ class TestEnumDatabaseValidation:
         order = Order(cart_id=1)  # No status specified, should use default
         db_session.add(order)
         await db_session.flush()
-        
+
         # Should have default pending_payment status
         assert order.status == OrderStatus.pending_payment.value
-        
+
+        # Clean up
+        await db_session.delete(order)
+
+    @pytest.mark.asyncio
+    async def test_all_enum_defaults_comprehensive(self, db_session):
+        """Test that all model enum defaults work correctly without explicit status assignment."""
+
+        # Test Order default (the critical one that was failing in production)
+        order = Order(cart_id=1)
+        db_session.add(order)
+        await db_session.flush()
+        assert order.status == OrderStatus.pending_payment.value
+        assert order.status == "PendingPayment"  # Verify it matches database enum value
+
+        # Test Reservation default
+        reservation = Reservation(cart_id=1, variant_id=1, qty=1, expires_at=datetime.now(timezone.utc))
+        db_session.add(reservation)
+        await db_session.flush()
+        assert reservation.status == ReservationStatus.active.value
+        assert reservation.status == "Active"
+
+        # Test Fulfillment default
+        fulfillment = Fulfillment(order_id=order.id)
+        db_session.add(fulfillment)
+        await db_session.flush()
+        assert fulfillment.status == FulfillmentStatus.processing.value
+        assert fulfillment.status == "Processing"
+
+        # Test Shipment default
+        shipment = Shipment(fulfillment_id=fulfillment.id, courier="Test Courier", tracking_id="TEST123")
+        db_session.add(shipment)
+        await db_session.flush()
+        assert shipment.status == ShipmentStatus.dispatched.value
+        assert shipment.status == "Dispatched"
+
+        # Clean up (in reverse order due to foreign key constraints)
+        await db_session.delete(shipment)
+        await db_session.delete(fulfillment)
+        await db_session.delete(reservation)
+        await db_session.delete(order)
+        await db_session.flush()
+
+    @pytest.mark.asyncio
+    async def test_enum_defaults_database_insertion(self, db_session):
+        """Test that enum defaults work correctly when inserting into database (reproduces production scenario)."""
+        # This test specifically reproduces the production checkout scenario
+        # where Order is created without explicit status and relies on model default
+
+        # Create order exactly like in checkout endpoint
+        order = Order(cart_id=1)  # This is what was failing in production
+        db_session.add(order)
+
+        # This flush should not raise InvalidTextRepresentationError
+        try:
+            await db_session.flush()
+        except Exception as e:
+            pytest.fail(f"Enum default insertion failed: {e}")
+
+        # Verify the order was created with correct status
+        assert order.id is not None
+        assert order.status == "PendingPayment"
+
+        # Verify we can retrieve it from database
+        result = await db_session.execute(select(Order).where(Order.id == order.id))
+        retrieved_order = result.scalar_one()
+        assert retrieved_order.status == "PendingPayment"
+
         # Clean up
         await db_session.delete(order)
 
