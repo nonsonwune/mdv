@@ -18,7 +18,9 @@
     "jsx": "preserve",
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
-    "paths": {},
+    "paths": {
+      "@/*": ["./*"]
+    },
     "incremental": true,
     "plugins": [
       {

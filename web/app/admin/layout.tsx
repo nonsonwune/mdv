@@ -133,7 +133,7 @@ export default function AdminLayout({
               return (
                 <Link
                   key={item.name}
-                  href={item.href}
+                  href={item.href as any}
                   className={`
                     flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                     ${isActive

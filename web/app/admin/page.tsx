@@ -110,7 +110,7 @@ export default function AdminHome() {
           const Icon = stat.icon
           const isPositive = stat.change >= 0
           return (
-            <Link href={stat.link} key={stat.title}>
+            <Link href={stat.link as any} key={stat.title}>
               <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer">
                 <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-lg bg-${stat.color}-100`}>
@@ -140,7 +140,7 @@ export default function AdminHome() {
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-            <Link href="/admin/orders" className="text-sm text-maroon-700 hover:text-maroon-800">
+            <Link href={"/admin/orders" as any} className="text-sm text-maroon-700 hover:text-maroon-800">
               View all →
             </Link>
           </div>
@@ -159,7 +159,7 @@ export default function AdminHome() {
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Low Stock Alert</h2>
-            <Link href="/admin/products" className="text-sm text-maroon-700 hover:text-maroon-800">
+            <Link href={"/admin/products" as any} className="text-sm text-maroon-700 hover:text-maroon-800">
               Manage inventory →
             </Link>
           </div>
@@ -179,19 +179,19 @@ export default function AdminHome() {
       <div className="mt-8 bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link href="/admin/products/new" className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+          <Link href={"/admin/products/new" as any} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <CubeIcon className="h-8 w-8 text-maroon-700 mb-2" />
             <span className="text-sm font-medium text-gray-700">Add Product</span>
           </Link>
-          <Link href="/admin/orders" className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+          <Link href={"/admin/orders" as any} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <ShoppingCartIcon className="h-8 w-8 text-maroon-700 mb-2" />
             <span className="text-sm font-medium text-gray-700">View Orders</span>
           </Link>
-          <Link href="/admin/users" className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+          <Link href={"/admin/users" as any} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <UsersIcon className="h-8 w-8 text-maroon-700 mb-2" />
             <span className="text-sm font-medium text-gray-700">Manage Users</span>
           </Link>
-          <Link href="/admin/analytics" className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+          <Link href={"/admin/analytics" as any} className="flex flex-col items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
             <CurrencyDollarIcon className="h-8 w-8 text-maroon-700 mb-2" />
             <span className="text-sm font-medium text-gray-700">View Analytics</span>
           </Link>

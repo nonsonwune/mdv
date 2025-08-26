@@ -20,7 +20,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`
+    (headers as any)["Authorization"] = `Bearer ${token}`
   }
   
   try {

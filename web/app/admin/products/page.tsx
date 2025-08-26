@@ -98,7 +98,7 @@ export default function ProductsManagement() {
             <p className="text-gray-600">Manage your product catalog</p>
           </div>
           <Link
-            href="/admin/products/new"
+            href={"/admin/products/new" as any}
             className="flex items-center gap-2 px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 transition-colors"
           >
             <PlusIcon className="h-5 w-5" />
@@ -234,7 +234,7 @@ export default function ProductsManagement() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
                         <Link
-                          href={`/admin/products/${product.id}/edit`}
+                          href={`/admin/products/${product.id}/edit` as any}
                           className="text-maroon-600 hover:text-maroon-900"
                         >
                           <PencilIcon className="h-5 w-5" />

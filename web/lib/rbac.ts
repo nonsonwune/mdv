@@ -87,7 +87,7 @@ export async function getUserClaims(request: NextRequest): Promise<UserClaims | 
  */
 export function hasPermission(userRole: Role, permission: Permission): boolean {
   const allowedRoles = PERMISSIONS[permission]
-  return allowedRoles.includes(userRole as any)
+  return allowedRoles.includes(userRole as never)
 }
 
 /**
