@@ -32,29 +32,29 @@ class Role(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
-    pending_payment = "PendingPayment"
-    paid = "Paid"
-    cancelled = "Cancelled"
-    refunded = "Refunded"
+    pending_payment = "pending_payment"
+    paid = "paid"
+    cancelled = "cancelled"
+    refunded = "refunded"
 
 
 class FulfillmentStatus(str, enum.Enum):
-    processing = "Processing"
-    ready_to_ship = "ReadyToShip"
+    processing = "processing"
+    ready_to_ship = "ready_to_ship"
 
 
 class ShipmentStatus(str, enum.Enum):
-    dispatched = "Dispatched"
-    in_transit = "InTransit"
-    delivered = "Delivered"
-    returned = "Returned"
+    dispatched = "dispatched"
+    in_transit = "in_transit"
+    delivered = "delivered"
+    returned = "returned"
 
 
 class ReservationStatus(str, enum.Enum):
-    active = "Active"
-    released = "Released"
-    consumed = "Consumed"
-    expired = "Expired"
+    active = "active"
+    released = "released"
+    consumed = "consumed"
+    expired = "expired"
 
 
 class RefundMethod(str, enum.Enum):
@@ -70,7 +70,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Hashed password for customers
-    role: Mapped[Role] = mapped_column(SAEnum(Role, name="role"), default=Role.operations.value, index=True)
+    role: Mapped[Role] = mapped_column(SAEnum(Role, name="role", values_callable=lambda obj: [e.value for e in obj]), default=Role.operations, index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -194,7 +194,7 @@ class Reservation(Base):
     cart_id: Mapped[int] = mapped_column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), index=True)
     variant_id: Mapped[int] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), index=True)
     qty: Mapped[int] = mapped_column(Integer)
-    status: Mapped[ReservationStatus] = mapped_column(SAEnum(ReservationStatus, name="reservation_status"), default=ReservationStatus.active.value)
+    status: Mapped[ReservationStatus] = mapped_column(SAEnum(ReservationStatus, name="reservation_status", values_callable=lambda obj: [e.value for e in obj]), default=ReservationStatus.active)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -206,7 +206,7 @@ class Order(Base):
     user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     cart_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("carts.id"), nullable=True)
     totals: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    status: Mapped[OrderStatus] = mapped_column(SAEnum(OrderStatus, name="order_status"), default=OrderStatus.pending_payment.value, index=True)
+    status: Mapped[OrderStatus] = mapped_column(SAEnum(OrderStatus, name="order_status", values_callable=lambda obj: [e.value for e in obj]), default=OrderStatus.pending_payment, index=True)
     payment_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -252,7 +252,7 @@ class Fulfillment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     order_id: Mapped[int] = mapped_column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), unique=True)
-    status: Mapped[FulfillmentStatus] = mapped_column(SAEnum(FulfillmentStatus, name="fulfillment_status"), default=FulfillmentStatus.processing.value, index=True)
+    status: Mapped[FulfillmentStatus] = mapped_column(SAEnum(FulfillmentStatus, name="fulfillment_status", values_callable=lambda obj: [e.value for e in obj]), default=FulfillmentStatus.processing, index=True)
     packed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     packed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -278,7 +278,7 @@ class Shipment(Base):
     fulfillment_id: Mapped[int] = mapped_column(Integer, ForeignKey("fulfillments.id", ondelete="CASCADE"), unique=True)
     courier: Mapped[str] = mapped_column(String(80))
     tracking_id: Mapped[str] = mapped_column(String(160), index=True)
-    status: Mapped[ShipmentStatus] = mapped_column(SAEnum(ShipmentStatus, name="shipment_status"), default=ShipmentStatus.dispatched.value, index=True)
+    status: Mapped[ShipmentStatus] = mapped_column(SAEnum(ShipmentStatus, name="shipment_status", values_callable=lambda obj: [e.value for e in obj]), default=ShipmentStatus.dispatched, index=True)
     dispatched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -350,7 +350,7 @@ class Refund(Base):
     amount: Mapped[Numeric] = mapped_column(Numeric(12, 2))
     reason: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
     created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
-    refund_method: Mapped[RefundMethod] = mapped_column(SAEnum(RefundMethod, name="refund_method"), default=RefundMethod.paystack)
+    refund_method: Mapped[RefundMethod] = mapped_column(SAEnum(RefundMethod, name="refund_method", values_callable=lambda obj: [e.value for e in obj]), default=RefundMethod.paystack)
     paystack_ref: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     manual_ref: Mapped[Optional[str]] = mapped_column(String(160), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
