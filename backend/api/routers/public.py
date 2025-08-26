@@ -619,6 +619,11 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
 
     # Call Paystack initialize in non-dev environments when key is set
     if settings.paystack_secret_key and settings.paystack_secret_key != "sk_test_xxx":
+        # Log webhook URL for debugging
+        webhook_url = f"{settings.app_url.replace('mdv-web', 'mdv-api')}/api/paystack/webhook"
+        print(f"[CHECKOUT] Webhook URL should be configured in Paystack dashboard: {webhook_url}")
+        print(f"[CHECKOUT] Callback URL: {settings.app_url}/checkout/callback?order_id={order.id}&ref={reference}")
+
         init_payload = {
             "email": body.email,
             "amount": amount_kobo,

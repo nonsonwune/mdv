@@ -22,10 +22,34 @@ async def paystack_mock(event: dict):
 
 @router.post("/webhook")
 async def paystack_webhook(request: Request, x_paystack_signature: str | None = Header(default=None)):
+    # Enhanced logging for webhook debugging
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent", "unknown")
+
+    print(f"[WEBHOOK] Incoming request from IP: {client_ip}, User-Agent: {user_agent}")
+    print(f"[WEBHOOK] Headers: {dict(request.headers)}")
+
     raw = await request.body()
-    verify_signature(raw, x_paystack_signature)
-    event = json.loads(raw.decode("utf-8"))
+    print(f"[WEBHOOK] Raw body length: {len(raw)} bytes")
+    print(f"[WEBHOOK] Signature header present: {x_paystack_signature is not None}")
+
+    try:
+        verify_signature(raw, x_paystack_signature)
+        print(f"[WEBHOOK] Signature verification: SUCCESS")
+    except Exception as e:
+        print(f"[WEBHOOK] Signature verification: FAILED - {e}")
+        raise
+
+    try:
+        event = json.loads(raw.decode("utf-8"))
+        print(f"[WEBHOOK] JSON parsing: SUCCESS")
+        print(f"[WEBHOOK] Event type: {event.get('event', 'unknown')}")
+    except Exception as e:
+        print(f"[WEBHOOK] JSON parsing: FAILED - {e}")
+        raise
+
     await handle_paystack_event(event)
+    print(f"[WEBHOOK] Event processing: COMPLETED")
     return {"ok": True}
 
 

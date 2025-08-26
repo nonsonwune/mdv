@@ -29,6 +29,24 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 @app.on_event("startup")
 async def startup_seed_reference():
     """Seed reference data on startup - non-blocking with error handling"""
+
+    # Log webhook configuration info
+    if settings.paystack_secret_key:
+        # Determine the correct webhook URL
+        if settings.app_url and "mdv-web" in settings.app_url:
+            webhook_url = settings.app_url.replace("mdv-web", "mdv-api") + "/api/paystack/webhook"
+        else:
+            webhook_url = "https://mdv-api-production.up.railway.app/api/paystack/webhook"
+
+        print("=" * 60)
+        print("PAYSTACK WEBHOOK CONFIGURATION")
+        print("=" * 60)
+        print(f"Webhook URL to configure in Paystack dashboard:")
+        print(f"  {webhook_url}")
+        print(f"Required events: charge.success, charge.failed")
+        print(f"Secret key configured: {'Yes' if settings.paystack_secret_key else 'No'}")
+        print("=" * 60)
+
     try:
         # Seed Zones and a minimal state mapping if empty
         Session = get_session_factory()
