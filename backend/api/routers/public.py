@@ -585,8 +585,8 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     addr = Address(order_id=order.id, name=body.address.name, phone=body.address.phone, state=body.address.state, city=body.address.city, street=body.address.street)
     db.add(addr)
 
-    # Reservations (optional)
-    if settings.enable_reservations:
+    # Reservations (optional) - temporarily disabled for debugging
+    if False:  # settings.enable_reservations:
         for it in items:
             inv = (await db.execute(select(Inventory).where(Inventory.variant_id == it.variant_id))).scalar_one_or_none()
             if not inv:
