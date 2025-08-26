@@ -19,7 +19,7 @@ from mdv.schemas import (
     CartItemQtyUpdate,
     ShippingEstimate,
 )
-from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage
+from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage
 from mdv.config import settings
 from ..deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -550,7 +550,7 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     subtotal_eligible = 0.0
     order = Order(
         cart_id=cart.id,
-        status=OrderStatus.pending_payment  # Explicitly set to ensure correct enum value
+        status=OrderStatus.pending_payment  # Explicitly set using the imported enum
     )
     db.add(order)
     await db.flush()
