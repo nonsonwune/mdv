@@ -12,8 +12,8 @@ async def expire_reservations(ctx) -> None:
     async with session_scope() as db:
         await db.execute(
             Reservation.__table__.update()
-            .where(and_(Reservation.status == ReservationStatus.active, Reservation.expires_at < now))
-            .values(status=ReservationStatus.expired)
+            .where(and_(Reservation.status == ReservationStatus.active.value, Reservation.expires_at < now))
+            .values(status=ReservationStatus.expired.value)
         )
     print(f"[worker] expired reservations @ {now.isoformat()}")
 
