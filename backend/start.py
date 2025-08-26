@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Startup script for the backend with proper error handling
+Startup script for the backend with proper error handling and async database URL conversion
 """
 import os
 import sys
@@ -8,11 +8,38 @@ import subprocess
 import time
 import traceback
 
-def get_alembic_database_url():
-    """Convert asyncpg URL to sync URL for Alembic"""
-    db_url = os.environ.get('DATABASE_URL', '')
-    if db_url.startswith('postgresql+asyncpg://'):
+def convert_to_async_url(db_url):
+    """Convert standard PostgreSQL URL to asyncpg URL for async operations"""
+    if not db_url:
+        return db_url
+    
+    # If it's already an async URL, return as is
+    if 'asyncpg' in db_url:
+        return db_url
+    
+    # Convert postgresql:// to postgresql+asyncpg://
+    if db_url.startswith('postgresql://'):
+        return db_url.replace('postgresql://', 'postgresql+asyncpg://')
+    
+    # If it's postgres:// (older format), convert it
+    if db_url.startswith('postgres://'):
+        return db_url.replace('postgres://', 'postgresql+asyncpg://')
+    
+    return db_url
+
+def convert_to_sync_url(db_url):
+    """Convert asyncpg URL to sync URL for Alembic migrations"""
+    if not db_url:
+        return db_url
+    
+    # Remove asyncpg driver specification for Alembic
+    if 'postgresql+asyncpg://' in db_url:
         return db_url.replace('postgresql+asyncpg://', 'postgresql://')
+    
+    # Handle postgres:// format
+    if db_url.startswith('postgres://'):
+        return db_url.replace('postgres://', 'postgresql://')
+    
     return db_url
 
 def run_migrations():
@@ -26,14 +53,18 @@ def run_migrations():
     
     for attempt in range(max_retries):
         try:
-            # Print environment info
-            db_url = os.environ.get('DATABASE_URL', 'Not set')
-            print(f"DATABASE_URL environment variable: {db_url[:50]}..." if len(db_url) > 50 else db_url)
+            # Get the original DATABASE_URL
+            original_db_url = os.environ.get('DATABASE_URL', 'Not set')
+            
+            # Convert to sync URL for Alembic
+            sync_db_url = convert_to_sync_url(original_db_url)
+            
+            print(f"Original DATABASE_URL: {original_db_url[:50]}..." if len(original_db_url) > 50 else original_db_url)
+            print(f"Alembic DATABASE_URL: {sync_db_url[:50]}..." if len(sync_db_url) > 50 else sync_db_url)
             
             # Set the sync database URL for Alembic
-            alembic_url = get_alembic_database_url()
             env = os.environ.copy()
-            env['DATABASE_URL'] = alembic_url
+            env['DATABASE_URL'] = sync_db_url
             
             # Try to run migrations
             result = subprocess.run(
@@ -66,6 +97,25 @@ def run_migrations():
     
     print("=" * 50)
 
+def setup_async_database_url():
+    """Ensure DATABASE_URL is properly formatted for async operations"""
+    original_db_url = os.environ.get('DATABASE_URL', '')
+    
+    if not original_db_url:
+        print("⚠️  DATABASE_URL not set!")
+        return
+    
+    # Convert to async URL for the application
+    async_db_url = convert_to_async_url(original_db_url)
+    
+    if async_db_url != original_db_url:
+        print(f"Converting DATABASE_URL to async format...")
+        print(f"  Original: {original_db_url[:50]}...")
+        print(f"  Async:    {async_db_url[:50]}...")
+        os.environ['DATABASE_URL'] = async_db_url
+    else:
+        print(f"DATABASE_URL already in correct format")
+
 def print_diagnostics():
     """Print diagnostic information for debugging"""
     print("=" * 50)
@@ -77,8 +127,13 @@ def print_diagnostics():
     for var in env_vars:
         val = os.environ.get(var, 'Not set')
         if var in ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'] and val != 'Not set':
-            # Sanitize sensitive values
-            val = f"{val[:20]}..." if len(val) > 20 else val
+            # Sanitize sensitive values but show the protocol
+            if var == 'DATABASE_URL':
+                # Show the protocol part to verify async configuration
+                protocol = val.split('://')[0] if '://' in val else 'unknown'
+                val = f"{protocol}://..." + val[30:50] + "..." if len(val) > 50 else val
+            else:
+                val = f"{val[:20]}..." if len(val) > 20 else val
         print(f"{var}: {val}")
     
     # Python path
@@ -105,6 +160,9 @@ def start_server():
         if '/app' not in sys.path:
             sys.path.insert(0, '/app')
             print("Added /app to Python path")
+        
+        # Ensure DATABASE_URL is async before importing the app
+        setup_async_database_url()
         
         # Change to backend directory for proper module resolution
         os.chdir('/app/backend')
