@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -114,6 +115,16 @@ async def debug_cors():
         "allowed_origins": allowed_origins,
         "app_url": settings.app_url,
         "env": settings.env
+    }
+
+# Test endpoint for API connectivity
+@app.get("/api/test")
+async def api_test():
+    return {
+        "status": "ok",
+        "service": "mdv-api",
+        "message": "API is responding correctly",
+        "timestamp": datetime.now().isoformat()
     }
 
 # Routes

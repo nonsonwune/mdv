@@ -19,6 +19,7 @@ const nextConfig = {
       hostname,
       pathname: '/**',
     })),
+    // Remove deprecated domains configuration
   },
 }
 

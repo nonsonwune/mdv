@@ -9,6 +9,7 @@ export async function GET(
 
     // Add debug logging
     console.log('Placeholder API called with params:', { width, height })
+    console.log('Request URL:', request.url)
 
     // Validate dimensions
     const w = parseInt(width, 10)
@@ -16,7 +17,12 @@ export async function GET(
 
     if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0 || w > 2000 || h > 2000) {
       console.log('Invalid dimensions:', { w, h })
-      return new NextResponse('Invalid dimensions', { status: 400 })
+      return new NextResponse('Invalid dimensions', {
+        status: 400,
+        headers: {
+          'Content-Type': 'text/plain',
+        }
+      })
     }
 
     // Create SVG placeholder
@@ -35,10 +41,16 @@ export async function GET(
       headers: {
         'Content-Type': 'image/svg+xml',
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
       },
     })
   } catch (error) {
     console.error('Error in placeholder API:', error)
-    return new NextResponse('Internal Server Error', { status: 500 })
+    return new NextResponse('Internal Server Error', {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain',
+      }
+    })
   }
 }

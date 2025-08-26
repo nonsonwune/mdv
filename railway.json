@@ -42,7 +42,7 @@
         "dockerfilePath": "Dockerfile.backend"
       },
       "deploy": {
-        "startCommand": "arq backend.worker.settings.WorkerSettings",
+        "startCommand": "python backend/start_worker.py",
         "restartPolicyType": "ON_FAILURE",
         "restartPolicyMaxRetries": 10
       },
