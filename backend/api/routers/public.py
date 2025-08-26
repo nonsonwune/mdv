@@ -548,10 +548,9 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     # Build order and calculate totals
     subtotal = 0.0
     subtotal_eligible = 0.0
-    order = Order(
-        cart_id=cart.id,
-        status="PendingPayment"  # HOTFIX: Use hardcoded string value to ensure correct DB enum
-    )
+    # Create order with explicit status assignment after object creation
+    order = Order(cart_id=cart.id)
+    order.status = "PendingPayment"  # HOTFIX: Set status after object creation
     db.add(order)
     await db.flush()
 
