@@ -1,0 +1,52 @@
+# Build Next.js web
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY web/package.json web/package-lock.json ./
+# Install ALL dependencies (including devDependencies) for build
+RUN npm ci
+
+FROM node:20-alpine AS build
+WORKDIR /app
+
+# IMPORTANT: Accept build args for Next.js public environment variables
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+
+# Set them as ENV for the build process
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY web ./
+# Copy docs directory for API contract generation
+COPY docs ../docs
+
+# Debug: Print environment variables during build
+RUN echo "Building with NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL"
+
+# Run build (which includes prebuild for type generation)
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Runtime environment variables (these don't affect the built code)
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+
+# Copy standalone output if available (Next 14 standalone)
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+# The standalone output includes a server.js with Next server
+ENV PORT=3000
+EXPOSE 3000
+CMD ["node", "server.js"]
