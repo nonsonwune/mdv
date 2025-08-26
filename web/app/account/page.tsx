@@ -46,9 +46,8 @@ export default function AccountPage() {
         return
       }
 
-      // Fetch user profile
-      const response = await fetch(`${API_BASE}/api/users/profile`, {
-        credentials: 'include',
+      // Fetch user profile through local API proxy
+      const response = await fetch('/api/users/profile', {
         headers: {
           'Accept': 'application/json'
         }
