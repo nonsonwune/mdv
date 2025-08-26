@@ -17,38 +17,38 @@ from mdv.models import (
 
 def test_order_status_values():
     """Verify OrderStatus enum values match database enum"""
-    assert OrderStatus.pending_payment.value == "pending_payment"
-    assert OrderStatus.paid.value == "paid"
-    assert OrderStatus.cancelled.value == "cancelled"
-    assert OrderStatus.refunded.value == "refunded"
+    assert OrderStatus.pending_payment.value == "PendingPayment"
+    assert OrderStatus.paid.value == "Paid"
+    assert OrderStatus.cancelled.value == "Cancelled"
+    assert OrderStatus.refunded.value == "Refunded"
     
     # Ensure all enum members are accounted for
     assert len(OrderStatus) == 4
     
 def test_fulfillment_status_values():
     """Verify FulfillmentStatus enum values match database enum"""
-    assert FulfillmentStatus.processing.value == "processing"
-    assert FulfillmentStatus.ready_to_ship.value == "ready_to_ship"
+    assert FulfillmentStatus.processing.value == "Processing"
+    assert FulfillmentStatus.ready_to_ship.value == "ReadyToShip"
 
     # Ensure all enum members are accounted for
     assert len(FulfillmentStatus) == 2
 
 def test_shipment_status_values():
     """Verify ShipmentStatus enum values match database enum"""
-    assert ShipmentStatus.dispatched.value == "dispatched"
-    assert ShipmentStatus.in_transit.value == "in_transit"
-    assert ShipmentStatus.delivered.value == "delivered"
-    assert ShipmentStatus.returned.value == "returned"
+    assert ShipmentStatus.dispatched.value == "Dispatched"
+    assert ShipmentStatus.in_transit.value == "InTransit"
+    assert ShipmentStatus.delivered.value == "Delivered"
+    assert ShipmentStatus.returned.value == "Returned"
 
     # Ensure all enum members are accounted for
     assert len(ShipmentStatus) == 4
 
 def test_reservation_status_values():
     """Verify ReservationStatus enum values match database enum"""
-    assert ReservationStatus.active.value == "active"
-    assert ReservationStatus.released.value == "released"
-    assert ReservationStatus.consumed.value == "consumed"
-    assert ReservationStatus.expired.value == "expired"
+    assert ReservationStatus.active.value == "Active"
+    assert ReservationStatus.released.value == "Released"
+    assert ReservationStatus.consumed.value == "Consumed"
+    assert ReservationStatus.expired.value == "Expired"
 
     # Ensure all enum members are accounted for
     assert len(ReservationStatus) == 4
@@ -74,38 +74,38 @@ def test_role_values():
 def test_enum_str_inheritance():
     """Verify that all enums properly inherit from str for SQLAlchemy compatibility"""
     # When enums inherit from str, they should be directly usable as strings
-    assert OrderStatus.pending_payment.value == "pending_payment"
-    assert OrderStatus.pending_payment == "pending_payment"  # This works because of str inheritance
+    assert OrderStatus.pending_payment.value == "PendingPayment"
+    assert OrderStatus.pending_payment == "PendingPayment"  # This works because of str inheritance
 
-    assert FulfillmentStatus.processing.value == "processing"
-    assert FulfillmentStatus.processing == "processing"
+    assert FulfillmentStatus.processing.value == "Processing"
+    assert FulfillmentStatus.processing == "Processing"
 
-    assert ShipmentStatus.dispatched.value == "dispatched"
-    assert ShipmentStatus.dispatched == "dispatched"
+    assert ShipmentStatus.dispatched.value == "Dispatched"
+    assert ShipmentStatus.dispatched == "Dispatched"
 
-    assert ReservationStatus.active.value == "active"
-    assert ReservationStatus.active == "active"
+    assert ReservationStatus.active.value == "Active"
+    assert ReservationStatus.active == "Active"
 
 def test_enum_values_are_strings():
     """Ensure all enum values are proper strings matching production database format"""
-    # For production compatibility, enum values should match the member names (lowercase/snake_case)
+    # For production compatibility, enum values should match the database format (PascalCase for most)
     for status in OrderStatus:
-        # The value should be the same as the member name for production database compatibility
-        assert status.value == status.name
-        # The value should be a lowercase string
-        assert status.value.islower()
+        # The value should be a string
+        assert isinstance(status.value, str)
+        # The value should start with uppercase (PascalCase)
+        assert status.value[0].isupper()
 
     for status in FulfillmentStatus:
-        assert status.value == status.name
-        assert status.value.islower()
+        assert isinstance(status.value, str)
+        assert status.value[0].isupper()
 
     for status in ShipmentStatus:
-        assert status.value == status.name
-        assert status.value.islower()
+        assert isinstance(status.value, str)
+        assert status.value[0].isupper()
 
     for status in ReservationStatus:
-        assert status.value == status.name
-        assert status.value.islower()
+        assert isinstance(status.value, str)
+        assert status.value[0].isupper()
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

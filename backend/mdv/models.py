@@ -32,29 +32,29 @@ class Role(str, enum.Enum):
 
 
 class OrderStatus(str, enum.Enum):
-    pending_payment = "pending_payment"
-    paid = "paid"
-    cancelled = "cancelled"
-    refunded = "refunded"
+    pending_payment = "PendingPayment"
+    paid = "Paid"
+    cancelled = "Cancelled"
+    refunded = "Refunded"
 
 
 class FulfillmentStatus(str, enum.Enum):
-    processing = "processing"
-    ready_to_ship = "ready_to_ship"
+    processing = "Processing"
+    ready_to_ship = "ReadyToShip"
 
 
 class ShipmentStatus(str, enum.Enum):
-    dispatched = "dispatched"
-    in_transit = "in_transit"
-    delivered = "delivered"
-    returned = "returned"
+    dispatched = "Dispatched"
+    in_transit = "InTransit"
+    delivered = "Delivered"
+    returned = "Returned"
 
 
 class ReservationStatus(str, enum.Enum):
-    active = "active"
-    released = "released"
-    consumed = "consumed"
-    expired = "expired"
+    active = "Active"
+    released = "Released"
+    consumed = "Consumed"
+    expired = "Expired"
 
 
 class RefundMethod(str, enum.Enum):
