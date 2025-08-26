@@ -17,7 +17,10 @@ import json
 from decimal import Decimal
 
 from mdv.auth import require_roles
-from mdv.rbac import ADMINS, SUPERVISORS
+from mdv.rbac import (
+    ADMINS, SUPERVISORS, Permission,
+    require_permission, require_any_permission
+)
 from mdv.models import (
     Product, Variant, Category, ProductImage, 
     Inventory, StockLedger, Reservation, ReservationStatus,
@@ -105,9 +108,9 @@ async def create_stock_ledger_entry(
 async def create_product(
     request: ProductCreateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_CREATE))
 ):
-    """Create a new product with variants."""
+    """Create a new product with variants. Requires PRODUCT_CREATE permission."""
     actor_id = parse_actor_id(claims)
     
     try:
@@ -204,9 +207,9 @@ async def update_product(
     product_id: int,
     request: ProductUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_EDIT))
 ):
-    """Update product details."""
+    """Update product details. Requires PRODUCT_EDIT permission."""
     actor_id = parse_actor_id(claims)
     
     product = await get_product_with_details(db, product_id)
@@ -243,9 +246,9 @@ async def delete_product(
     product_id: int,
     force: bool = Query(False, description="Force delete even with orders"),
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_DELETE))
 ):
-    """Delete a product and all its variants."""
+    """Delete a product and all its variants. Requires PRODUCT_DELETE permission."""
     actor_id = parse_actor_id(claims)
     
     product = await get_product_with_details(db, product_id)
@@ -299,9 +302,9 @@ async def list_products(
     category_id: Optional[int] = None,
     low_stock_only: bool = False,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*SUPERVISORS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_VIEW))
 ):
-    """List products with filtering and pagination."""
+    """List products with filtering and pagination. Requires PRODUCT_VIEW permission."""
     # Base query
     query = select(Product).options(
         selectinload(Product.images),
@@ -411,9 +414,9 @@ async def list_products(
 async def get_product_details(
     product_id: int,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*SUPERVISORS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_VIEW))
 ):
-    """Get detailed product information."""
+    """Get detailed product information. Requires PRODUCT_VIEW permission."""
     product = await get_product_with_details(db, product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -629,9 +632,9 @@ async def update_inventory(
     variant_id: int,
     request: InventoryUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*SUPERVISORS))
+    claims: dict = Depends(require_permission(Permission.INVENTORY_ADJUST))
 ):
-    """Update inventory for a variant."""
+    """Update inventory for a variant. Requires INVENTORY_ADJUST permission."""
     actor_id = parse_actor_id(claims)
     
     # Get or create inventory record
@@ -675,9 +678,9 @@ async def update_inventory(
 async def bulk_adjust_inventory(
     request: BulkInventoryAdjustRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*SUPERVISORS))
+    claims: dict = Depends(require_permission(Permission.INVENTORY_ADJUST))
 ):
-    """Bulk adjust inventory for multiple variants."""
+    """Bulk adjust inventory for multiple variants. Requires INVENTORY_ADJUST permission."""
     actor_id = parse_actor_id(claims)
     
     adjusted = []
@@ -741,9 +744,9 @@ async def bulk_adjust_inventory(
 async def sync_inventory(
     request: InventorySyncRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.INVENTORY_SYNC))
 ):
-    """Sync inventory with physical counts."""
+    """Sync inventory with physical counts. Requires INVENTORY_SYNC permission."""
     actor_id = parse_actor_id(claims)
     
     synced = []
@@ -802,9 +805,9 @@ async def sync_inventory(
 async def get_low_stock_items(
     threshold_multiplier: float = Query(1.0, description="Multiplier for safety stock threshold"),
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*SUPERVISORS))
+    claims: dict = Depends(require_permission(Permission.INVENTORY_VIEW))
 ):
-    """Get list of low stock items."""
+    """Get list of low stock items. Requires INVENTORY_VIEW permission."""
     # Query for low stock variants
     query = (
         select(Variant, Inventory, Product)

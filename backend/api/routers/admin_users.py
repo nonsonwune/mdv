@@ -14,7 +14,10 @@ import hashlib
 import secrets
 
 from mdv.auth import require_roles, get_current_claims
-from mdv.rbac import ADMINS, SUPERVISORS
+from mdv.rbac import (
+    ADMINS, SUPERVISORS, Permission,
+    require_permission, require_any_permission
+)
 from mdv.models import User, Role
 from mdv.utils import audit, parse_actor_id
 from ..deps import get_db
@@ -103,18 +106,19 @@ def generate_temp_password() -> str:
 
 # Endpoints
 
-@router.get("", response_model=UserListResponse, dependencies=[Depends(require_roles(*ADMINS))])
+@router.get("", response_model=UserListResponse)
 async def list_users(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     role: Optional[Role] = None,
     active: Optional[bool] = None,
     search: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_permission(Permission.USER_VIEW))
 ):
     """
     List all users with pagination and filtering.
-    Admin only.
+    Requires USER_VIEW permission.
     """
     # Build query
     query = select(User)
@@ -171,11 +175,14 @@ async def list_users(
     )
 
 
-@router.get("/stats", response_model=UserStatsResponse, dependencies=[Depends(require_roles(*ADMINS))])
-async def get_user_stats(db: AsyncSession = Depends(get_db)):
+@router.get("/stats", response_model=UserStatsResponse)
+async def get_user_stats(
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_permission(Permission.USER_VIEW))
+):
     """
     Get user statistics.
-    Admin only.
+    Requires USER_VIEW permission.
     """
     # Total users
     total = await db.execute(select(func.count()).select_from(User))
