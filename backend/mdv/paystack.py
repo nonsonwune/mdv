@@ -39,14 +39,14 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
             order = (await db.execute(select(Order).where(Order.payment_ref == reference))).scalar_one_or_none()
             if not order:
                 return
-            if order.status in (OrderStatus.paid, OrderStatus.refunded, OrderStatus.cancelled):
+            if order.status in (OrderStatus.paid.value, OrderStatus.refunded.value, OrderStatus.cancelled.value):
                 return  # idempotent
-            order.status = OrderStatus.paid
+            order.status = OrderStatus.paid.value
 
             # Create fulfillment if missing
             ful = (await db.execute(select(Fulfillment).where(Fulfillment.order_id == order.id))).scalar_one_or_none()
             if not ful:
-                ful = Fulfillment(order_id=order.id, status=FulfillmentStatus.processing)
+                ful = Fulfillment(order_id=order.id, status=FulfillmentStatus.processing.value)
                 db.add(ful)
 
             # Reduce inventory and ledger entries
@@ -60,7 +60,7 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                 await db.execute(
                     Reservation.__table__.update()
                     .where(and_(Reservation.variant_id == it.variant_id, Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active))
-                    .values(status=ReservationStatus.consumed)
+                    .values(status=ReservationStatus.consumed.value)
                 )
             
             # Clear cart items after successful payment
@@ -136,7 +136,7 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                 return
             await db.execute(
                 Reservation.__table__.update()
-                .where(and_(Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active))
-                .values(status=ReservationStatus.released)
+                .where(and_(Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active.value))
+                .values(status=ReservationStatus.released.value)
             )
 

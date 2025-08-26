@@ -43,11 +43,11 @@ async def set_ready_to_ship(fid: int, db: AsyncSession = Depends(get_db), claims
     ful = (await db.execute(select(Fulfillment).where(Fulfillment.id == fid))).scalar_one_or_none()
     if not ful:
         raise HTTPException(status_code=404, detail="Fulfillment not found")
-    if ful.status != FulfillmentStatus.processing:
+    if ful.status != FulfillmentStatus.processing.value:
         raise HTTPException(status_code=409, detail="Fulfillment not in Processing")
     # Ensure order is paid
     order = (await db.execute(select(Order).where(Order.id == ful.order_id))).scalar_one()
-    if order.status != OrderStatus.paid:
+    if order.status != OrderStatus.paid.value:
         raise HTTPException(status_code=409, detail="Order not Paid")
     before = {"status": ful.status.value}
     ful.status = FulfillmentStatus.ready_to_ship
@@ -109,7 +109,7 @@ async def cancel_order(oid: int, db: AsyncSession = Depends(get_db), claims=Depe
     order = (await db.execute(select(Order).where(Order.id == oid))).scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status != OrderStatus.paid:
+    if order.status != OrderStatus.paid.value:
         raise HTTPException(status_code=409, detail="Only Paid orders can be cancelled pre-ship")
     # ensure no shipment exists
     ful = (await db.execute(select(Fulfillment).where(Fulfillment.order_id == order.id))).scalar_one_or_none()

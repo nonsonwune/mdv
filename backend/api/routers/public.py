@@ -550,7 +550,7 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     subtotal_eligible = 0.0
     order = Order(
         cart_id=cart.id,
-        status=OrderStatus.pending_payment  # Enum value is handled by SQLAlchemy
+        status=OrderStatus.pending_payment.value  # HOTFIX: Force explicit enum value
     )
     db.add(order)
     await db.flush()
@@ -592,12 +592,12 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
             if not inv:
                 raise HTTPException(status_code=409, detail="Inventory missing for variant")
             # compute already reserved
-            active_reserved = (await db.execute(select(func.coalesce(func.sum(Reservation.qty), 0)).where(and_(Reservation.variant_id == it.variant_id, Reservation.status == ReservationStatus.active, Reservation.expires_at > datetime.now(timezone.utc))))).scalar_one()
+            active_reserved = (await db.execute(select(func.coalesce(func.sum(Reservation.qty), 0)).where(and_(Reservation.variant_id == it.variant_id, Reservation.status == ReservationStatus.active.value, Reservation.expires_at > datetime.now(timezone.utc))))).scalar_one()
             available = (inv.quantity - inv.safety_stock) - int(active_reserved)
             if it.qty > max(0, available):
                 raise HTTPException(status_code=409, detail="Insufficient stock to reserve")
             expires = datetime.now(timezone.utc) + timedelta(minutes=15)
-            db.add(Reservation(cart_id=cart.id, variant_id=it.variant_id, qty=it.qty, status=ReservationStatus.active, expires_at=expires))
+            db.add(Reservation(cart_id=cart.id, variant_id=it.variant_id, qty=it.qty, status=ReservationStatus.active.value, expires_at=expires))
 
     order.totals = {
         "subtotal": round(subtotal, 2),

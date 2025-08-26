@@ -175,9 +175,9 @@ async def get_order_details(
         )
     
     # Determine capabilities
-    can_cancel = order.status == OrderStatus.pending_payment
-    can_return = order.status == OrderStatus.paid and order.fulfillment and order.fulfillment.status == FulfillmentStatus.ready_to_ship
-    tracking_available = order.status in [OrderStatus.paid, OrderStatus.refunded]
+    can_cancel = order.status == OrderStatus.pending_payment.value
+    can_return = order.status == OrderStatus.paid.value and order.fulfillment and order.fulfillment.status == FulfillmentStatus.ready_to_ship.value
+    tracking_available = order.status in [OrderStatus.paid.value, OrderStatus.refunded.value]
     
     return OrderResponse(
         id=order.id,
@@ -211,7 +211,7 @@ async def cancel_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.status != OrderStatus.pending_payment:
+    if order.status != OrderStatus.pending_payment.value:
         raise HTTPException(
             status_code=400,
             detail="Order can only be cancelled if payment is pending"
@@ -246,7 +246,7 @@ async def request_return(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.status != OrderStatus.paid:
+    if order.status != OrderStatus.paid.value:
         raise HTTPException(
             status_code=400,
             detail="Returns can only be requested for paid orders"
