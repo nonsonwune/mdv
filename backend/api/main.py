@@ -108,6 +108,52 @@ async def health_check():
 async def root():
     return {"message": "MDV API is running", "version": "0.1.0"}
 
+# Custom exception handlers to ensure CORS headers are included in error responses
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    headers = {}
+    origin = request.headers.get("origin")
+    if origin in allowed_origins:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*",
+        }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    headers = {}
+    origin = request.headers.get("origin")  
+    if origin in allowed_origins:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*",
+        }
+    # Log the error for debugging
+    print(f"Unhandled exception: {exc}")
+    import traceback
+    traceback.print_exc()
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=headers
+    )
+
 # Debug endpoint to check CORS configuration (remove in production)
 @app.get("/debug/cors")
 async def debug_cors():

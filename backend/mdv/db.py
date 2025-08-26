@@ -31,7 +31,31 @@ _SessionFactory: async_sessionmaker[AsyncSession] | None = None
 def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
-        _engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        # Enhanced connection pool settings for production reliability
+        pool_kwargs = {
+            "pool_pre_ping": True,  # Verify connections before use
+            "pool_recycle": 3600,   # Recycle connections after 1 hour
+        }
+        
+        # Increase pool size for production
+        if settings.env == "production":
+            pool_kwargs.update({
+                "pool_size": 20,      # Increase from default 5
+                "max_overflow": 10,   # Allow 10 additional connections
+                "pool_timeout": 30,   # Wait up to 30 seconds for connection
+                "echo_pool": False,   # Disable pool logging in production
+            })
+        else:
+            pool_kwargs.update({
+                "pool_size": 5,       # Default for development
+                "max_overflow": 5,    # Smaller overflow for dev
+                "echo": settings.env == "development",
+            })
+        
+        _engine = create_async_engine(
+            settings.database_url,
+            **pool_kwargs
+        )
     return _engine
 
 

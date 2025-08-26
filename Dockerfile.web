@@ -1,9 +1,13 @@
 # Build Next.js web
 FROM node:20-alpine AS deps
 WORKDIR /app
+# Install dependencies for sharp (required for Next.js image optimization)
+RUN apk add --no-cache libc6-compat python3 make g++ 
 COPY web/package.json web/package-lock.json ./
 # Install ALL dependencies (including devDependencies) for build
 RUN npm ci
+# Install sharp explicitly with platform-specific binary
+RUN npm install sharp
 
 FROM node:20-alpine AS build
 WORKDIR /app
@@ -32,6 +36,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Add runtime dependencies for sharp
+RUN apk add --no-cache libc6-compat
 
 # Runtime environment variables (these don't affect the built code)
 ARG NEXT_PUBLIC_API_URL
