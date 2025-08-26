@@ -11,14 +11,12 @@ import ToastProvider from "./_components/ToastProvider"
 export const metadata: Metadata = {
   title: "Maison De Valeur",
   description: "Affordable essentials and last-season fashion.",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
+  metadataBase: new URL('https://mdv.ng'),
+  openGraph: {
+    title: "Maison De Valeur",
+    description: "Affordable essentials and last-season fashion.",
+    type: "website",
   },
-  themeColor: "#800000",
-  manifest: "/manifest.json",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -27,6 +25,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   
   return (
     <html lang="en">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        <meta name="theme-color" content="#800000" />
+        <link rel="manifest" href="/manifest.json" />
+      </head>
       <body>
         <ToastProvider>
           <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-maroon-700 text-white px-4 py-2 rounded">
