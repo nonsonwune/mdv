@@ -25,10 +25,18 @@ export enum Permission {
   PRODUCT_DELETE = "product:delete",
   PRODUCT_PUBLISH = "product:publish",
   
+  // Category permissions
+  MANAGE_CATEGORIES = "category:manage",
+  VIEW_CATEGORIES = "category:view",
+  DELETE_CATEGORIES = "category:delete",
+  
   // Inventory permissions
   INVENTORY_VIEW = "inventory:view",
   INVENTORY_ADJUST = "inventory:adjust",
   INVENTORY_SYNC = "inventory:sync",
+  // Aliases for backend compatibility
+  VIEW_INVENTORY = "inventory:view",
+  MANAGE_INVENTORY = "inventory:adjust",
   
   // Order permissions
   ORDER_VIEW = "order:view",
@@ -45,6 +53,10 @@ export enum Permission {
   USER_DELETE = "user:delete",
   USER_ACTIVATE = "user:activate",
   USER_ASSIGN_ROLE = "user:assign_role",
+  // Aliases for backend compatibility
+  MANAGE_USERS = "user:manage",
+  VIEW_USERS = "user:view",
+  DELETE_USERS = "user:delete",
   
   // Payment permissions
   PAYMENT_VIEW = "payment:view",
@@ -55,6 +67,12 @@ export enum Permission {
   REPORT_VIEW = "report:view",
   REPORT_GENERATE = "report:generate",
   REPORT_EXPORT = "report:export",
+  // Aliases for backend compatibility
+  VIEW_REPORTS = "report:view",
+  VIEW_SALES_REPORTS = "report:view",
+  VIEW_INVENTORY_REPORTS = "report:view",
+  VIEW_CUSTOMER_REPORTS = "report:view",
+  EXPORT_DATA = "report:export",
   
   // System permissions
   SYSTEM_SETTINGS = "system:settings",
@@ -131,9 +149,15 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
     Permission.PRODUCT_CREATE,
     Permission.PRODUCT_EDIT,
     Permission.PRODUCT_PUBLISH,
+    // Categories
+    Permission.MANAGE_CATEGORIES,
+    Permission.VIEW_CATEGORIES,
+    Permission.DELETE_CATEGORIES,
     // Inventory - full access
     Permission.INVENTORY_VIEW,
+    Permission.VIEW_INVENTORY,
     Permission.INVENTORY_ADJUST,
+    Permission.MANAGE_INVENTORY,
     Permission.INVENTORY_SYNC,
     // Orders - full access
     Permission.ORDER_VIEW,
@@ -144,29 +168,44 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
     Permission.ORDER_REFUND,
     // Users - limited access
     Permission.USER_VIEW,
+    Permission.VIEW_USERS,
     Permission.USER_CREATE,
     Permission.USER_EDIT,
     Permission.USER_ACTIVATE,
+    Permission.MANAGE_USERS,
+    Permission.DELETE_USERS,
     // Payments - view and process
     Permission.PAYMENT_VIEW,
     Permission.PAYMENT_PROCESS,
     Permission.PAYMENT_REFUND,
     // Reports - full access
     Permission.REPORT_VIEW,
+    Permission.VIEW_REPORTS,
+    Permission.VIEW_SALES_REPORTS,
+    Permission.VIEW_INVENTORY_REPORTS,
+    Permission.VIEW_CUSTOMER_REPORTS,
     Permission.REPORT_GENERATE,
     Permission.REPORT_EXPORT,
+    Permission.EXPORT_DATA,
     // Analytics
     Permission.ANALYTICS_VIEW,
     Permission.ANALYTICS_EXPORT,
   ]),
   
   operations: new Set([
-    // Products - view and edit only (no create or delete as per requirements)
+    // Products - create/edit/delete
     Permission.PRODUCT_VIEW,
+    Permission.PRODUCT_CREATE,
     Permission.PRODUCT_EDIT,
+    Permission.PRODUCT_DELETE,
+    // Categories
+    Permission.VIEW_CATEGORIES,
+    Permission.MANAGE_CATEGORIES,
     // Inventory - view and adjust
     Permission.INVENTORY_VIEW,
+    Permission.VIEW_INVENTORY,
     Permission.INVENTORY_ADJUST,
+    Permission.MANAGE_INVENTORY,
     // Orders - manage fulfillment
     Permission.ORDER_VIEW,
     Permission.ORDER_EDIT,
@@ -175,6 +214,8 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
     Permission.PAYMENT_VIEW,
     // Reports - view only
     Permission.REPORT_VIEW,
+    Permission.VIEW_REPORTS,
+    Permission.VIEW_INVENTORY_REPORTS,
     // Analytics - view only
     Permission.ANALYTICS_VIEW,
   ]),
@@ -184,11 +225,14 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
     Permission.PRODUCT_VIEW,
     // Inventory - view only
     Permission.INVENTORY_VIEW,
+    Permission.VIEW_INVENTORY,
     // Orders - view and update shipping
     Permission.ORDER_VIEW,
     Permission.ORDER_EDIT,
     // Reports - view logistics reports
     Permission.REPORT_VIEW,
+    Permission.VIEW_REPORTS,
+    Permission.VIEW_INVENTORY_REPORTS,
     // Analytics - view logistics analytics
     Permission.ANALYTICS_VIEW,
   ]),

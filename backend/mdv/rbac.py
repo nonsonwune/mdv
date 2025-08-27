@@ -205,18 +205,30 @@ def require_permission(permission: Permission):
     """Dependency to require a specific permission."""
     async def _checker(claims: dict = Depends(get_current_claims)):
         role_str = claims.get("role")
+        user_id = claims.get("sub")
+        
         try:
             role = Role(role_str)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid role"
+                detail={
+                    "error": "invalid_role",
+                    "message": f"Invalid role: {role_str}",
+                    "required_permission": permission.value
+                }
             )
         
         if not has_permission(role, permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {permission.value}"
+                detail={
+                    "error": "insufficient_permissions",
+                    "message": f"Access denied. Required permission: {permission.value}",
+                    "user_role": role.value,
+                    "required_permission": permission.value,
+                    "user_id": user_id
+                }
             )
         
         return claims
