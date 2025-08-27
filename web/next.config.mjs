@@ -22,6 +22,8 @@ const nextConfig = {
     // Enable rendering of SVGs from trusted sources only
     dangerouslyAllowSVG: true,
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+    // Hotfix: bypass Next.js Image optimizer so inline/API SVGs render
+    unoptimized: true,
     // Remove deprecated domains configuration
   },
 }
