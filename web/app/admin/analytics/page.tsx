@@ -91,65 +91,8 @@ export default function AnalyticsPage() {
       setData(response)
     } catch (error) {
       console.error('Failed to fetch analytics:', error)
-      // Set mock data for development
-      setData({
-        revenue: {
-          current: 125000,
-          previous: 98000,
-          change: 27.6,
-          daily: Array.from({ length: 30 }, (_, i) => ({
-            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            amount: Math.floor(Math.random() * 5000) + 2000
-          }))
-        },
-        orders: {
-          current: 1250,
-          previous: 980,
-          change: 27.6,
-          daily: Array.from({ length: 30 }, (_, i) => ({
-            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            count: Math.floor(Math.random() * 50) + 20
-          })),
-          by_status: [
-            { status: 'completed', count: 850 },
-            { status: 'processing', count: 200 },
-            { status: 'shipped', count: 150 },
-            { status: 'pending', count: 50 }
-          ]
-        },
-        customers: {
-          current: 2340,
-          previous: 2180,
-          change: 7.3,
-          new_customers: 340,
-          returning_customers: 1910
-        },
-        products: {
-          total_products: 125,
-          out_of_stock: 8,
-          low_stock: 15,
-          top_selling: [
-            { product_id: 1, product_title: 'Classic White T-Shirt', quantity_sold: 245, revenue: 6125 },
-            { product_id: 2, product_title: 'Denim Jacket', quantity_sold: 180, revenue: 14400 },
-            { product_id: 3, product_title: 'Running Shoes', quantity_sold: 160, revenue: 19200 },
-            { product_id: 4, product_title: 'Leather Wallet', quantity_sold: 120, revenue: 7200 },
-            { product_id: 5, product_title: 'Casual Hoodie', quantity_sold: 95, revenue: 5700 }
-          ]
-        },
-        geographic: [
-          { country: 'United States', orders: 750, revenue: 75000 },
-          { country: 'Canada', orders: 180, revenue: 18000 },
-          { country: 'United Kingdom', orders: 120, revenue: 12000 },
-          { country: 'Australia', orders: 90, revenue: 9000 },
-          { country: 'Germany', orders: 60, revenue: 6000 }
-        ],
-        conversion: {
-          views: 15000,
-          add_to_cart: 2250,
-          purchases: 1250,
-          conversion_rate: 8.33
-        }
-      })
+      // Don't set dummy data in production - keep data as null to show error state
+      setData(null)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -228,7 +171,19 @@ export default function AnalyticsPage() {
 
       {!data ? (
         <div className="text-center py-12">
-          <p className="text-gray-500">No analytics data available</p>
+          <div className="mb-4">
+            <ChartBarIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Unavailable</h3>
+            <p className="text-gray-500 mb-4">Unable to load analytics data at the moment.</p>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition-colors"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Try Again'}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">

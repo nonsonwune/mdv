@@ -68,15 +68,26 @@ export default function AccountPage() {
       const firstName = nameParts[0] || 'User'
       const lastName = nameParts.slice(1).join(' ') || ''
 
+      // Calculate real user statistics from order data
+      const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]')
+      const totalSpent = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
+      const totalOrders = orders.length
+      
+      // Calculate loyalty tier based on spending
+      let loyaltyTier = 'bronze'
+      if (totalSpent >= 1000000) loyaltyTier = 'platinum'
+      else if (totalSpent >= 500000) loyaltyTier = 'gold'
+      else if (totalSpent >= 100000) loyaltyTier = 'silver'
+
       setUser({
         ...userData,
         firstName,
         lastName,
-        loyaltyTier: 'bronze', // Default tier
+        loyaltyTier,
         joinedDate: userData.createdAt || new Date().toISOString(),
-        verified: true,
-        totalOrders: 0,
-        totalSpent: 0
+        verified: userData.verified || true,
+        totalOrders,
+        totalSpent
       })
     } catch (error) {
       console.error('Error loading user data:', error)

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button, Card, Alert } from "../../components/ui"
 import { useToast } from "../_components/ToastProvider"
+import { useAuth } from "../../lib/auth-context"
 
 interface FormData {
   name: string
@@ -34,6 +35,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const sp = useSearchParams()
   const toast = useToast()
+  const { checkAuth } = useAuth()
 
   // Validate form fields
   function validateForm(): boolean {
@@ -117,6 +119,9 @@ export default function RegisterPage() {
 
       // Registration successful
       toast.success("Registration successful!", "Welcome to MDV! You are now logged in.")
+      
+      // Refresh auth state to update navigation
+      await checkAuth()
       
       // Redirect to the intended page or homepage
       const next = sp.get("next") || "/"

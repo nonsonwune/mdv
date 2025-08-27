@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { useAuth } from "../../lib/auth-context"
 
 export default function CustomerLoginPage() {
   const [email, setEmail] = useState("")
@@ -11,6 +12,7 @@ export default function CustomerLoginPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { checkAuth } = useAuth()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -30,6 +32,9 @@ export default function CustomerLoginPage() {
       }
       
       const data = await res.json()
+      
+      // Refresh auth state to update navigation
+      await checkAuth()
       
       // For customers, redirect to account page by default
       const next = searchParams.get("next") || "/account"
