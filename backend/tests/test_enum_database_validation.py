@@ -11,6 +11,7 @@ Run with: pytest backend/tests/test_enum_database_validation.py -v
 """
 
 import pytest
+import os
 import asyncio
 from typing import Dict, List, Any
 from datetime import datetime, timezone
@@ -30,6 +31,10 @@ class TestEnumDatabaseValidation:
     @pytest.fixture
     async def db_session(self):
         """Create test database session."""
+        # Skip tests if not using Postgres in CI/local env
+        if not os.environ.get("DATABASE_URL", "").startswith("postgresql"):
+            pytest.skip("Enum DB validation requires PostgreSQL DATABASE_URL")
+
         Session = get_session_factory()
         async with Session() as session:
             yield session

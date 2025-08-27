@@ -196,14 +196,14 @@ async def get_low_stock_items(
     return items
 
 
-@router.post("/adjust")
+@router.post("/adjust", dependencies=[Depends(require_permission(Permission.INVENTORY_ADJUST))])
 async def adjust_stock(
     request: StockAdjustmentRequest,
     db: AsyncSession = Depends(get_async_db),
-    claims: dict = Depends(require_permission(Permission.INVENTORY_ADJUST))
 ):
     """Adjust stock levels for multiple items."""
-    user_id = int(claims.get("sub"))
+    # claims already validated for permission via dependency
+    # In tests we don't use user_id here
     
     # Process each adjustment
     for adjustment in request.adjustments:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import AsyncIterator, AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
@@ -36,21 +36,24 @@ def get_engine() -> AsyncEngine:
             "pool_pre_ping": True,  # Verify connections before use
             "pool_recycle": 3600,   # Recycle connections after 1 hour
         }
-        
-        # Increase pool size for production
-        if settings.env == "production":
-            pool_kwargs.update({
-                "pool_size": 20,      # Increase from default 5
-                "max_overflow": 10,   # Allow 10 additional connections
-                "pool_timeout": 30,   # Wait up to 30 seconds for connection
-                "echo_pool": False,   # Disable pool logging in production
-            })
-        else:
-            pool_kwargs.update({
-                "pool_size": 5,       # Default for development
-                "max_overflow": 5,    # Smaller overflow for dev
-                "echo": settings.env == "development",
-            })
+
+        is_sqlite = settings.database_url.startswith("sqlite+aiosqlite")
+
+        # Pool tuning only applies to non-SQLite backends
+        if not is_sqlite:
+            if settings.env == "production":
+                pool_kwargs.update({
+                    "pool_size": 20,
+                    "max_overflow": 10,
+                    "pool_timeout": 30,
+                    "echo_pool": False,
+                })
+            else:
+                pool_kwargs.update({
+                    "pool_size": 5,
+                    "max_overflow": 5,
+                    "echo": settings.env == "development",
+                })
         
         _engine = create_async_engine(
             settings.database_url,
@@ -77,4 +80,11 @@ async def session_scope() -> AsyncIterator[AsyncSession]:
         raise
     finally:
         await session.close()
+
+
+# FastAPI dependency for injecting an AsyncSession
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+    Session = get_session_factory()
+    async with Session() as session:
+        yield session
 

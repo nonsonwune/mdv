@@ -7,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import StaticPool
 from datetime import datetime, timedelta
 
-from mdv.main import app
+from backend.api.main import app
+from backend.api.deps import get_db as _get_db_dep
 from mdv.models import User, Role, Product, Category, Inventory, Variant
-from mdv.db import get_async_db, Base
+from backend.mdv.db import get_async_db, Base
 from mdv.auth import create_access_token
 
 
@@ -28,7 +29,7 @@ async def test_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
-    async with AsyncSession(engine) as session:
+    async with AsyncSession(engine, expire_on_commit=False) as session:
         yield session
     
     async with engine.begin() as conn:
@@ -41,6 +42,17 @@ async def test_db():
 def test_client():
     """Create a test client."""
     return TestClient(app)
+
+
+# Ensure API uses the test database session
+@pytest.fixture(autouse=True)
+async def override_db_dependency(test_db):
+    async def _override_get_db():
+        yield test_db
+
+    app.dependency_overrides[_get_db_dep] = _override_get_db
+    yield
+    app.dependency_overrides.pop(_get_db_dep, None)
 
 
 @pytest.fixture
