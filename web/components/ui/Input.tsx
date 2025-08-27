@@ -9,9 +9,10 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   fullWidth?: boolean
   variant?: 'default' | 'filled' | 'unstyled'
   inputSize?: 'sm' | 'md' | 'lg'
+  as?: 'input' | 'select' | 'textarea'
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
+export const Input = forwardRef<any, InputProps>(
   (
     {
       label,
@@ -27,13 +28,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       type = 'text',
       disabled = false,
       required = false,
+      as = 'input',
       ...props
     },
     ref
   ) => {
     const [showPassword, setShowPassword] = useState(false)
     const inputId = id || `input-${Math.random().toString(36).substr(2, 9)}`
-    const isPassword = type === 'password'
+    const isPassword = type === 'password' && as === 'input'
     const inputType = isPassword && showPassword ? 'text' : type
 
     // Size styles
@@ -74,8 +76,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       ${variantStyles[variant]}
       ${sizeStyles[inputSize]}
       ${errorStyles}
-      ${leftIcon ? 'pl-10' : ''}
-      ${rightIcon || isPassword ? 'pr-10' : ''}
+      ${leftIcon && as === 'input' ? 'pl-10' : ''}
+      ${((rightIcon && as === 'input') || isPassword) ? 'pr-10' : ''}
       ${className}
     `.trim()
 
@@ -117,27 +119,59 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
         
         <div className="relative">
-          {leftIcon && (
+          {leftIcon && as === 'input' && (
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
               {leftIcon}
             </div>
           )}
           
-          <input
-            ref={ref}
-            id={inputId}
-            type={inputType}
-            className={inputStyles}
-            disabled={disabled}
-            required={required}
-            aria-invalid={!!error}
-            aria-describedby={
-              error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
-            }
-            {...props}
-          />
+          {as === 'input' && (
+            <input
+              ref={ref}
+              id={inputId}
+              type={inputType}
+              className={inputStyles}
+              disabled={disabled}
+              required={required}
+              aria-invalid={!!error}
+              aria-describedby={
+                error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
+              }
+              {...props}
+            />
+          )}
+
+          {as === 'textarea' && (
+            <textarea
+              ref={ref}
+              id={inputId}
+              className={inputStyles}
+              disabled={disabled}
+              required={required}
+              aria-invalid={!!error}
+              aria-describedby={
+                error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
+              }
+              {...(props as any)}
+            />
+          )}
+
+          {as === 'select' && (
+            <select
+              ref={ref}
+              id={inputId}
+              className={inputStyles}
+              disabled={disabled}
+              required={required}
+              aria-invalid={!!error}
+              aria-describedby={
+                error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
+              }
+              {...(props as any)}
+            />
+          )}
           
-          {rightIcon && !isPassword && (
+          {rightIcon && as === 'input' && !isPassword && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
               {rightIcon}
             </div>

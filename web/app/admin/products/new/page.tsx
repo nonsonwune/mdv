@@ -3,11 +3,17 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
+import { DEFAULT_CATEGORIES } from '@/lib/default-data'
+import Alert from '@/components/ui/Alert'
+import Input from '@/components/ui/Input'
+import Button from '@/components/ui/Button'
 import {
   PlusIcon,
   TrashIcon,
   PhotoIcon,
-  XMarkIcon
+  XMarkIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 
 interface ProductVariant {
@@ -40,6 +46,7 @@ export default function NewProductPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [success, setSuccess] = useState<string | null>(null)
   
   const [formData, setFormData] = useState<ProductFormData>({
     title: '',
@@ -73,12 +80,26 @@ export default function NewProductPage() {
     }
   }, [formData.title, formData.slug])
 
+  useEffect(() => {
+    if (categories.length === 0) {
+      // Initialize with default categories if no categories exist
+      setCategories(DEFAULT_CATEGORIES)
+    }
+  }, [categories])
+
   const fetchCategories = async () => {
     try {
       const response = await api<Category[]>('/api/admin/categories')
-      setCategories(response)
+      if (response && response.length > 0) {
+        setCategories(response)
+      } else {
+        // Use default categories if no categories exist
+        setCategories(DEFAULT_CATEGORIES)
+      }
     } catch (error) {
       console.error('Failed to fetch categories:', error)
+      // Fallback to default categories on error
+      setCategories(DEFAULT_CATEGORIES)
     }
   }
 
@@ -124,18 +145,37 @@ export default function NewProductPage() {
 
     if (!formData.title.trim()) {
       newErrors.title = 'Product title is required'
+    } else if (formData.title.length < 3) {
+      newErrors.title = 'Product title must be at least 3 characters'
     }
 
     if (!formData.slug.trim()) {
       newErrors.slug = 'Product slug is required'
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug)) {
+      newErrors.slug = 'Invalid slug format. Use lowercase letters, numbers, and hyphens only'
+    }
+
+    if (!formData.category_id) {
+      newErrors.category = 'Please select a category'
     }
 
     formData.variants.forEach((variant, index) => {
       if (!variant.sku.trim()) {
         newErrors[`variant-${index}-sku`] = 'SKU is required'
+      } else if (!/^[A-Z0-9-]+$/.test(variant.sku)) {
+        newErrors[`variant-${index}-sku`] = 'SKU must contain only uppercase letters, numbers, and hyphens'
       }
+
       if (variant.price <= 0) {
         newErrors[`variant-${index}-price`] = 'Price must be greater than 0'
+      }
+
+      if (variant.initial_quantity < 0) {
+        newErrors[`variant-${index}-initial_quantity`] = 'Initial quantity cannot be negative'
+      }
+
+      if (variant.safety_stock < 0) {
+        newErrors[`variant-${index}-safety_stock`] = 'Safety stock cannot be negative'
       }
     })
 
@@ -172,9 +212,14 @@ export default function NewProductPage() {
         method: 'POST',
         body: JSON.stringify(payload)
       })
-
-      // Redirect to products list or product detail
-      router.push('/admin/products')
+      
+      // Show success message then redirect
+      setSuccess('Product created successfully')
+      
+      // Short delay before redirect for better UX
+      setTimeout(() => {
+        router.push('/admin/products')
+      }, 1500)
     } catch (error: any) {
       console.error('Failed to create product:', error)
       if (error.message.includes('Slug already exists')) {
@@ -198,11 +243,17 @@ export default function NewProductPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* General Error */}
+      {/* Notifications */}
         {errors.general && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-sm text-red-600">{errors.general}</p>
-          </div>
+          <Alert variant="danger" closable onClose={() => setErrors({})} className="animate-fade-in">
+            {errors.general}
+          </Alert>
+        )}
+
+        {success && (
+          <Alert variant="success" className="animate-fade-in">
+            {success}
+          </Alert>
         )}
 
         {/* Basic Information */}
@@ -214,42 +265,41 @@ export default function NewProductPage() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Title *
               </label>
-              <input
+              <Input
                 type="text"
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-maroon-500 focus:border-maroon-500 ${
-                  errors.title ? 'border-red-300' : 'border-gray-300'
-                }`}
+                error={errors.title}
                 placeholder="Enter product title"
+                required
               />
-              {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Product Slug *
               </label>
-              <input
+              <Input
                 type="text"
                 value={formData.slug}
                 onChange={(e) => handleInputChange('slug', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-maroon-500 focus:border-maroon-500 ${
-                  errors.slug ? 'border-red-300' : 'border-gray-300'
-                }`}
+                error={errors.slug}
                 placeholder="product-slug"
+                required
+                helperText="Used in the product's URL. Example: premium-t-shirt"
               />
-              {errors.slug && <p className="mt-1 text-sm text-red-600">{errors.slug}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
+                Category *
               </label>
-              <select
+              <Input
+                as="select"
                 value={formData.category_id || ''}
                 onChange={(e) => handleInputChange('category_id', e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
+                required
+                error={errors.category}
               >
                 <option value="">Select a category</option>
                 {categories.map((category) => (
@@ -257,34 +307,34 @@ export default function NewProductPage() {
                     {category.name}
                   </option>
                 ))}
-              </select>
+              </Input>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Compare At Price (₦)
               </label>
-              <input
+              <Input
                 type="number"
                 step="0.01"
                 value={formData.compare_at_price || ''}
                 onChange={(e) => handleInputChange('compare_at_price', e.target.value ? parseFloat(e.target.value) : null)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
                 placeholder="0.00"
+                helperText="Original price to show as crossed out"
+                leftIcon={<span className="text-gray-500">₦</span>}
               />
-              <p className="mt-1 text-xs text-gray-500">Original price to show as crossed out</p>
             </div>
           </div>
 
           <div className="mt-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
+            Description
             </label>
-            <textarea
+            <Input
+              as="textarea"
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
               placeholder="Enter product description..."
             />
           </div>
@@ -325,29 +375,25 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       SKU *
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={variant.sku}
                       onChange={(e) => handleVariantChange(index, 'sku', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-maroon-500 focus:border-maroon-500 ${
-                        errors[`variant-${index}-sku`] ? 'border-red-300' : 'border-gray-300'
-                      }`}
                       placeholder="SKU-001"
+                      required
+                      error={errors[`variant-${index}-sku`]}
+                      helperText="Example: PREM-SHIRT-BLK-L"
                     />
-                    {errors[`variant-${index}-sku`] && (
-                      <p className="mt-1 text-sm text-red-600">{errors[`variant-${index}-sku`]}</p>
-                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Size
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={variant.size}
                       onChange={(e) => handleVariantChange(index, 'size', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
                       placeholder="M, L, XL"
                     />
                   </div>
@@ -356,11 +402,10 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Color
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={variant.color}
                       onChange={(e) => handleVariantChange(index, 'color', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
                       placeholder="Black, White, Red"
                     />
                   </div>
@@ -369,30 +414,26 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Price (₦) *
                     </label>
-                    <input
+                    <Input
                       type="number"
                       step="0.01"
                       value={variant.price}
                       onChange={(e) => handleVariantChange(index, 'price', parseFloat(e.target.value) || 0)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-maroon-500 focus:border-maroon-500 ${
-                        errors[`variant-${index}-price`] ? 'border-red-300' : 'border-gray-300'
-                      }`}
                       placeholder="0.00"
+                      leftIcon={<span className="text-gray-500">₦</span>}
+                      error={errors[`variant-${index}-price`]}
+                      required
                     />
-                    {errors[`variant-${index}-price`] && (
-                      <p className="mt-1 text-sm text-red-600">{errors[`variant-${index}-price`]}</p>
-                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Initial Stock
                     </label>
-                    <input
+                    <Input
                       type="number"
                       value={variant.initial_quantity}
                       onChange={(e) => handleVariantChange(index, 'initial_quantity', parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
                       placeholder="0"
                     />
                   </div>
@@ -401,12 +442,12 @@ export default function NewProductPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Safety Stock
                     </label>
-                    <input
+                    <Input
                       type="number"
                       value={variant.safety_stock}
                       onChange={(e) => handleVariantChange(index, 'safety_stock', parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
                       placeholder="5"
+                      helperText="Alert when stock falls below this level"
                     />
                   </div>
                 </div>
@@ -417,21 +458,21 @@ export default function NewProductPage() {
 
         {/* Actions */}
         <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => router.back()}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Cancel
-          </button>
+          </Button>
           
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            loading={loading}
+            leftIcon={loading ? undefined : <PlusIcon className="h-4 w-4" />}
           >
             {loading ? 'Creating...' : 'Create Product'}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

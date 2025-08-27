@@ -32,23 +32,96 @@ function ProductGrid({ products, loading }: { products: Product[], loading: bool
   }
 
   if (products.length === 0) {
+    // Different empty state for admin vs regular users
+    const hasFilters = Object.keys(searchParams.toString()).length > 0
+    
+    if (hasFilters) {
+      return (
+        <EmptyState
+          icon={
+            <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} 
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+          }
+          title="No products match your filters"
+          description="Try adjusting your search criteria or removing some filters"
+          action={
+            <Button variant="secondary" onClick={() => window.location.href = window.location.pathname}>
+              Clear All Filters
+            </Button>
+          }
+        />
+      )
+    }
+    
+    // Check if user is admin/staff (you'll need to implement this check)
+    const isStaff = false // TODO: implement proper staff check
+    
+    if (isStaff) {
+      return (
+        <EmptyState
+          icon={
+            <div className="relative inline-block">
+              <svg className="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+              <div className="absolute -right-2 -bottom-2 bg-maroon-100 rounded-full p-2">
+                <svg className="w-6 h-6 text-maroon-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+            </div>
+          }
+          title="Get started with your product catalog"
+          description={
+            <>This collection is currently empty. Start by adding your first product to make it available to customers.</>
+          }
+          size="lg"
+          action={
+            <div className="flex gap-3">
+              <Button 
+                variant="primary"
+                onClick={() => window.location.href = '/admin/products/new'}
+              >
+                Add First Product
+              </Button>
+              <Button 
+                variant="secondary"
+                onClick={() => window.location.href = '/admin/products'}
+              >
+                Go to Product Admin
+              </Button>
+            </div>
+          }
+        />
+      )
+    }
+    
+    // Default empty state for customers
     return (
       <EmptyState
         icon={
           <svg className="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
           </svg>
         }
-        title="No products found"
-        description="Try adjusting your filters or search criteria"
+        title="Coming Soon"
+        description={"We're working on adding products to this collection. Check back soon for updates!"}
+        size="lg"
         action={
-          <Button variant="secondary" onClick={() => window.location.href = window.location.pathname}>
-            Clear Filters
+          <Button 
+            variant="primary"
+            onClick={() => window.location.href = '/'}
+          >
+            Browse Other Categories
           </Button>
         }
       />
     )
+  }
   }
 
   return (
