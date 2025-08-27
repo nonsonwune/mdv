@@ -35,28 +35,18 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController()
   const id = setTimeout(() => ctrl.abort(), 12000)
   
-  // Get token from cookies for client-side requests
-  let token: string | undefined
-  if (typeof document !== 'undefined') {
-    const cookies = document.cookie.split(';')
-    const tokenCookie = cookies.find(c => c.trim().startsWith('mdv_token='))
-    if (tokenCookie) {
-      token = tokenCookie.split('=')[1]
-    }
-  }
-  
-  // Build headers with Authorization if token exists
+  // Build headers
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...(init?.headers || {}),
   }
   
-  if (token) {
-    (headers as any)["Authorization"] = `Bearer ${token}`
-  }
+  // Route admin requests through Next.js proxy (uses HttpOnly cookie on server)
+  const isAdminPath = path.startsWith('/api/admin')
+  const url = isAdminPath ? path : `${base}${path}`
   
   try {
-    const res = await fetch(`${base}${path}`, {
+    const res = await fetch(url, {
       ...init,
       signal: ctrl.signal,
       headers,
