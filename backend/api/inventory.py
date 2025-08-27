@@ -7,12 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 
-from ..mdv.models import (
+from mdv.models import (
     Inventory, Variant, Product, StockLedger, Role
 )
-from ..mdv.db import get_async_db
-from ..mdv.auth import get_current_claims
-from ..mdv.rbac import require_permission, Permission
+from mdv.db import get_async_db
+from mdv.auth import get_current_claims
+from mdv.rbac import require_permission, Permission
 
 router = APIRouter(prefix="/admin/inventory", tags=["Admin - Inventory"])
 

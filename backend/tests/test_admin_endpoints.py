@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from backend.api.main import app
 from backend.api.deps import get_db as _get_db_dep
 from mdv.models import User, Role, Product, Category, Inventory, Variant
-from backend.mdv.db import get_async_db, Base
+from mdv.db import Base
 from mdv.auth import create_access_token
 
 

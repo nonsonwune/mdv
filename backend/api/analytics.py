@@ -6,11 +6,11 @@ from sqlalchemy import func, select, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from ..mdv.models import (
+from mdv.models import (
     Order, OrderItem, Product, Variant, Category, User, OrderStatus
 )
-from ..mdv.db import get_async_db
-from ..mdv.rbac import require_permission, Permission
+from mdv.db import get_async_db
+from mdv.rbac import require_permission, Permission
 
 router = APIRouter(prefix="/admin/analytics", tags=["Admin - Analytics"])
 
