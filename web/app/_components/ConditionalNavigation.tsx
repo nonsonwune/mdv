@@ -15,10 +15,8 @@ export default function ConditionalNavigation() {
   // Check if we're on an admin page
   const isAdminPage = pathname.startsWith('/admin') || pathname.startsWith('/staff-login')
   
-  // Show customer nav if:
-  // - Not on admin page, OR
-  // - On admin page but user is viewing as customer (when they access /account, etc.)
-  const showCustomerNav = !isAdminPage || (isStaff && pathname.startsWith('/account'))
+  // Show customer nav only if we're NOT on an admin page
+  const showCustomerNav = !isAdminPage
   
   // If we shouldn't show customer nav, return null (no navigation)
   if (!showCustomerNav) {
