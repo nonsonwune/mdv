@@ -16,6 +16,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/lib/auth-context'
+import AdminLayout from '@/components/admin/AdminLayout'
 
 interface DashboardStats {
   totalProducts: number
@@ -148,7 +149,8 @@ export default function AdminHome() {
   ]
 
   return (
-    <div>
+    <AdminLayout>
+      <div>
       {/* Role-based Welcome Banner */}
       <div className={`p-4 rounded-lg border mb-6 ${roleInfo.color}`}>
         <div className="flex items-start gap-3">
@@ -320,6 +322,7 @@ export default function AdminHome() {
         </div>
       </div>
     </div>
+    </AdminLayout>
   )
 }
 
