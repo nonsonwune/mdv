@@ -12,7 +12,7 @@ export default function LoginPage() {
     // Preserve the next parameter if it exists
     const next = searchParams.get("next")
     const redirectUrl = next ? `/customer-login?next=${encodeURIComponent(next)}` : "/customer-login"
-    router.replace(redirectUrl)
+    router.replace(redirectUrl as any)
   }, [router, searchParams])
 
   return (

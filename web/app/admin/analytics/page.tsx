@@ -7,8 +7,8 @@ import {
   CurrencyDollarIcon,
   ShoppingBagIcon,
   UsersIcon,
-  TrendingUpIcon,
-  TrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
   CalendarIcon,
   ArrowPathIcon,
   EyeIcon,
@@ -177,7 +177,7 @@ export default function AnalyticsPage() {
   }
 
   const getTrendIcon = (change: number) => {
-    return change >= 0 ? TrendingUpIcon : TrendingDownIcon
+    return change >= 0 ? ArrowTrendingUpIcon : ArrowTrendingDownIcon
   }
 
   const getTrendColor = (change: number) => {
