@@ -34,7 +34,9 @@ export default function AdminLayout({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is authenticated and has admin/supervisor role
+    // Check if user is authenticated and has any staff role
+    // All staff roles (admin, supervisor, operations, logistics) can access admin dashboard
+    // Individual permissions are controlled by the permission system in auth-context
     fetchUserProfile()
   }, [])
 
@@ -54,6 +56,9 @@ export default function AdminLayout({
       const userData = await response.json()
       
       // Check if user has staff role (admin, supervisor, operations, logistics)
+      // IMPORTANT: This must match STAFF_ROLES in /lib/auth-context.tsx
+      // All staff roles can access admin dashboard, with individual permissions
+      // controlled by the permission system for specific features
       const STAFF_ROLES = ['admin', 'supervisor', 'operations', 'logistics']
       if (!STAFF_ROLES.includes(userData.role)) {
         router.push('/staff-login?error=insufficient_permissions')

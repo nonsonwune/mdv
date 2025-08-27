@@ -7,6 +7,12 @@ Monorepo for:
 
 Services (dev): Postgres + Redis via docker-compose.
 
+## Documentation
+
+- **[Authentication & Authorization](docs/AUTHENTICATION.md)** - Role-based access control system
+- **[Error Handling Guidelines](docs/ERROR_HANDLING.md)** - Best practices for error handling and UX
+- **[API Contracts](docs/api-contracts.yaml)** - OpenAPI specification for backend APIs
+
 ## Quick start (local)
 
 Prereqs:

@@ -1,3 +1,17 @@
+/**
+ * Authentication Context for MDV Application
+ * 
+ * Provides authentication state management and role-based access control.
+ * Supports staff roles (admin, supervisor, operations, logistics) and customers.
+ * 
+ * Key Features:
+ * - JWT token management via HTTP-only cookies
+ * - Role-based permission system
+ * - Graceful error handling for authentication failures
+ * - Automatic session validation and cleanup
+ * 
+ * @see /docs/AUTHENTICATION.md for complete documentation
+ */
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
@@ -38,7 +52,18 @@ interface AuthProviderProps {
   children: ReactNode
 }
 
-// Define staff roles
+/**
+ * Staff Roles Definition
+ * 
+ * All roles listed here have access to the admin dashboard with different permission levels:
+ * - admin: Full system access, user management
+ * - supervisor: Product and order management, analytics
+ * - operations: Order management, inventory, fulfillment
+ * - logistics: Inventory management, shipping, fulfillment
+ * 
+ * IMPORTANT: This list must match the role checking in /app/admin/layout.tsx
+ * Any changes here should be reflected in the admin layout authentication.
+ */
 const STAFF_ROLES = ['admin', 'supervisor', 'operations', 'logistics']
 
 export function AuthProvider({ children }: AuthProviderProps) {
@@ -50,7 +75,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isStaff = user ? STAFF_ROLES.includes(user.role) : false
   const isCustomer = user ? !STAFF_ROLES.includes(user.role) : false
 
-  // Check authentication status
+  /**
+   * Check Authentication Status
+   * 
+   * Validates current session with the server and updates user state.
+   * Handles 401 errors gracefully - only logs non-authentication errors.
+   * Used automatically on app startup and can be called manually to refresh state.
+   */
   const checkAuth = async () => {
     try {
       const response = await fetch('/api/auth/check', {
@@ -145,7 +176,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
   )
 }
 
-// Hook for checking specific permissions
+/**
+ * Permission Hook
+ * 
+ * Checks if the current user has a specific permission based on their role.
+ * Returns false if user is not authenticated.
+ * 
+ * Available permissions:
+ * - view_admin: Access to admin dashboard
+ * - manage_products: Create, edit, delete products
+ * - manage_orders: View and manage orders
+ * - manage_users: User administration (admin only)
+ * - view_analytics: Access to analytics dashboard
+ * - manage_fulfillment: Inventory and shipping management
+ * 
+ * @param permission - Permission name to check
+ * @returns boolean indicating if user has permission
+ * 
+ * @example
+ * const canManageProducts = usePermission('manage_products')
+ * if (canManageProducts) {
+ *   // Show product management UI
+ * }
+ */
 export function usePermission(permission: string): boolean {
   const { user } = useAuth()
   if (!user) return false
@@ -164,7 +217,22 @@ export function usePermission(permission: string): boolean {
   return allowedRoles.includes(user.role)
 }
 
-// Hook for role checking
+/**
+ * Role Hierarchy Hook
+ * 
+ * Checks if the current user meets or exceeds a required role level.
+ * Uses hierarchical role system where higher roles include lower role permissions.
+ * 
+ * Role hierarchy (lowest to highest):
+ * customer (1) < logistics (2) < operations (3) < supervisor (4) < admin (5)
+ * 
+ * @param requiredRole - Minimum role required
+ * @returns boolean indicating if user meets role requirement
+ * 
+ * @example
+ * const canAccessAdminFeatures = useRole('operations')
+ * // True for operations, supervisor, and admin roles
+ */
 export function useRole(requiredRole: string): boolean {
   const { user } = useAuth()
   if (!user) return false

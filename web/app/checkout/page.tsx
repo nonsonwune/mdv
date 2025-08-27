@@ -77,7 +77,8 @@ export default function CheckoutPage() {
     setLoading(true);
     
     try {
-      // Check if cart is empty before proceeding
+      // Pre-checkout validation: Prevent empty cart submissions
+      // This provides better UX than letting backend return raw JSON errors
       if (!cart || cart.items.length === 0) {
         toast.error("Cart is empty", "Please add items to your cart before checkout");
         setError("Your cart is empty. Please add some items before proceeding to checkout.");
