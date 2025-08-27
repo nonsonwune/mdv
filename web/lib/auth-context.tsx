@@ -16,6 +16,56 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+// Permission enum matching backend permissions
+export enum Permission {
+  // Product permissions
+  PRODUCT_VIEW = "product:view",
+  PRODUCT_CREATE = "product:create",
+  PRODUCT_EDIT = "product:edit",
+  PRODUCT_DELETE = "product:delete",
+  PRODUCT_PUBLISH = "product:publish",
+  
+  // Inventory permissions
+  INVENTORY_VIEW = "inventory:view",
+  INVENTORY_ADJUST = "inventory:adjust",
+  INVENTORY_SYNC = "inventory:sync",
+  
+  // Order permissions
+  ORDER_VIEW = "order:view",
+  ORDER_CREATE = "order:create",
+  ORDER_EDIT = "order:edit",
+  ORDER_CANCEL = "order:cancel",
+  ORDER_FULFILL = "order:fulfill",
+  ORDER_REFUND = "order:refund",
+  
+  // User permissions
+  USER_VIEW = "user:view",
+  USER_CREATE = "user:create",
+  USER_EDIT = "user:edit",
+  USER_DELETE = "user:delete",
+  USER_ACTIVATE = "user:activate",
+  USER_ASSIGN_ROLE = "user:assign_role",
+  
+  // Payment permissions
+  PAYMENT_VIEW = "payment:view",
+  PAYMENT_PROCESS = "payment:process",
+  PAYMENT_REFUND = "payment:refund",
+  
+  // Report permissions
+  REPORT_VIEW = "report:view",
+  REPORT_GENERATE = "report:generate",
+  REPORT_EXPORT = "report:export",
+  
+  // System permissions
+  SYSTEM_SETTINGS = "system:settings",
+  SYSTEM_AUDIT = "system:audit",
+  SYSTEM_BACKUP = "system:backup",
+  
+  // Analytics permissions
+  ANALYTICS_VIEW = "analytics:view",
+  ANALYTICS_EXPORT = "analytics:export",
+}
+
 export interface User {
   id: string
   name: string
@@ -36,6 +86,11 @@ interface AuthContextType {
   logout: () => void
   checkAuth: () => Promise<void>
   getRoleDisplayName: () => string
+  hasPermission: (permission: Permission) => boolean
+  hasAnyPermission: (...permissions: Permission[]) => boolean
+  hasAllPermissions: (...permissions: Permission[]) => boolean
+  isRole: (role: string) => boolean
+  isAnyRole: (...roles: string[]) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -65,6 +120,79 @@ interface AuthProviderProps {
  * Any changes here should be reflected in the admin layout authentication.
  */
 const STAFF_ROLES = ['admin', 'supervisor', 'operations', 'logistics']
+
+// Role-Permission mapping (matching backend ROLE_PERMISSIONS)
+const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
+  admin: new Set(Object.values(Permission)), // Admins have all permissions
+  
+  supervisor: new Set([
+    // Products - full access except delete
+    Permission.PRODUCT_VIEW,
+    Permission.PRODUCT_CREATE,
+    Permission.PRODUCT_EDIT,
+    Permission.PRODUCT_PUBLISH,
+    // Inventory - full access
+    Permission.INVENTORY_VIEW,
+    Permission.INVENTORY_ADJUST,
+    Permission.INVENTORY_SYNC,
+    // Orders - full access
+    Permission.ORDER_VIEW,
+    Permission.ORDER_CREATE,
+    Permission.ORDER_EDIT,
+    Permission.ORDER_CANCEL,
+    Permission.ORDER_FULFILL,
+    Permission.ORDER_REFUND,
+    // Users - limited access
+    Permission.USER_VIEW,
+    Permission.USER_CREATE,
+    Permission.USER_EDIT,
+    Permission.USER_ACTIVATE,
+    // Payments - view and process
+    Permission.PAYMENT_VIEW,
+    Permission.PAYMENT_PROCESS,
+    Permission.PAYMENT_REFUND,
+    // Reports - full access
+    Permission.REPORT_VIEW,
+    Permission.REPORT_GENERATE,
+    Permission.REPORT_EXPORT,
+    // Analytics
+    Permission.ANALYTICS_VIEW,
+    Permission.ANALYTICS_EXPORT,
+  ]),
+  
+  operations: new Set([
+    // Products - view and edit only (no create or delete as per requirements)
+    Permission.PRODUCT_VIEW,
+    Permission.PRODUCT_EDIT,
+    // Inventory - view and adjust
+    Permission.INVENTORY_VIEW,
+    Permission.INVENTORY_ADJUST,
+    // Orders - manage fulfillment
+    Permission.ORDER_VIEW,
+    Permission.ORDER_EDIT,
+    Permission.ORDER_FULFILL,
+    // Payments - view only
+    Permission.PAYMENT_VIEW,
+    // Reports - view only
+    Permission.REPORT_VIEW,
+    // Analytics - view only
+    Permission.ANALYTICS_VIEW,
+  ]),
+  
+  logistics: new Set([
+    // Products - view only
+    Permission.PRODUCT_VIEW,
+    // Inventory - view only
+    Permission.INVENTORY_VIEW,
+    // Orders - view and update shipping
+    Permission.ORDER_VIEW,
+    Permission.ORDER_EDIT,
+    // Reports - view logistics reports
+    Permission.REPORT_VIEW,
+    // Analytics - view logistics analytics
+    Permission.ANALYTICS_VIEW,
+  ]),
+}
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
@@ -152,6 +280,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
+  // Permission checking methods
+  const hasPermission = (permission: Permission): boolean => {
+    if (!user) return false
+    const rolePerms = ROLE_PERMISSIONS[user.role]
+    return rolePerms?.has(permission) || false
+  }
+
+  const hasAnyPermission = (...permissions: Permission[]): boolean => {
+    if (!user) return false
+    const rolePerms = ROLE_PERMISSIONS[user.role]
+    return permissions.some(perm => rolePerms?.has(perm))
+  }
+
+  const hasAllPermissions = (...permissions: Permission[]): boolean => {
+    if (!user) return false
+    const rolePerms = ROLE_PERMISSIONS[user.role]
+    return permissions.every(perm => rolePerms?.has(perm))
+  }
+
+  const isRole = (role: string): boolean => {
+    return user?.role === role
+  }
+
+  const isAnyRole = (...roles: string[]): boolean => {
+    return roles.includes(user?.role || '')
+  }
+
   // Check auth on mount
   useEffect(() => {
     checkAuth()
@@ -166,7 +321,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     checkAuth,
-    getRoleDisplayName
+    getRoleDisplayName,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    isRole,
+    isAnyRole
   }
 
   return (
@@ -182,39 +342,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
  * Checks if the current user has a specific permission based on their role.
  * Returns false if user is not authenticated.
  * 
- * Available permissions:
- * - view_admin: Access to admin dashboard
- * - manage_products: Create, edit, delete products
- * - manage_orders: View and manage orders
- * - manage_users: User administration (admin only)
- * - view_analytics: Access to analytics dashboard
- * - manage_fulfillment: Inventory and shipping management
- * 
- * @param permission - Permission name to check
+ * @param permission - Permission to check
  * @returns boolean indicating if user has permission
  * 
  * @example
- * const canManageProducts = usePermission('manage_products')
- * if (canManageProducts) {
- *   // Show product management UI
+ * const canCreateProducts = usePermission(Permission.PRODUCT_CREATE)
+ * if (canCreateProducts) {
+ *   // Show product creation UI
  * }
  */
-export function usePermission(permission: string): boolean {
-  const { user } = useAuth()
-  if (!user) return false
-
-  // Define permissions based on roles
-  const permissions: Record<string, string[]> = {
-    'view_admin': ['admin', 'supervisor', 'operations', 'logistics'],
-    'manage_products': ['admin', 'supervisor'],
-    'manage_orders': ['admin', 'supervisor', 'operations'],
-    'manage_users': ['admin'],
-    'view_analytics': ['admin', 'supervisor'],
-    'manage_fulfillment': ['admin', 'operations', 'logistics'],
-  }
-
-  const allowedRoles = permissions[permission] || []
-  return allowedRoles.includes(user.role)
+export function usePermission(permission: Permission): boolean {
+  const { hasPermission } = useAuth()
+  return hasPermission(permission)
 }
 
 /**

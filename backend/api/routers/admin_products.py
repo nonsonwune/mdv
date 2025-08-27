@@ -1053,9 +1053,9 @@ async def set_primary_image(
 async def create_category(
     request: CategoryCreateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_roles(*SUPERVISORS))  # Allow both admin and supervisor
 ):
-    """Create a new category."""
+    """Create a new category. Requires supervisor or admin role."""
     actor_id = parse_actor_id(claims)
     
     # Check slug uniqueness
@@ -1094,9 +1094,9 @@ async def update_category(
     category_id: int,
     request: CategoryUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_roles(*SUPERVISORS))  # Allow both admin and supervisor
 ):
-    """Update a category."""
+    """Update a category. Requires supervisor or admin role."""
     actor_id = parse_actor_id(claims)
     
     category = await db.get(Category, category_id)
@@ -1138,9 +1138,9 @@ async def delete_category(
     category_id: int,
     force: bool = Query(False),
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_roles(*SUPERVISORS))  # Allow both admin and supervisor
 ):
-    """Delete a category."""
+    """Delete a category. Requires supervisor or admin role."""
     actor_id = parse_actor_id(claims)
     
     category = await db.get(Category, category_id)

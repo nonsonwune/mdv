@@ -28,8 +28,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-@router.get("/orders", dependencies=[Depends(require_roles(*ALL_STAFF))])
-async def admin_list_orders(status: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: AsyncSession = Depends(get_db)):
+@router.get("/orders")
+async def admin_list_orders(
+    status: str | None = None, 
+    page: int = Query(1, ge=1), 
+    page_size: int = Query(20, ge=1, le=100), 
+    db: AsyncSession = Depends(get_db),
+    claims=Depends(require_roles(*ALL_STAFF))
+):
+    # Get user role from claims
+    user_role = claims.get("role")
+    
     stmt = (
         select(Order)
         .limit(page_size)
@@ -42,9 +51,28 @@ async def admin_list_orders(status: str | None = None, page: int = Query(1, ge=1
         )
     )
     count_stmt = select(func.count()).select_from(Order)
+    
+    # Apply role-based filtering
+    if user_role == "operations":
+        # Operations: Only see paid orders and later statuses
+        allowed_statuses = [OrderStatus.paid, OrderStatus.cancelled, OrderStatus.refunded]
+        stmt = stmt.where(Order.status.in_([s.value for s in allowed_statuses]))
+        count_stmt = count_stmt.where(Order.status.in_([s.value for s in allowed_statuses]))
+    elif user_role == "logistics":
+        # Logistics: Only see orders with fulfillment ready to ship
+        stmt = stmt.join(Fulfillment).where(
+            Fulfillment.status.in_([FulfillmentStatus.ready_to_ship.value])
+        )
+        count_stmt = count_stmt.join(Fulfillment).where(
+            Fulfillment.status.in_([FulfillmentStatus.ready_to_ship.value])
+        )
+    # Admin and Supervisor see all orders (no additional filtering)
+    
+    # Apply status filter if provided
     if status:
         stmt = stmt.where(Order.status == status)
         count_stmt = count_stmt.where(Order.status == status)
+        
     items = (await db.execute(stmt)).scalars().all()
     total = (await db.execute(count_stmt)).scalar_one()
     total_pages = (total + page_size - 1) // page_size

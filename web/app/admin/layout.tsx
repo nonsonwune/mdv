@@ -12,8 +12,12 @@ import {
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  ClipboardDocumentListIcon,
+  TagIcon
 } from '@heroicons/react/24/outline'
+import { useAuth, Permission } from '@/lib/auth-context'
+import { PermissionGuard } from '@/components/auth/permission-guards'
 
 interface User {
   id: number
@@ -29,72 +33,96 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const { user, loading, isStaff, logout, hasPermission, isRole } = useAuth()
 
   useEffect(() => {
-    // Check if user is authenticated and has any staff role
-    // All staff roles (admin, supervisor, operations, logistics) can access admin dashboard
-    // Individual permissions are controlled by the permission system in auth-context
-    fetchUserProfile()
-  }, [])
-
-  const fetchUserProfile = async () => {
-    try {
-      const response = await fetch('/api/users/profile')
-      if (!response.ok) {
-        // Handle authentication errors gracefully
-        if (response.status === 401) {
-          router.push('/staff-login?error=authentication_required')
-        } else {
-          console.error('Profile fetch failed:', response.status)
-          router.push('/staff-login')
-        }
-        return
-      }
-      const userData = await response.json()
-      
-      // Check if user has staff role (admin, supervisor, operations, logistics)
-      // IMPORTANT: This must match STAFF_ROLES in /lib/auth-context.tsx
-      // All staff roles can access admin dashboard, with individual permissions
-      // controlled by the permission system for specific features
-      const STAFF_ROLES = ['admin', 'supervisor', 'operations', 'logistics']
-      if (!STAFF_ROLES.includes(userData.role)) {
-        router.push('/staff-login?error=insufficient_permissions')
-        return
-      }
-      
-      setUser(userData)
-    } catch (error) {
-      // Only log network errors, not auth failures
-      if (error instanceof TypeError) {
-        console.error('Network error fetching profile:', error)
-      }
-      router.push('/staff-login')
-    } finally {
-      setLoading(false)
+    // Redirect non-staff users
+    if (!loading && !isStaff) {
+      router.push('/staff-login?error=insufficient_permissions')
     }
-  }
+  }, [loading, isStaff, router])
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
+    await logout()
   }
 
+  // Define navigation with permission requirements
   const navigation = [
-    { name: 'Dashboard', href: '/admin', icon: HomeIcon },
-    { name: 'Products', href: '/admin/products', icon: CubeIcon },
-    { name: 'Orders', href: '/admin/orders', icon: ShoppingCartIcon },
-    { name: 'Users', href: '/admin/users', icon: UsersIcon, adminOnly: true },
-    { name: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
-    { name: 'Settings', href: '/admin/settings', icon: Cog6ToothIcon },
+    { 
+      name: 'Dashboard', 
+      href: '/admin', 
+      icon: HomeIcon,
+      // All staff can see dashboard
+      permission: null 
+    },
+    { 
+      name: 'Products', 
+      href: '/admin/products', 
+      icon: CubeIcon,
+      // Admin, supervisor, operations can see products (not logistics)
+      permission: Permission.PRODUCT_VIEW,
+      roles: ['admin', 'supervisor', 'operations']
+    },
+    { 
+      name: 'Categories', 
+      href: '/admin/categories', 
+      icon: TagIcon,
+      // Only admin and supervisor can manage categories
+      permission: Permission.PRODUCT_CREATE,
+      roles: ['admin', 'supervisor']
+    },
+    { 
+      name: 'Orders', 
+      href: '/admin/orders', 
+      icon: ShoppingCartIcon,
+      // All staff can see orders
+      permission: Permission.ORDER_VIEW
+    },
+    { 
+      name: 'Inventory', 
+      href: '/admin/inventory', 
+      icon: ClipboardDocumentListIcon,
+      // Admin, supervisor, operations can see inventory (not logistics)
+      permission: Permission.INVENTORY_VIEW,
+      roles: ['admin', 'supervisor', 'operations']
+    },
+    { 
+      name: 'Users', 
+      href: '/admin/users', 
+      icon: UsersIcon,
+      // Only admin can manage users
+      permission: Permission.USER_VIEW,
+      roles: ['admin']
+    },
+    { 
+      name: 'Analytics', 
+      href: '/admin/analytics', 
+      icon: ChartBarIcon,
+      // Admin and supervisor can see analytics
+      permission: Permission.ANALYTICS_VIEW
+    },
+    { 
+      name: 'Settings', 
+      href: '/admin/settings', 
+      icon: Cog6ToothIcon,
+      // Only admin can access settings
+      permission: Permission.SYSTEM_SETTINGS,
+      roles: ['admin']
+    },
   ]
 
+  // Filter navigation based on permissions and roles
   const filteredNavigation = navigation.filter(item => {
-    if (item.adminOnly && user?.role !== 'admin') {
-      return false
-    }
+    // If no permission required, show to all staff
+    if (!item.permission) return true
+    
+    // Check if user has the required permission
+    if (!hasPermission(item.permission)) return false
+    
+    // If specific roles are defined, check role
+    if (item.roles && !item.roles.includes(user?.role || '')) return false
+    
     return true
   })
 
