@@ -193,37 +193,77 @@ export default function ProductEditPage() {
 
     setSaving(true)
     try {
-      // Prepare form data for file uploads
-      const formData = new FormData()
-      
-      // Add product data
-      formData.append('title', title)
-      formData.append('description', description)
-      if (categoryId) formData.append('category_id', categoryId.toString())
-      if (typeof isActive === 'boolean') {
-        formData.append('is_active', String(isActive))
+      // 1) Update basic product fields (JSON)
+      const productPayload: any = {
+        title,
+        description,
       }
-      
-      // Add variants data
-      formData.append('variants', JSON.stringify(variants))
-      
-      // Add deleted images
-      if (deletedImages.length > 0) {
-        formData.append('deleted_images', JSON.stringify(deletedImages))
+      if (categoryId) {
+        productPayload.category_id = categoryId
       }
-      
-      // Add existing images with updated order
-      formData.append('existing_images', JSON.stringify(images))
-      
-      // Add new image files
-      newImages.forEach((file, index) => {
-        formData.append(`new_images`, file)
-      })
-
       await api(`/api/admin/products/${params.id}`, {
         method: 'PUT',
-        body: formData
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(productPayload)
       })
+
+      // 2) Update variants (sku/size/color/price)
+      for (const v of variants) {
+        // Only update existing variants (skip client-only temp IDs if any)
+        if (typeof v.id === 'number' && v.id > 0) {
+          await api(`/api/admin/variants/${v.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sku: v.sku,
+              size: v.size || undefined,
+              color: v.color || undefined,
+              price: v.price,
+            })
+          })
+        }
+      }
+
+      // 3) Update inventory per variant
+      for (const v of variants) {
+        if (typeof v.id === 'number' && v.id > 0) {
+          await api(`/api/admin/inventory/${v.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              quantity: v.stock_quantity,
+              safety_stock: v.safety_stock,
+              reason: 'Admin product edit',
+              reference_type: 'product_edit',
+              reference_id: Number(params.id)
+            })
+          })
+        }
+      }
+
+      // 4) Delete removed images
+      for (const imageId of deletedImages) {
+        await api(`/api/admin/images/${imageId}`, { method: 'DELETE' })
+      }
+
+      // 5) Update existing image sort order (translate display_order -> sort_order)
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i]
+        // Send as query params since endpoint expects individual params
+        await api(`/api/admin/images/${img.id}?sort_order=${i + 1}`, { method: 'PUT' })
+      }
+
+      // 6) Upload new images
+      for (const file of newImages) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('alt_text', title)
+        fd.append('is_primary', 'false')
+        await api(`/api/admin/products/${params.id}/images`, {
+          method: 'POST',
+          body: fd
+        })
+      }
 
       alert('Product updated successfully!')
       router.push('/admin/products')
