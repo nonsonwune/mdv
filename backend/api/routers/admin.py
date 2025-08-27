@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, select, distinct
+from sqlalchemy import and_, func, select, distinct, or_
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
@@ -20,6 +20,10 @@ from mdv.models import (
     ShipmentEvent,
     Refund,
     User,
+    Product,
+    Variant,
+    Inventory,
+    StockLedger,
 )
 from mdv.utils import audit, parse_actor_id
 from ..deps import get_db
@@ -222,6 +226,74 @@ async def refund_order(oid: int, body: RefundRequest, db: AsyncSession = Depends
     return {"id": order.id, "refunded": body.amount, "reason": body.reason, "method": body.method}
 
 
+@router.get("/analytics", dependencies=[Depends(require_roles(*ALL_STAFF))])
+async def get_admin_analytics(
+    period: str = Query("30d", description="Time period: 7d, 30d, 90d, 1y"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get analytics data for the admin panel"""
+    from datetime import datetime, timezone, timedelta
+    
+    # Parse period
+    period_map = {
+        "7d": 7,
+        "30d": 30,
+        "90d": 90,
+        "1y": 365
+    }
+    
+    days = period_map.get(period, 30)
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    
+    # Get orders in the period
+    orders_result = await db.execute(
+        select(func.count(Order.id)).where(Order.created_at >= start_date)
+    )
+    orders_count = orders_result.scalar_one()
+    
+    # Get revenue in the period
+    orders_with_totals = await db.execute(
+        select(Order.totals).where(
+            and_(
+                Order.totals.isnot(None),
+                Order.created_at >= start_date
+            )
+        )
+    )
+    revenue = Decimal("0")
+    for (totals,) in orders_with_totals:
+        if totals and isinstance(totals, dict) and "total" in totals:
+            try:
+                amount = Decimal(str(totals["total"]))
+                revenue += amount
+            except (ValueError, TypeError):
+                pass
+    
+    # Get unique customers in period
+    customers_result = await db.execute(
+        select(func.count(distinct(Order.user_id))).where(
+            and_(
+                Order.user_id.isnot(None),
+                Order.created_at >= start_date
+            )
+        )
+    )
+    customers_count = customers_result.scalar_one()
+    
+    # Average order value
+    avg_order_value = float(revenue / orders_count) if orders_count > 0 else 0.0
+    
+    return {
+        "period": period,
+        "orders": orders_count,
+        "revenue": float(revenue),
+        "customers": customers_count,
+        "average_order_value": round(avg_order_value, 2),
+        "start_date": start_date.isoformat(),
+        "end_date": datetime.now(timezone.utc).isoformat()
+    }
+
+
 @router.get("/stats", dependencies=[Depends(require_roles(*ALL_STAFF))])
 async def get_admin_stats(db: AsyncSession = Depends(get_db)):
     """Get dashboard statistics for the admin panel"""
@@ -286,5 +358,157 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
         "recent_orders": recent_orders,
         "recent_revenue": float(recent_revenue),
         "period_days": 30
+    }
+
+
+class InventoryUpdateRequest(BaseModel):
+    quantity: int
+    safety_stock: Optional[int] = None
+    reason: str = "Manual adjustment"
+
+
+@router.get("/inventory", dependencies=[Depends(require_roles(*ALL_STAFF))])
+async def get_inventory(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    low_stock: bool = Query(False, description="Filter for low stock items"),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get inventory information with product and variant details"""
+    # Build query to get variants with inventory, products, and categories
+    stmt = (
+        select(Variant, Inventory, Product)
+        .join(Inventory, Variant.id == Inventory.variant_id, isouter=True)
+        .join(Product, Variant.product_id == Product.id)
+        .order_by(Product.title, Variant.sku)
+    )
+    
+    if low_stock:
+        # Filter for items where quantity <= safety_stock or inventory is null
+        stmt = stmt.where(
+            or_(
+                Inventory.quantity <= Inventory.safety_stock,
+                Inventory.quantity.is_(None)
+            )
+        )
+    
+    # Count total items
+    count_stmt = (
+        select(func.count())
+        .select_from(
+            Variant.__table__
+            .join(Inventory.__table__, Variant.id == Inventory.variant_id, isouter=True)
+            .join(Product.__table__, Variant.product_id == Product.id)
+        )
+    )
+    if low_stock:
+        count_stmt = count_stmt.where(
+            or_(
+                Inventory.quantity <= Inventory.safety_stock,
+                Inventory.quantity.is_(None)
+            )
+        )
+    
+    # Add pagination
+    stmt = stmt.limit(page_size).offset((page - 1) * page_size)
+    
+    # Execute queries
+    result = await db.execute(stmt)
+    items = result.all()
+    
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar_one()
+    
+    # Format response
+    inventory_items = []
+    for variant, inventory, product in items:
+        inventory_items.append({
+            "variant_id": variant.id,
+            "sku": variant.sku,
+            "product_id": product.id,
+            "product_title": product.title,
+            "size": variant.size,
+            "color": variant.color,
+            "price": float(variant.price),
+            "quantity": inventory.quantity if inventory else 0,
+            "safety_stock": inventory.safety_stock if inventory else 0,
+            "is_low_stock": (
+                inventory.quantity <= inventory.safety_stock 
+                if inventory and inventory.quantity is not None 
+                else True
+            )
+        })
+    
+    total_pages = (total + page_size - 1) // page_size
+    
+    return {
+        "items": inventory_items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages
+    }
+
+
+@router.post("/inventory/{variant_id}", dependencies=[Depends(require_roles(*ALL_STAFF))])
+async def update_inventory(
+    variant_id: int,
+    update_request: InventoryUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_roles(*ALL_STAFF))
+):
+    """Update inventory for a specific variant"""
+    actor_id = parse_actor_id(claims)
+    
+    # Get or create inventory record
+    inventory = await db.execute(
+        select(Inventory).where(Inventory.variant_id == variant_id)
+    )
+    inventory = inventory.scalar_one_or_none()
+    
+    if not inventory:
+        # Create new inventory record
+        inventory = Inventory(
+            variant_id=variant_id,
+            quantity=update_request.quantity,
+            safety_stock=update_request.safety_stock or 0
+        )
+        db.add(inventory)
+        delta = update_request.quantity
+        old_quantity = 0
+    else:
+        # Update existing inventory
+        old_quantity = inventory.quantity
+        delta = update_request.quantity - old_quantity
+        inventory.quantity = update_request.quantity
+        if update_request.safety_stock is not None:
+            inventory.safety_stock = update_request.safety_stock
+    
+    # Create stock ledger entry
+    if delta != 0:
+        stock_ledger = StockLedger(
+            variant_id=variant_id,
+            delta=delta,
+            reason=update_request.reason,
+            ref_type="admin_adjustment",
+            ref_id=actor_id
+        )
+        db.add(stock_ledger)
+    
+    # Audit log
+    await audit(
+        db, actor_id, "inventory.update", "Inventory", variant_id,
+        before={"quantity": old_quantity, "safety_stock": inventory.safety_stock if inventory else 0},
+        after={"quantity": update_request.quantity, "safety_stock": update_request.safety_stock or inventory.safety_stock}
+    )
+    
+    await db.commit()
+    
+    return {
+        "variant_id": variant_id,
+        "quantity": inventory.quantity,
+        "safety_stock": inventory.safety_stock,
+        "delta": delta,
+        "reason": update_request.reason
     }
 

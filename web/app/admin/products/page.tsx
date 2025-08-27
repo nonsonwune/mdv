@@ -951,7 +951,7 @@ function AccessDenied() {
 // Main exported component with route and permission guards
 export default function ProductsManagement() {
   return (
-    <RoleGuard allowedRoles={['admin', 'supervisor', 'operations', 'logistics']}>
+    <RoleGuard roles={['admin', 'supervisor', 'operations', 'logistics']}>
       <PermissionGuard 
         permission={Permission.PRODUCT_VIEW}
         fallback={<AccessDenied />}

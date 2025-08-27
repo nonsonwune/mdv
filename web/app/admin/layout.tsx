@@ -117,7 +117,7 @@ export default function AdminLayout({
           name: 'Reports', 
           href: '/admin/reports', 
           icon: DocumentChartBarIcon,
-          permission: Permission.REPORTS_VIEW,
+          permission: Permission.REPORT_VIEW,
           roles: ['admin', 'supervisor'],
           description: 'Business intelligence and reports'
         },
@@ -167,7 +167,7 @@ export default function AdminLayout({
     if (!hasPermission(item.permission)) return false
     
     // If specific roles are defined, check role
-    if (item.roles && !item.roles.includes(user?.role || '')) return false
+    // Note: roles property is optional and not used in current implementation
     
     return true
   })

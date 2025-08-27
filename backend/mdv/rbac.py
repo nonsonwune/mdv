@@ -25,11 +25,18 @@ class Permission(str, Enum):
     PRODUCT_EDIT = "product:edit"
     PRODUCT_DELETE = "product:delete"
     PRODUCT_PUBLISH = "product:publish"
+    # Category permissions
+    MANAGE_CATEGORIES = "category:manage"
+    VIEW_CATEGORIES = "category:view"
+    DELETE_CATEGORIES = "category:delete"
     
     # Inventory permissions
     INVENTORY_VIEW = "inventory:view"
     INVENTORY_ADJUST = "inventory:adjust"
     INVENTORY_SYNC = "inventory:sync"
+    # Aliases for frontend compatibility
+    VIEW_INVENTORY = "inventory:view"  # Alias
+    MANAGE_INVENTORY = "inventory:adjust"  # Alias
     
     # Order permissions
     ORDER_VIEW = "order:view"
@@ -46,6 +53,10 @@ class Permission(str, Enum):
     USER_DELETE = "user:delete"
     USER_ACTIVATE = "user:activate"
     USER_ASSIGN_ROLE = "user:assign_role"
+    # Aliases for frontend compatibility
+    MANAGE_USERS = "user:manage"
+    VIEW_USERS = "user:view"  # Alias
+    DELETE_USERS = "user:delete"  # Alias
     
     # Payment permissions
     PAYMENT_VIEW = "payment:view"
@@ -56,6 +67,12 @@ class Permission(str, Enum):
     REPORT_VIEW = "report:view"
     REPORT_GENERATE = "report:generate"
     REPORT_EXPORT = "report:export"
+    # Aliases for frontend compatibility
+    VIEW_REPORTS = "report:view"  # Alias
+    VIEW_SALES_REPORTS = "report:view"  # Alias
+    VIEW_INVENTORY_REPORTS = "report:view"  # Alias  
+    VIEW_CUSTOMER_REPORTS = "report:view"  # Alias
+    EXPORT_DATA = "report:export"  # Alias
     
     # System permissions
     SYSTEM_SETTINGS = "system:settings"
@@ -77,9 +94,15 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.PRODUCT_CREATE,
         Permission.PRODUCT_EDIT,
         Permission.PRODUCT_PUBLISH,
+        # Categories
+        Permission.MANAGE_CATEGORIES,
+        Permission.VIEW_CATEGORIES,
+        Permission.DELETE_CATEGORIES,
         # Inventory - full access
         Permission.INVENTORY_VIEW,
+        Permission.VIEW_INVENTORY,  # Alias
         Permission.INVENTORY_ADJUST,
+        Permission.MANAGE_INVENTORY,  # Alias
         Permission.INVENTORY_SYNC,
         # Orders - full access
         Permission.ORDER_VIEW,
@@ -90,17 +113,25 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.ORDER_REFUND,
         # Users - limited access
         Permission.USER_VIEW,
+        Permission.VIEW_USERS,  # Alias
         Permission.USER_CREATE,
         Permission.USER_EDIT,
         Permission.USER_ACTIVATE,
+        Permission.MANAGE_USERS,
+        Permission.DELETE_USERS,
         # Payments - view and process
         Permission.PAYMENT_VIEW,
         Permission.PAYMENT_PROCESS,
         Permission.PAYMENT_REFUND,
         # Reports - full access
         Permission.REPORT_VIEW,
+        Permission.VIEW_REPORTS,  # Alias
+        Permission.VIEW_SALES_REPORTS,  # Alias
+        Permission.VIEW_INVENTORY_REPORTS,  # Alias
+        Permission.VIEW_CUSTOMER_REPORTS,  # Alias
         Permission.REPORT_GENERATE,
         Permission.REPORT_EXPORT,
+        Permission.EXPORT_DATA,  # Alias
         # Analytics
         Permission.ANALYTICS_VIEW,
         Permission.ANALYTICS_EXPORT,
@@ -112,9 +143,14 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.PRODUCT_CREATE,
         Permission.PRODUCT_EDIT,
         Permission.PRODUCT_DELETE,
+        # Categories
+        Permission.VIEW_CATEGORIES,
+        Permission.MANAGE_CATEGORIES,
         # Inventory - view and adjust
         Permission.INVENTORY_VIEW,
+        Permission.VIEW_INVENTORY,  # Alias
         Permission.INVENTORY_ADJUST,
+        Permission.MANAGE_INVENTORY,  # Alias
         # Orders - manage fulfillment
         Permission.ORDER_VIEW,
         Permission.ORDER_EDIT,
@@ -123,6 +159,8 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.PAYMENT_VIEW,
         # Reports - view only
         Permission.REPORT_VIEW,
+        Permission.VIEW_REPORTS,  # Alias
+        Permission.VIEW_INVENTORY_REPORTS,  # Alias
         # Analytics - view only
         Permission.ANALYTICS_VIEW,
     },
@@ -132,11 +170,14 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.PRODUCT_VIEW,
         # Inventory - view only
         Permission.INVENTORY_VIEW,
+        Permission.VIEW_INVENTORY,  # Alias
         # Orders - view and update shipping
         Permission.ORDER_VIEW,
         Permission.ORDER_EDIT,
         # Reports - view logistics reports
         Permission.REPORT_VIEW,
+        Permission.VIEW_REPORTS,  # Alias
+        Permission.VIEW_INVENTORY_REPORTS,  # Alias
         # Analytics - view logistics analytics
         Permission.ANALYTICS_VIEW,
     },

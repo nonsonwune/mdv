@@ -705,7 +705,7 @@ function AccessDeniedCategories() {
 // Main page component with comprehensive RBAC protection
 export default function CategoryManagementPage() {
   return (
-    <RoleGuard allowedRoles={['admin', 'supervisor']}>
+    <RoleGuard roles={['admin', 'supervisor']}>
       <PermissionGuard 
         permission={Permission.PRODUCT_CREATE}
         fallback={<AccessDeniedCategories />}

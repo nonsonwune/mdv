@@ -15,6 +15,8 @@ from sqlalchemy import select
 from .routers import public, admin, payments
 from .routers import auth as auth_router
 from .routers import users, orders, wishlist, reviews, admin_users, admin_products
+from . import inventory as inventory_router
+from . import analytics as analytics_router
 
 
 init_observability("mdv-api")
@@ -197,6 +199,8 @@ app.include_router(payments.router)
 app.include_router(admin.router)
 app.include_router(admin_users.router)
 app.include_router(admin_products.router)
+app.include_router(inventory_router.router)
+app.include_router(analytics_router.router)
 app.include_router(auth_router.router)
 app.include_router(users.router)
 app.include_router(orders.router)

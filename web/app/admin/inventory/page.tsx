@@ -704,7 +704,7 @@ function AccessDeniedInventory() {
 // Main page component with comprehensive RBAC protection
 export default function InventoryManagementPage() {
   return (
-    <RoleGuard allowedRoles={['admin', 'supervisor', 'operations', 'logistics']}>
+    <RoleGuard roles={['admin', 'supervisor', 'operations', 'logistics']}>
       <PermissionGuard 
         permission={Permission.VIEW_INVENTORY}
         fallback={<AccessDeniedInventory />}

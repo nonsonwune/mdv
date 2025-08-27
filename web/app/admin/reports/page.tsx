@@ -7,8 +7,8 @@ import { useAuth, Permission } from '@/lib/auth-context'
 import { PermissionGuard, RoleGuard } from '@/components/auth/permission-guards'
 import {
   ChartBarIcon,
-  TrendingUpIcon,
-  TrendingDownIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
   UsersIcon,
   ShoppingBagIcon,
   CurrencyDollarIcon,
@@ -113,11 +113,11 @@ function ReportsDashboardContent() {
   const [userMetrics, setUserMetrics] = useState<UserMetrics | null>(null)
   
   // Permission checks
-  const canViewReports = hasPermission(Permission.VIEW_REPORTS)
-  const canViewSalesReports = hasPermission(Permission.VIEW_SALES_REPORTS)
-  const canViewInventoryReports = hasPermission(Permission.VIEW_INVENTORY_REPORTS)
-  const canViewCustomerReports = hasPermission(Permission.VIEW_CUSTOMER_REPORTS)
-  const canExportReports = hasPermission(Permission.EXPORT_DATA)
+  const canViewReports = hasPermission(Permission.REPORT_VIEW)
+  const canViewSalesReports = hasPermission(Permission.REPORT_VIEW)
+  const canViewInventoryReports = hasPermission(Permission.REPORT_VIEW)
+  const canViewCustomerReports = hasPermission(Permission.REPORT_VIEW)
+  const canExportReports = hasPermission(Permission.REPORT_EXPORT)
 
   // Fetch reports data
   const fetchReportsData = async () => {
@@ -200,7 +200,7 @@ function ReportsDashboardContent() {
       })
       
       // Create download link
-      const blob = new Blob([response], { type: 'text/csv' })
+      const blob = new Blob([response as string], { type: 'text/csv' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -289,10 +289,10 @@ function ReportsDashboardContent() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8">
             {[
-              { key: 'overview', label: 'Overview', icon: ChartBarIcon, permission: Permission.VIEW_REPORTS },
-              { key: 'sales', label: 'Sales Analytics', icon: CurrencyDollarIcon, permission: Permission.VIEW_SALES_REPORTS },
-              { key: 'inventory', label: 'Inventory Reports', icon: BuildingStorefrontIcon, permission: Permission.VIEW_INVENTORY_REPORTS },
-              { key: 'customers', label: 'Customer Insights', icon: UsersIcon, permission: Permission.VIEW_CUSTOMER_REPORTS }
+              { key: 'overview', label: 'Overview', icon: ChartBarIcon, permission: Permission.REPORT_VIEW },
+              { key: 'sales', label: 'Sales Analytics', icon: CurrencyDollarIcon, permission: Permission.REPORT_VIEW },
+              { key: 'inventory', label: 'Inventory Reports', icon: BuildingStorefrontIcon, permission: Permission.REPORT_VIEW },
+              { key: 'customers', label: 'Customer Insights', icon: UsersIcon, permission: Permission.REPORT_VIEW }
             ].map(tab => {
               const Icon = tab.icon
               const hasTabPermission = hasPermission(tab.permission)
@@ -336,8 +336,8 @@ function ReportsDashboardContent() {
                         salesMetrics.revenue_growth >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {salesMetrics.revenue_growth >= 0 ? 
-                          <TrendingUpIcon className="h-4 w-4" /> : 
-                          <TrendingDownIcon className="h-4 w-4" />
+                          <ArrowTrendingUpIcon className="h-4 w-4" /> : 
+                          <ArrowTrendingDownIcon className="h-4 w-4" />
                         }
                         {formatPercentage(salesMetrics.revenue_growth)}
                       </p>
@@ -357,8 +357,8 @@ function ReportsDashboardContent() {
                         salesMetrics.order_growth >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
                         {salesMetrics.order_growth >= 0 ? 
-                          <TrendingUpIcon className="h-4 w-4" /> : 
-                          <TrendingDownIcon className="h-4 w-4" />
+                          <ArrowTrendingUpIcon className="h-4 w-4" /> : 
+                          <ArrowTrendingDownIcon className="h-4 w-4" />
                         }
                         {formatPercentage(salesMetrics.order_growth)}
                       </p>
@@ -381,8 +381,8 @@ function ReportsDashboardContent() {
                       userMetrics.user_growth >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
                       {userMetrics.user_growth >= 0 ? 
-                        <TrendingUpIcon className="h-4 w-4" /> : 
-                        <TrendingDownIcon className="h-4 w-4" />
+                        <ArrowTrendingUpIcon className="h-4 w-4" /> : 
+                        <ArrowTrendingDownIcon className="h-4 w-4" />
                       }
                       {formatPercentage(userMetrics.user_growth)}
                     </p>
@@ -764,7 +764,7 @@ function ReportsDashboardContent() {
                     {userMetrics.new_users_this_month.toLocaleString()}
                   </p>
                 </div>
-                <TrendingUpIcon className="h-8 w-8 text-green-600" />
+                <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
               </div>
             </div>
 
@@ -843,9 +843,9 @@ function AccessDeniedReports() {
 // Main page component with comprehensive RBAC protection
 export default function ReportsDashboardPage() {
   return (
-    <RoleGuard allowedRoles={['admin', 'supervisor', 'operations', 'logistics']}>
+    <RoleGuard roles={['admin', 'supervisor', 'operations', 'logistics']}>
       <PermissionGuard 
-        permission={Permission.VIEW_REPORTS}
+        permission={Permission.REPORT_VIEW}
         fallback={<AccessDeniedReports />}
       >
         <ReportsDashboardContent />

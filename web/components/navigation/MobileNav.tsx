@@ -53,6 +53,30 @@ export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
       ]
     }
     
+    // Check if staff is viewing customer pages
+    const isStaffViewingCustomer = isStaff && (
+      pathname.startsWith('/account') || 
+      pathname === '/' || 
+      pathname.startsWith('/men') || 
+      pathname.startsWith('/women') || 
+      pathname.startsWith('/essentials') || 
+      pathname.startsWith('/sale')
+    )
+    
+    // Staff viewing customer pages - show both contexts
+    if (isStaffViewingCustomer) {
+      return [
+        { label: "Customer View", href: "/account", icon: "👁️" },
+        { label: "Orders", href: "/account?tab=orders", icon: "📦" },
+        { label: "Track Order", href: "/track", icon: "📍" },
+        { label: "━━━━━━━━━━", href: "#", icon: "" }, // Divider
+        { label: `Admin: ${getRoleDisplayName()}`, href: "/admin", icon: "🔑" },
+        { label: "Admin Dashboard", href: "/admin", icon: "📊" },
+        { label: "Sign Out", href: "#", icon: "🚪", onClick: logout },
+      ]
+    }
+    
+    // Staff on admin pages
     if (isStaff) {
       return [
         { label: getRoleDisplayName(), href: "/admin", icon: "📊" },
@@ -232,7 +256,12 @@ export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
                 <ul className="space-y-1">
                   {accountItems.map((item) => (
                     <li key={item.href + item.label}>
-                      {item.onClick ? (
+                      {item.href === "#" && item.label.includes("━") ? (
+                        // Divider
+                        <div className="px-3 py-1 text-center text-neutral-300 text-xs">
+                          {item.label}
+                        </div>
+                      ) : item.onClick ? (
                         <button
                           onClick={() => {
                             setIsOpen(false)

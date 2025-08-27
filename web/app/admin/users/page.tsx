@@ -752,7 +752,7 @@ function AccessDeniedUsers() {
 // Main page component with comprehensive RBAC protection
 export default function UsersManagement() {
   return (
-    <RoleGuard allowedRoles={['admin', 'supervisor']}>
+    <RoleGuard roles={['admin', 'supervisor']}>
       <PermissionGuard 
         permission={Permission.MANAGE_USERS}
         fallback={<AccessDeniedUsers />}
