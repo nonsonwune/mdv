@@ -30,7 +30,9 @@ export default function MiniCart({ onClose }: { onClose: () => void }) {
   }, [])
 
   useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose() }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose()
+    }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [onClose])
@@ -74,60 +76,115 @@ export default function MiniCart({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-96 max-w-[90vw] bg-white shadow-xl flex flex-col">
+    <>
+      {/* Invisible backdrop for click-outside detection */}
+      <div className="fixed inset-0" style={{ zIndex: 'var(--z-popover)' }} onClick={onClose} />
+
+      {/* Dropdown positioned relative to cart button */}
+      <div
+        className="absolute top-full right-0 mt-2 w-80 max-w-[90vw] bg-white border border-neutral-200 rounded-lg shadow-lg max-h-96 flex flex-col"
+        style={{ zIndex: 'var(--z-dropdown)' }}
+      >
         <div className="p-4 border-b flex items-center justify-between">
           <div className="font-medium">Your Cart</div>
-          <button onClick={onClose} className="text-sm underline">Close</button>
+          <button onClick={onClose} className="text-sm text-neutral-500 hover:text-neutral-700">✕</button>
         </div>
-        <div className="flex-1 overflow-auto p-4 space-y-3">
+
+        <div className="flex-1 overflow-auto p-4 space-y-3 min-h-0">
           {loading ? (
-            <p>Loading…</p>
+            <div className="flex items-center justify-center py-8">
+              <p className="text-sm text-neutral-500">Loading…</p>
+            </div>
           ) : !cart || cart.items.length === 0 ? (
-            <p className="text-sm">Your cart is empty.</p>
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="text-4xl mb-2">🛒</div>
+              <p className="text-sm text-neutral-500">Your cart is empty</p>
+            </div>
           ) : (
             cart.items.map((it) => (
-              <div key={it.id} className="border border-neutral-200 rounded p-3 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div key={it.id} className="border border-neutral-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-start gap-3">
                   {it.image_url ? (
-                    <Image src={it.image_url} alt={it.title || `Variant ${it.variant_id}`} width={64} height={64} className="w-16 h-16 object-cover rounded bg-neutral-100" />
+                    <Image
+                      src={it.image_url}
+                      alt={it.title || `Variant ${it.variant_id}`}
+                      width={48}
+                      height={48}
+                      className="w-12 h-12 object-cover rounded bg-neutral-100 flex-shrink-0"
+                    />
                   ) : (
-                    <div className="w-16 h-16 rounded bg-neutral-100" />
+                    <div className="w-12 h-12 rounded bg-neutral-100 flex-shrink-0" />
                   )}
-                  <div className="text-sm">
-                    <div>{it.title || `Variant #${it.variant_id}`}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{it.title || `Variant #${it.variant_id}`}</div>
                     {typeof it.price === "number" ? (
-                      <div className="text-xs" style={{ color: "var(--ink-600)" }}>Unit: ₦{Number(it.price).toLocaleString()}</div>
+                      <div className="text-xs text-neutral-500">₦{Number(it.price).toLocaleString()} each</div>
                     ) : null}
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
                   {typeof it.price === "number" ? (
-                    <div className="text-sm">₦{Number(it.price * it.qty).toLocaleString()}</div>
+                    <div className="text-sm font-medium">₦{Number(it.price * it.qty).toLocaleString()}</div>
                   ) : null}
+                </div>
+
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <button className="border rounded px-2 py-1" onClick={() => changeQty(it.id, it.qty - 1)} disabled={updatingItemId === it.id}>−</button>
-                    <div className="text-sm">{it.qty}</div>
-                    <button className="border rounded px-2 py-1" onClick={() => changeQty(it.id, it.qty + 1)} disabled={updatingItemId === it.id}>＋</button>
+                    <button
+                      className="w-8 h-8 border border-neutral-300 rounded hover:bg-neutral-50 flex items-center justify-center text-sm"
+                      onClick={() => changeQty(it.id, it.qty - 1)}
+                      disabled={updatingItemId === it.id}
+                    >
+                      −
+                    </button>
+                    <span className="text-sm font-medium w-8 text-center">{it.qty}</span>
+                    <button
+                      className="w-8 h-8 border border-neutral-300 rounded hover:bg-neutral-50 flex items-center justify-center text-sm"
+                      onClick={() => changeQty(it.id, it.qty + 1)}
+                      disabled={updatingItemId === it.id}
+                    >
+                      +
+                    </button>
                   </div>
+                  <button
+                    className="text-xs text-neutral-500 hover:text-red-600 underline"
+                    onClick={() => changeQty(it.id, 0)}
+                    disabled={updatingItemId === it.id}
+                  >
+                    Remove
+                  </button>
                 </div>
               </div>
             ))
           )}
         </div>
-        <div className="p-4 border-t space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span>Subtotal</span>
-            <span>{subtotal() > 0 ? `₦${subtotal().toLocaleString()}` : <span className="italic">Unavailable</span>}</span>
+
+        {cart && cart.items.length > 0 && (
+          <div className="p-4 border-t bg-neutral-50 space-y-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">Subtotal</span>
+              <span className="font-medium">
+                {subtotal() > 0 ? `₦${subtotal().toLocaleString()}` : <span className="italic text-neutral-500">Unavailable</span>}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href="/cart"
+                className="border border-neutral-300 rounded-lg px-4 py-2 text-sm text-center hover:bg-neutral-50 transition-colors"
+                onClick={onClose}
+              >
+                View Cart
+              </Link>
+              <Link
+                href="/checkout"
+                className="bg-maroon-700 text-white rounded-lg px-4 py-2 text-sm text-center hover:bg-maroon-800 transition-colors"
+                onClick={onClose}
+              >
+                Checkout
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <Link href="/cart" className="border rounded px-4 py-2 text-sm text-center flex-1" onClick={onClose}>View cart</Link>
-            <Link href="/checkout" className="btn-primary text-sm flex-1 text-center" onClick={onClose}>Checkout</Link>
-          </div>
-        </div>
+        )}
       </div>
-    </div>
+    </>
   )
 }
 
