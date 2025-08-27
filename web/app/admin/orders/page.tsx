@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
+import { useAuth, Permission } from '@/lib/auth-context'
+import { PermissionGuard, RoleGuard } from '@/components/auth/permission-guards'
 import {
   EyeIcon,
   TruckIcon,
@@ -10,6 +13,25 @@ import {
   XCircleIcon,
   ClockIcon,
   MagnifyingGlassIcon,
+  PencilIcon,
+  DocumentTextIcon,
+  PrinterIcon,
+  ArrowPathIcon,
+  CubeIcon,
+  UserIcon,
+  CalendarDaysIcon,
+  CurrencyDollarIcon,
+  ShoppingBagIcon,
+  MapPinIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  ExclamationTriangleIcon,
+  ShieldExclamationIcon,
+  ChevronDownIcon,
+  ArrowTopRightOnSquareIcon,
+  FunnelIcon,
+  Cog6ToothIcon,
+  TagIcon
 } from '@heroicons/react/24/outline'
 
 interface Order {
@@ -60,7 +82,10 @@ interface Stats {
   period_days: number
 }
 
-export default function AdminOrdersPage() {
+// Enhanced Order Management Component with RBAC
+function OrderManagementContent() {
+  const router = useRouter()
+  const { user, hasPermission, isRole } = useAuth()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -69,6 +94,16 @@ export default function AdminOrdersPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [stats, setStats] = useState<Stats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [selectedOrders, setSelectedOrders] = useState<number[]>([])
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'processing' | 'shipped'>('all')
+  const [showBulkActions, setShowBulkActions] = useState(false)
+
+  // Check permissions on mount
+  useEffect(() => {
+    if (!hasPermission(Permission.ORDER_VIEW)) {
+      router.push('/admin?error=unauthorized')
+    }
+  }, [hasPermission, router])
 
   useEffect(() => {
     fetchOrders()
@@ -142,15 +177,200 @@ export default function AdminOrdersPage() {
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-maroon-700"></div>
       </div>
-    )
+
+}
+
+// Access Denied Component
+function AccessDenied() {
+  const router = useRouter()
+  
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="text-center">
+          <ShieldExclamationIcon className="mx-auto h-16 w-16 text-red-500" />
+          <h2 className="mt-6 text-3xl font-bold text-gray-900">Access Denied</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            You don't have permission to view this page. Please contact your administrator if you believe this is an error.
+          </p>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push('/admin')}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-maroon-600 hover:bg-maroon-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-maroon-500"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Export main component with RBAC guards
+export default function OrdersManagementPage() {
+  return (
+    <RoleGuard allowedRoles={['admin', 'supervisor', 'operations', 'logistics']}>
+      <PermissionGuard 
+        permission={Permission.ORDER_VIEW}
+        fallback={<AccessDenied />}
+      >
+        <OrderManagementContent />
+      </PermissionGuard>
+    </RoleGuard>
+  )
+}
+  // Function to handle order status changes
+  const handleStatusUpdate = async (orderId: number, newStatus: string) => {
+    if (!hasPermission(Permission.ORDER_EDIT)) {
+      alert('You do not have permission to update order status')
+      return
+    }
+
+    try {
+      await api(`/api/admin/orders/${orderId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      })
+      
+      fetchOrders() // Refresh orders
+      fetchStats() // Refresh stats
+    } catch (error) {
+      console.error('Failed to update order status:', error)
+      alert('Failed to update order status')
+    }
+  }
+
+  // Function to handle bulk status updates
+  const handleBulkStatusUpdate = async (status: string) => {
+    if (selectedOrders.length === 0) {
+      alert('Please select orders to update')
+      return
+    }
+
+    if (!hasPermission(Permission.ORDER_EDIT)) {
+      alert('You do not have permission to update order status')
+      return
+    }
+
+    try {
+      await api('/api/admin/orders/bulk-update', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          order_ids: selectedOrders,
+          status
+        })
+      })
+
+      setSelectedOrders([])
+      fetchOrders()
+      fetchStats()
+    } catch (error) {
+      console.error('Failed to bulk update orders:', error)
+      alert('Failed to update orders')
+    }
+  }
+
+  // Function to export orders to CSV
+  const handleExportOrders = async () => {
+    if (!hasPermission(Permission.ORDER_EXPORT)) {
+      alert('You do not have permission to export orders')
+      return
+    }
+
+    try {
+      const params = new URLSearchParams()
+      
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter)
+      }
+      
+      if (searchTerm) {
+        params.append('search', searchTerm)
+      }
+
+      const response = await api<any>(`/api/admin/orders/export?${params}`, {
+        method: 'GET',
+        responseType: 'blob'
+      })
+
+      // Create a download link
+      const url = window.URL.createObjectURL(new Blob([response]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `orders-export-${new Date().toISOString().split('T')[0]}.csv`)
+      document.body.appendChild(link)
+      link.click()
+
+      // Clean up
+      link.parentNode?.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Failed to export orders:', error)
+      alert('Failed to export orders')
+    }
   }
 
   return (
     <div>
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
-        <p className="text-gray-600">Manage customer orders and fulfillment</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
+            <p className="text-gray-600">
+              Track and manage customer orders
+              {isRole('logistics') && (
+                <span className="text-blue-600 ml-2">(Fulfillment Focus)</span>
+              )}
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {/* Quick Actions based on permissions */}
+            <PermissionGuard permission={Permission.ORDER_EXPORT}>
+              <button
+                onClick={handleExportOrders}
+                className="flex items-center gap-2 px-4 py-2 border border-maroon-300 text-maroon-700 rounded-lg hover:bg-maroon-50 transition-colors"
+              >
+                <DocumentTextIcon className="h-5 w-5" />
+                Export Orders
+              </button>
+            </PermissionGuard>
+            
+            <PermissionGuard permission={Permission.ORDER_EDIT}>
+              <button
+                onClick={() => setShowBulkActions(!showBulkActions)}
+                className="flex items-center gap-2 px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 transition-colors"
+              >
+                <Cog6ToothIcon className="h-5 w-5" />
+                Bulk Actions
+              </button>
+            </PermissionGuard>
+          </div>
+        </div>
+        
+        {/* Role-specific notices */}
+        {isRole('operations') && (
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <p className="text-sm text-blue-800">
+                <strong>Operations Role:</strong> You can view and update order statuses, manage fulfillment, but cannot access customer payment information.
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {isRole('logistics') && (
+          <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <TruckIcon className="h-5 w-5 text-green-600 mr-2" />
+              <p className="text-sm text-green-800">
+                <strong>Logistics Role:</strong> Focus on order fulfillment, shipping, and delivery tracking. You can update shipping status and tracking information.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -220,11 +440,72 @@ export default function AdminOrdersPage() {
           </form>
         </div>
 
+        {/* Bulk Actions Bar */}
+        {selectedOrders.length > 0 && hasPermission(Permission.ORDER_EDIT) && (
+          <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-700">
+                {selectedOrders.length} order{selectedOrders.length !== 1 ? 's' : ''} selected
+              </span>
+              <div className="flex gap-2">
+                {isRole('operations') || isRole('supervisor') || isRole('admin') ? (
+                  <>
+                    <button
+                      onClick={() => handleBulkStatusUpdate('Processing')}
+                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Mark Processing
+                    </button>
+                    <button
+                      onClick={() => handleBulkStatusUpdate('Shipped')}
+                      className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Mark Shipped
+                    </button>
+                  </>
+                ) : null}
+                
+                {isRole('logistics') && (
+                  <button
+                    onClick={() => handleBulkStatusUpdate('Shipped')}
+                    className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Mark Shipped
+                  </button>
+                )}
+                
+                <button
+                  onClick={() => setSelectedOrders([])}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Orders Table */}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
+                {hasPermission(Permission.ORDER_EDIT) && (
+                  <th className="px-6 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedOrders(orders.map(o => o.id))
+                        } else {
+                          setSelectedOrders([])
+                        }
+                      }}
+                      checked={selectedOrders.length === orders.length && orders.length > 0}
+                      className="rounded border-gray-300 text-maroon-600 focus:ring-maroon-500"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Order ID
                 </th>

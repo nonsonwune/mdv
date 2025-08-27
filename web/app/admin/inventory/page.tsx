@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
+import { useAuth, Permission } from '@/lib/auth-context'
+import { PermissionGuard, RoleGuard } from '@/components/auth/permission-guards'
 import {
   ExclamationTriangleIcon,
   PlusIcon,
@@ -9,7 +12,11 @@ import {
   ArrowPathIcon,
   MagnifyingGlassIcon,
   AdjustmentsHorizontalIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  DocumentArrowDownIcon,
+  DocumentArrowUpIcon,
+  ClockIcon,
+  ShieldExclamationIcon
 } from '@heroicons/react/24/outline'
 
 interface LowStockItem {
@@ -43,7 +50,11 @@ interface StockAdjustment {
   reason: string
 }
 
-export default function InventoryManagementPage() {
+// Main inventory page component with full RBAC integration
+function InventoryManagementContent() {
+  const { user, hasPermission } = useAuth()
+  const router = useRouter()
+  
   const [activeTab, setActiveTab] = useState<'overview' | 'low-stock' | 'adjust'>('overview')
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([])
@@ -55,6 +66,12 @@ export default function InventoryManagementPage() {
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([])
   const [adjustmentReason, setAdjustmentReason] = useState('Manual adjustment')
   const [processing, setProcessing] = useState(false)
+  
+  // Permission-based access checks
+  const canViewInventory = hasPermission(Permission.VIEW_INVENTORY)
+  const canAdjustStock = hasPermission(Permission.MANAGE_INVENTORY)
+  const canViewReports = hasPermission(Permission.VIEW_REPORTS)
+  const canExportData = hasPermission(Permission.EXPORT_DATA)
 
   useEffect(() => {
     if (activeTab === 'overview') {
@@ -212,6 +229,29 @@ export default function InventoryManagementPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
         <p className="text-gray-600">Monitor and adjust stock levels</p>
+        
+        {/* Role-based access notice */}
+        {!canAdjustStock && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <ShieldExclamationIcon className="h-5 w-5 text-amber-600" />
+              <p className="text-sm text-amber-700">
+                <strong>Limited Access:</strong> You have read-only access to inventory. Stock adjustments require admin or supervisor permissions.
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {user?.role === 'logistics' && (
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <ClockIcon className="h-5 w-5 text-blue-600" />
+              <p className="text-sm text-blue-700">
+                <strong>Logistics View:</strong> You can view inventory levels and low stock alerts to support operations planning.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -404,22 +444,29 @@ export default function InventoryManagementPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleQuickAdjust(item.variant_id, -1)}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded"
-                              title="Decrease by 1"
-                            >
-                              <MinusIcon className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleQuickAdjust(item.variant_id, 1)}
-                              className="p-1 text-green-600 hover:bg-green-50 rounded"
-                              title="Increase by 1"
-                            >
-                              <PlusIcon className="h-4 w-4" />
-                            </button>
-                          </div>
+                          {canAdjustStock ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleQuickAdjust(item.variant_id, -1)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                title="Decrease by 1"
+                              >
+                                <MinusIcon className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleQuickAdjust(item.variant_id, 1)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                title="Increase by 1"
+                              >
+                                <PlusIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-xs text-gray-400">
+                              <ShieldExclamationIcon className="h-4 w-4" />
+                              <span>No permission</span>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )
@@ -515,12 +562,19 @@ export default function InventoryManagementPage() {
                         <span className="text-sm font-medium text-red-600">-{item.shortage}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleQuickAdjust(item.variant_id, item.shortage)}
-                          className="text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg hover:bg-yellow-200 transition-colors"
-                        >
-                          Restock to Safety Level
-                        </button>
+                        {canAdjustStock ? (
+                          <button
+                            onClick={() => handleQuickAdjust(item.variant_id, item.shortage)}
+                            className="text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg hover:bg-yellow-200 transition-colors"
+                          >
+                            Restock to Safety Level
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1 text-xs text-gray-400">
+                            <ShieldExclamationIcon className="h-4 w-4" />
+                            <span>No permission</span>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -618,5 +672,45 @@ export default function InventoryManagementPage() {
         </div>
       )}
     </div>
+  )
+}
+
+// Access denied component for unauthorized users
+function AccessDeniedInventory() {
+  const { user } = useAuth()
+  
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-lg shadow">
+      <ShieldExclamationIcon className="h-16 w-16 text-red-500 mb-4" />
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+      <p className="text-gray-600 text-center mb-4 max-w-md">
+        You don't have permission to access inventory management.
+        {user?.role === 'operations' 
+          ? ' Operations staff have limited inventory viewing permissions.'
+          : ' Please contact an administrator for access.'}
+      </p>
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <p className="text-sm text-gray-500">
+          Current role: <span className="font-medium text-gray-900">{user?.role}</span>
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Required: Admin, Supervisor, or Operations role with inventory permissions
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Main page component with comprehensive RBAC protection
+export default function InventoryManagementPage() {
+  return (
+    <RoleGuard allowedRoles={['admin', 'supervisor', 'operations', 'logistics']}>
+      <PermissionGuard 
+        permission={Permission.VIEW_INVENTORY}
+        fallback={<AccessDeniedInventory />}
+      >
+        <InventoryManagementContent />
+      </PermissionGuard>
+    </RoleGuard>
   )
 }

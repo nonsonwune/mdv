@@ -1,7 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
+import { useAuth, Permission } from '@/lib/auth-context'
+import { PermissionGuard, RoleGuard } from '@/components/auth/permission-guards'
 import {
   PlusIcon,
   PencilIcon,
@@ -9,9 +12,46 @@ import {
   UserIcon,
   MagnifyingGlassIcon,
   CheckIcon,
-  XMarkIcon
+  XMarkIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  ShieldCheckIcon,
+  ShieldExclamationIcon,
+  ExclamationTriangleIcon,
+  ArrowPathIcon,
+  UsersIcon,
+  KeyIcon,
+  ClockIcon,
+  UserCircleIcon,
+  EnvelopeIcon,
+  PhoneIcon,
+  CalendarDaysIcon,
+  UserGroupIcon,
+  CogIcon,
+  BuildingOfficeIcon,
+  DocumentTextIcon,
+  ChartBarIcon,
+  TagIcon,
+  LockClosedIcon,
+  LockOpenIcon,
+  CheckCircleIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline'
 
+interface StaffUser {
+  id: number
+  email: string
+  first_name: string
+  last_name: string
+  role: 'admin' | 'supervisor' | 'operations' | 'logistics'
+  is_active: boolean
+  is_verified: boolean
+  last_login: string | null
+  created_at: string
+  permissions: string[]
+}
+
+// Legacy User interface for backward compatibility
 interface User {
   id: number
   name: string
@@ -22,6 +62,67 @@ interface User {
   phone?: string
 }
 
+// Enhanced role configuration
+const ROLE_CONFIG = {
+  admin: {
+    label: 'Administrator',
+    color: 'bg-red-100 text-red-800',
+    icon: ShieldCheckIcon,
+    description: 'Full system access and management',
+    permissions: ['ALL']
+  },
+  supervisor: {
+    label: 'Supervisor',
+    color: 'bg-purple-100 text-purple-800',
+    icon: UserGroupIcon,
+    description: 'Manage operations and oversee staff',
+    permissions: ['MANAGE_USERS', 'VIEW_REPORTS', 'MANAGE_ORDERS']
+  },
+  operations: {
+    label: 'Operations',
+    color: 'bg-blue-100 text-blue-800',
+    icon: CogIcon,
+    description: 'Handle orders, products, and inventory',
+    permissions: ['MANAGE_ORDERS', 'MANAGE_PRODUCTS', 'MANAGE_INVENTORY']
+  },
+  logistics: {
+    label: 'Logistics',
+    color: 'bg-green-100 text-green-800',
+    icon: BuildingOfficeIcon,
+    description: 'Manage shipping and fulfillment',
+    permissions: ['VIEW_ORDERS', 'MANAGE_SHIPPING']
+  }
+}
+
+// Status configuration
+const STATUS_CONFIG = {
+  active: {
+    label: 'Active',
+    color: 'bg-green-100 text-green-800',
+    icon: CheckCircleIcon
+  },
+  inactive: {
+    label: 'Inactive',
+    color: 'bg-gray-100 text-gray-800',
+    icon: ClockIcon
+  },
+  suspended: {
+    label: 'Suspended',
+    color: 'bg-red-100 text-red-800',
+    icon: XCircleIcon
+  }
+}
+
+interface UserStats {
+  total_users: number
+  active_users: number
+  admin_count: number
+  supervisor_count: number
+  operations_count: number
+  logistics_count: number
+  recent_logins: number
+}
+
 const roleColors: Record<string, string> = {
   'admin': 'bg-red-100 text-red-800',
   'supervisor': 'bg-purple-100 text-purple-800',
@@ -29,14 +130,27 @@ const roleColors: Record<string, string> = {
   'logistics': 'bg-green-100 text-green-800'
 }
 
-export default function UsersManagement() {
+// Main user management content component
+function UserManagementContent() {
+  const { user: currentUser, hasPermission } = useAuth()
+  const router = useRouter()
+  
+  // Permission checks
+  const canManageUsers = hasPermission(Permission.MANAGE_USERS)
+  const canViewUsers = hasPermission(Permission.VIEW_USERS) || hasPermission(Permission.MANAGE_USERS)
+  const canDeleteUsers = hasPermission(Permission.DELETE_USERS) || hasPermission(Permission.MANAGE_USERS)
   const [users, setUsers] = useState<User[]>([])
+  const [stats, setStats] = useState<UserStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [emailError, setEmailError] = useState<string>('')
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -186,24 +300,172 @@ export default function UsersManagement() {
     )
   }
 
+  // Fetch stats function
+  const fetchStats = async () => {
+    try {
+      const response = await api<UserStats>('/api/admin/users/stats')
+      setStats(response)
+    } catch (error) {
+      console.error('Failed to fetch user stats:', error)
+    }
+  }
+
+  // Add to useEffect
+  useEffect(() => {
+    fetchUsers()
+    fetchStats()
+  }, [currentPage, searchTerm, roleFilter, statusFilter])
+
+  // Handle bulk actions
+  const handleBulkStatusUpdate = async (status: string) => {
+    if (selectedUsers.length === 0) {
+      alert('Please select users to update')
+      return
+    }
+
+    try {
+      await Promise.all(
+        selectedUsers.map(userId => 
+          api(`/api/admin/users/${userId}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status })
+          })
+        )
+      )
+      setSelectedUsers([])
+      fetchUsers()
+      fetchStats()
+    } catch (error) {
+      console.error('Failed to bulk update users:', error)
+      alert('Failed to update users')
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-NG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   return (
     <div>
       {/* Header */}
       <div className="mb-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Users</h1>
-            <p className="text-gray-600">Manage user accounts and roles</p>
+            <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+            <p className="text-gray-600">
+              Manage staff accounts, roles, and permissions
+              {currentUser?.role === 'supervisor' && (
+                <span className="text-amber-600 ml-2">(Limited Access)</span>
+              )}
+            </p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 transition-colors"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Add User
-          </button>
+          <div className="flex gap-3">
+            {/* Export Users */}
+            <PermissionGuard permission={Permission.MANAGE_USERS}>
+              <button
+                onClick={() => {/* handleExportUsers() */}}
+                className="flex items-center gap-2 px-4 py-2 border border-maroon-300 text-maroon-700 rounded-lg hover:bg-maroon-50 transition-colors"
+              >
+                <DocumentTextIcon className="h-5 w-5" />
+                Export Users
+              </button>
+            </PermissionGuard>
+            
+            {/* Add User */}
+            <PermissionGuard permission={Permission.MANAGE_USERS}>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 transition-colors"
+              >
+                <PlusIcon className="h-5 w-5" />
+                Add User
+              </button>
+            </PermissionGuard>
+          </div>
         </div>
+        
+        {/* Role-specific notices */}
+        {currentUser?.role === 'supervisor' && (
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <ExclamationTriangleIcon className="h-5 w-5 text-blue-600 mr-2" />
+              <p className="text-sm text-blue-800">
+                <strong>Supervisor Role:</strong> You can view and manage operations/logistics staff, but cannot create admin accounts or modify admin permissions.
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {!canManageUsers && (
+          <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <ShieldExclamationIcon className="h-5 w-5 text-amber-600 mr-2" />
+              <p className="text-sm text-amber-800">
+                <strong>Limited Access:</strong> You can only view user information. Contact an administrator to make changes.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* User Stats */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-blue-50">
+                <UsersIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Total Users</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.total_users}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-green-50">
+                <CheckCircleIcon className="h-6 w-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Active Users</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.active_users}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-red-50">
+                <ShieldCheckIcon className="h-6 w-6 text-red-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Administrators</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.admin_count}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="p-2 rounded-lg bg-purple-50">
+                <ClockIcon className="h-6 w-6 text-purple-600" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm text-gray-600">Recent Logins</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.recent_logins}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow mb-6">
@@ -456,5 +718,47 @@ export default function UsersManagement() {
         </div>
       )}
     </div>
+  )
+}
+
+// Access denied component for unauthorized users
+function AccessDeniedUsers() {
+  const { user } = useAuth()
+  
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] bg-white rounded-lg shadow">
+      <ShieldExclamationIcon className="h-16 w-16 text-red-500 mb-4" />
+      <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+      <p className="text-gray-600 text-center mb-4 max-w-md">
+        You don't have permission to access user management.
+        {user?.role === 'supervisor' 
+          ? ' Supervisors have limited access to user information.'
+          : user?.role === 'operations' || user?.role === 'logistics'
+          ? ' Operations and logistics staff cannot access user management.'
+          : ' Please contact an administrator for access.'}
+      </p>
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <p className="text-sm text-gray-500">
+          Current role: <span className="font-medium text-gray-900">{user?.role}</span>
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          Required: Admin role with user management permissions
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Main page component with comprehensive RBAC protection
+export default function UsersManagement() {
+  return (
+    <RoleGuard allowedRoles={['admin', 'supervisor']}>
+      <PermissionGuard 
+        permission={Permission.MANAGE_USERS}
+        fallback={<AccessDeniedUsers />}
+      >
+        <UserManagementContent />
+      </PermissionGuard>
+    </RoleGuard>
   )
 }

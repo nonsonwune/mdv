@@ -14,7 +14,15 @@ import {
   Bars3Icon,
   XMarkIcon,
   ClipboardDocumentListIcon,
-  TagIcon
+  TagIcon,
+  DocumentChartBarIcon,
+  ArchiveBoxIcon,
+  TruckIcon,
+  BuildingStorefrontIcon,
+  UserGroupIcon,
+  ShieldCheckIcon,
+  ExclamationTriangleIcon,
+  InformationCircleIcon
 } from '@heroicons/react/24/outline'
 import { useAuth, Permission } from '@/lib/auth-context'
 import { PermissionGuard } from '@/components/auth/permission-guards'
@@ -47,73 +55,111 @@ export default function AdminLayout({
     await logout()
   }
 
-  // Define navigation with permission requirements
-  const navigation = [
-    { 
-      name: 'Dashboard', 
-      href: '/admin', 
-      icon: HomeIcon,
-      // All staff can see dashboard
-      permission: null 
+  // Define navigation sections with role-based organization
+  const navigationSections = [
+    {
+      name: 'Overview',
+      items: [
+        { 
+          name: 'Dashboard', 
+          href: '/admin', 
+          icon: HomeIcon,
+          permission: null,
+          description: 'System overview and quick actions'
+        }
+      ]
     },
-    { 
-      name: 'Products', 
-      href: '/admin/products', 
-      icon: CubeIcon,
-      // Admin, supervisor, operations can see products (not logistics)
-      permission: Permission.PRODUCT_VIEW,
-      roles: ['admin', 'supervisor', 'operations']
+    {
+      name: 'Catalog Management',
+      items: [
+        { 
+          name: 'Products', 
+          href: '/admin/products', 
+          icon: CubeIcon,
+          permission: Permission.PRODUCT_VIEW,
+          roles: ['admin', 'supervisor', 'operations'],
+          description: 'Product catalog and inventory'
+        },
+        { 
+          name: 'Categories', 
+          href: '/admin/categories', 
+          icon: TagIcon,
+          permission: Permission.PRODUCT_CREATE,
+          roles: ['admin', 'supervisor'],
+          description: 'Product organization'
+        }
+      ]
     },
-    { 
-      name: 'Categories', 
-      href: '/admin/categories', 
-      icon: TagIcon,
-      // Only admin and supervisor can manage categories
-      permission: Permission.PRODUCT_CREATE,
-      roles: ['admin', 'supervisor']
+    {
+      name: 'Operations',
+      items: [
+        { 
+          name: 'Orders', 
+          href: '/admin/orders', 
+          icon: ShoppingCartIcon,
+          permission: Permission.ORDER_VIEW,
+          description: 'Order processing and fulfillment'
+        },
+        { 
+          name: 'Inventory', 
+          href: '/admin/inventory', 
+          icon: ArchiveBoxIcon,
+          permission: Permission.INVENTORY_VIEW,
+          roles: ['admin', 'supervisor', 'operations'],
+          description: 'Stock management and adjustments'
+        }
+      ]
     },
-    { 
-      name: 'Orders', 
-      href: '/admin/orders', 
-      icon: ShoppingCartIcon,
-      // All staff can see orders
-      permission: Permission.ORDER_VIEW
+    {
+      name: 'Analytics & Reports',
+      items: [
+        { 
+          name: 'Reports', 
+          href: '/admin/reports', 
+          icon: DocumentChartBarIcon,
+          permission: Permission.REPORTS_VIEW,
+          roles: ['admin', 'supervisor'],
+          description: 'Business intelligence and reports'
+        },
+        { 
+          name: 'Analytics', 
+          href: '/admin/analytics', 
+          icon: ChartBarIcon,
+          permission: Permission.ANALYTICS_VIEW,
+          roles: ['admin', 'supervisor'],
+          description: 'Performance metrics and insights'
+        }
+      ]
     },
-    { 
-      name: 'Inventory', 
-      href: '/admin/inventory', 
-      icon: ClipboardDocumentListIcon,
-      // Admin, supervisor, operations can see inventory (not logistics)
-      permission: Permission.INVENTORY_VIEW,
-      roles: ['admin', 'supervisor', 'operations']
-    },
-    { 
-      name: 'Users', 
-      href: '/admin/users', 
-      icon: UsersIcon,
-      // Only admin can manage users
-      permission: Permission.USER_VIEW,
-      roles: ['admin']
-    },
-    { 
-      name: 'Analytics', 
-      href: '/admin/analytics', 
-      icon: ChartBarIcon,
-      // Admin and supervisor can see analytics
-      permission: Permission.ANALYTICS_VIEW
-    },
-    { 
-      name: 'Settings', 
-      href: '/admin/settings', 
-      icon: Cog6ToothIcon,
-      // Only admin can access settings
-      permission: Permission.SYSTEM_SETTINGS,
-      roles: ['admin']
-    },
+    {
+      name: 'Administration',
+      items: [
+        { 
+          name: 'Users', 
+          href: '/admin/users', 
+          icon: UserGroupIcon,
+          permission: Permission.USER_VIEW,
+          roles: ['admin', 'supervisor'],
+          description: 'Staff account management'
+        },
+        { 
+          name: 'Settings', 
+          href: '/admin/settings', 
+          icon: Cog6ToothIcon,
+          permission: Permission.SYSTEM_SETTINGS,
+          roles: ['admin'],
+          description: 'System configuration'
+        }
+      ]
+    }
   ]
 
-  // Filter navigation based on permissions and roles
-  const filteredNavigation = navigation.filter(item => {
+  // Flatten and filter navigation based on permissions and roles
+  const allNavItems = navigationSections.flatMap(section => 
+    section.items.map(item => ({ ...item, section: section.name }))
+  )
+  
+  const filteredNavigation = allNavItems.filter(item => {
     // If no permission required, show to all staff
     if (!item.permission) return true
     
@@ -125,6 +171,30 @@ export default function AdminLayout({
     
     return true
   })
+
+  // Group filtered navigation back into sections
+  const filteredSections = navigationSections.map(section => ({
+    ...section,
+    items: section.items.filter(item => 
+      filteredNavigation.some(navItem => navItem.name === item.name)
+    )
+  })).filter(section => section.items.length > 0)
+
+  // Get role-specific welcome message
+  const getRoleWelcomeMessage = () => {
+    switch(user?.role) {
+      case 'admin':
+        return 'Full system administrator access'
+      case 'supervisor':
+        return 'Supervisory access to operations and staff'
+      case 'operations':
+        return 'Operations and inventory management'
+      case 'logistics':
+        return 'Order fulfillment and shipping'
+      default:
+        return 'Staff member'
+    }
+  }
 
   if (loading) {
     return (
@@ -169,27 +239,45 @@ export default function AdminLayout({
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            {filteredNavigation.map((item) => {
-              const isActive = pathname === item.href
-              const Icon = item.icon
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href as any}
-                  className={`
-                    flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                    ${isActive
-                      ? 'bg-maroon-50 text-maroon-700'
-                      : 'text-gray-700 hover:bg-gray-50'
-                    }
-                  `}
-                >
-                  <Icon className="h-5 w-5" />
-                  {item.name}
-                </Link>
-              )
-            })}
+          <nav className="flex-1 px-4 py-4 overflow-y-auto">
+            {filteredSections.map((section, sectionIndex) => (
+              <div key={section.name} className={sectionIndex > 0 ? 'mt-6' : ''}>
+                {/* Section Header */}
+                <div className="px-3 py-2 mb-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    {section.name}
+                  </h3>
+                </div>
+                
+                {/* Section Items */}
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const isActive = pathname === item.href
+                    const Icon = item.icon
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href as any}
+                        className={`
+                          flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group
+                          ${isActive
+                            ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                          }
+                        `}
+                        title={item.description}
+                      >
+                        <Icon className={`h-5 w-5 ${isActive ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                        <span className="flex-1">{item.name}</span>
+                        {isActive && (
+                          <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
 
           {/* User info and logout */}
