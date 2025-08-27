@@ -151,6 +151,24 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
         headers=headers
     )
 
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    headers = {}
+    origin = request.headers.get("origin")
+    if origin in allowed_origins:
+        headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Expose-Headers": "*",
+        }
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors()},
+        headers=headers,
+    )
+
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     headers = {}
