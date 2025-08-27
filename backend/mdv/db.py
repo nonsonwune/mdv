@@ -37,7 +37,12 @@ def get_engine() -> AsyncEngine:
             "pool_recycle": 3600,   # Recycle connections after 1 hour
         }
 
-        is_sqlite = settings.database_url.startswith("sqlite+aiosqlite")
+        # Transform DATABASE_URL for asyncpg driver
+        database_url = settings.database_url
+        if database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        
+        is_sqlite = database_url.startswith("sqlite+aiosqlite")
 
         # Pool tuning only applies to non-SQLite backends
         if not is_sqlite:
@@ -56,7 +61,7 @@ def get_engine() -> AsyncEngine:
                 })
         
         _engine = create_async_engine(
-            settings.database_url,
+            database_url,
             **pool_kwargs
         )
     return _engine
