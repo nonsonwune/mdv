@@ -53,8 +53,9 @@ export default function AdminLayout({
       }
       const userData = await response.json()
       
-      // Check if user has admin or supervisor role
-      if (userData.role !== 'admin' && userData.role !== 'supervisor') {
+      // Check if user has staff role (admin, supervisor, operations, logistics)
+      const STAFF_ROLES = ['admin', 'supervisor', 'operations', 'logistics']
+      if (!STAFF_ROLES.includes(userData.role)) {
         router.push('/staff-login?error=insufficient_permissions')
         return
       }

@@ -74,8 +74,19 @@ export default function InventoryManagementPage() {
       // Note: This endpoint would need to be created in the backend
       const response = await api<any>(`/api/admin/inventory?${params}`)
       setInventory(response.items || [])
-    } catch (error) {
-      console.error('Failed to fetch inventory:', error)
+    } catch (error: any) {
+      // Handle authentication errors gracefully
+      if (error?.message?.includes('Not authenticated') || error?.message?.includes('401')) {
+        // Redirect to staff login for authentication
+        window.location.href = '/staff-login?error=authentication_required'
+        return
+      }
+      
+      // Only log non-auth errors
+      if (!error?.message?.includes('401') && !error?.message?.includes('Not authenticated')) {
+        console.error('Failed to fetch inventory:', error)
+      }
+      
       setInventory([])
     } finally {
       setLoading(false)
@@ -87,8 +98,19 @@ export default function InventoryManagementPage() {
       setLoading(true)
       const response = await api<LowStockItem[]>('/api/admin/inventory/low-stock')
       setLowStockItems(response)
-    } catch (error) {
-      console.error('Failed to fetch low stock items:', error)
+    } catch (error: any) {
+      // Handle authentication errors gracefully
+      if (error?.message?.includes('Not authenticated') || error?.message?.includes('401')) {
+        // Redirect to staff login for authentication
+        window.location.href = '/staff-login?error=authentication_required'
+        return
+      }
+      
+      // Only log non-auth errors
+      if (!error?.message?.includes('401') && !error?.message?.includes('Not authenticated')) {
+        console.error('Failed to fetch low stock items:', error)
+      }
+      
       setLowStockItems([])
     } finally {
       setLoading(false)
