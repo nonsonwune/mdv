@@ -9,7 +9,7 @@ const PROTECTED_PATHS = {
 
 // Define role-specific restrictions
 const ROLE_RESTRICTIONS = {
-  '/admin/products': ['admin', 'supervisor'],
+  '/admin/products': ['admin', 'supervisor', 'operations'],
   '/admin/users': ['admin'],
   '/admin/analytics': ['admin', 'supervisor'],
 } as const

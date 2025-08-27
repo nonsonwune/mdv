@@ -107,8 +107,11 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
     },
     
     Role.operations: {
-        # Products - view only
+        # Products - create/edit/delete
         Permission.PRODUCT_VIEW,
+        Permission.PRODUCT_CREATE,
+        Permission.PRODUCT_EDIT,
+        Permission.PRODUCT_DELETE,
         # Inventory - view and adjust
         Permission.INVENTORY_VIEW,
         Permission.INVENTORY_ADJUST,

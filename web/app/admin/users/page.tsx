@@ -36,6 +36,7 @@ export default function UsersManagement() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [emailError, setEmailError] = useState<string>('')
 
   // Form state
   const [formData, setFormData] = useState({
@@ -75,6 +76,7 @@ export default function UsersManagement() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    setEmailError('')
     try {
       await api('/api/admin/users', {
         method: 'POST',
@@ -83,9 +85,18 @@ export default function UsersManagement() {
       setShowCreateModal(false)
       resetForm()
       fetchUsers()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create user:', error)
-      alert('Failed to create user')
+      let detail = ''
+      try {
+        const data = JSON.parse(error.message)
+        detail = data?.detail || ''
+      } catch {}
+      if (detail.includes('Email already registered')) {
+        setEmailError('This email is already registered')
+      } else {
+        alert('Failed to create user')
+      }
     }
   }
 
@@ -153,6 +164,7 @@ export default function UsersManagement() {
       role: 'operations',
       active: true
     })
+    setEmailError('')
   }
 
   const openEditModal = (user: User) => {
@@ -364,10 +376,13 @@ export default function UsersManagement() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-maroon-500 focus:border-maroon-500 ${emailError ? 'border-red-300' : 'border-gray-300'}`}
                       required
                       disabled={!!editingUser}
                     />
+                    {emailError && (
+                      <p className="mt-1 text-sm text-red-600">{emailError}</p>
+                    )}
                   </div>
                   
                   {!editingUser && (

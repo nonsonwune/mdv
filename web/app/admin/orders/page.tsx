@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { api } from '@/lib/api-client'
 import {
   EyeIcon,
@@ -9,7 +10,6 @@ import {
   XCircleIcon,
   ClockIcon,
   MagnifyingGlassIcon,
-  ChevronDownIcon
 } from '@heroicons/react/24/outline'
 
 interface Order {
@@ -90,18 +90,8 @@ export default function AdminOrdersPage() {
     }
   }
 
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
-    try {
-      await api(`/api/admin/orders/${orderId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ status: newStatus })
-      })
-      fetchOrders()
-    } catch (error) {
-      console.error('Failed to update order status:', error)
-      alert('Failed to update order status')
-    }
-  }
+  // Note: Order status transitions are handled via specific endpoints (cancel, fulfill, shipment).
+  // The generic status update function has been removed to avoid calling non-existent APIs.
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -135,45 +125,7 @@ export default function AdminOrdersPage() {
         <p className="text-gray-600">Manage customer orders and fulfillment</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">0</p>
-            </div>
-            <ClockIcon className="h-8 w-8 text-yellow-600" />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Processing</p>
-              <p className="text-2xl font-bold text-blue-600">0</p>
-            </div>
-            <ClockIcon className="h-8 w-8 text-blue-600" />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Shipped</p>
-              <p className="text-2xl font-bold text-purple-600">0</p>
-            </div>
-            <TruckIcon className="h-8 w-8 text-purple-600" />
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Completed</p>
-              <p className="text-2xl font-bold text-green-600">0</p>
-            </div>
-            <CheckCircleIcon className="h-8 w-8 text-green-600" />
-          </div>
-        </div>
-      </div>
+      {/* Stats cards removed to avoid showing dummy data. Can be reintroduced when backed by real API stats. */}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow mb-6">
@@ -286,50 +238,9 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end gap-2">
-                          <button className="text-maroon-600 hover:text-maroon-900">
+                          <Link href={`/admin/orders/${order.id}`} className="text-maroon-600 hover:text-maroon-900">
                             <EyeIcon className="h-5 w-5" />
-                          </button>
-                          <div className="relative group">
-                            <button className="text-gray-600 hover:text-gray-900">
-                              <ChevronDownIcon className="h-5 w-5" />
-                            </button>
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden group-hover:block z-10">
-                              <div className="py-1">
-                                {order.status === 'Paid' && (
-                                  <button
-                                    onClick={() => updateOrderStatus(order.id, 'Processing')}
-                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    Mark as Processing
-                                  </button>
-                                )}
-                                {order.status === 'Processing' && (
-                                  <button
-                                    onClick={() => updateOrderStatus(order.id, 'Shipped')}
-                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    Mark as Shipped
-                                  </button>
-                                )}
-                                {order.status === 'Shipped' && (
-                                  <button
-                                    onClick={() => updateOrderStatus(order.id, 'Delivered')}
-                                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                  >
-                                    Mark as Delivered
-                                  </button>
-                                )}
-                                {(order.status === 'PendingPayment' || order.status === 'Paid') && (
-                                  <button
-                                    onClick={() => updateOrderStatus(order.id, 'Cancelled')}
-                                    className="block w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-gray-100"
-                                  >
-                                    Cancel Order
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          </Link>
                         </div>
                       </td>
                     </tr>

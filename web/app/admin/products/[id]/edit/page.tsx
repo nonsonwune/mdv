@@ -42,6 +42,7 @@ interface ProductImage {
 interface Product {
   id: number
   title: string
+  slug: string
   description?: string
   category_id?: number
   is_active: boolean
@@ -275,8 +276,13 @@ export default function ProductEditPage() {
     }
   }
 
-  const handlePreview = () => {
-    window.open(`/products/${params.id}`, '_blank')
+const handlePreview = () => {
+    const slug = (product as any)?.slug
+    if (slug) {
+      window.open(`/product/${slug}`, '_blank')
+    } else {
+      window.open(`/product/${params.id}`, '_blank')
+    }
   }
 
   if (loading) {
@@ -683,7 +689,7 @@ export default function ProductEditPage() {
               <div className="flex justify-between">
                 <span className="text-sm text-gray-600">Total Stock</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {variants.reduce((sum, v) => sum + v.stock_quantity, 0)}
+{variants.reduce((sum, v) => sum + (((v as any).inventory?.quantity ?? v.stock_quantity ?? 0)), 0)}
                 </span>
               </div>
               

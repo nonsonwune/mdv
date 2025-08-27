@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, select
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import Literal, Optional
@@ -27,14 +28,59 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 @router.get("/orders", dependencies=[Depends(require_roles(*ALL_STAFF))])
 async def admin_list_orders(status: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: AsyncSession = Depends(get_db)):
-    stmt = select(Order).limit(page_size).offset((page - 1) * page_size)
+    stmt = (
+        select(Order)
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(Order.id.desc())
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.address),
+            selectinload(Order.user),
+        )
+    )
     count_stmt = select(func.count()).select_from(Order)
     if status:
         stmt = stmt.where(Order.status == status)
         count_stmt = count_stmt.where(Order.status == status)
-    items = (await db.execute(stmt.order_by(Order.id.desc()))).scalars().all()
+    items = (await db.execute(stmt)).scalars().all()
     total = (await db.execute(count_stmt)).scalar_one()
-    return {"items": [{"id": o.id, "status": o.status.value if hasattr(o.status, 'value') else o.status, "total": (o.totals or {}).get("total") } for o in items], "total": total}
+    total_pages = (total + page_size - 1) // page_size
+
+    def _status_value(s):
+        return s.value if hasattr(s, "value") else s
+
+    response_items = []
+    for o in items:
+        total_amount = (o.totals or {}).get("total")
+        try:
+            total_value = float(total_amount) if total_amount is not None else None
+        except Exception:
+            total_value = None
+        item_count = sum(i.qty for i in (o.items or []))
+        user_obj = {"name": o.user.name, "email": o.user.email} if getattr(o, "user", None) else None
+        addr = getattr(o, "address", None)
+        shipping_address = (
+            {"name": addr.name, "city": addr.city, "state": addr.state} if addr else None
+        )
+        response_items.append(
+            {
+                "id": o.id,
+                "status": _status_value(o.status),
+                "total": total_value,
+                "item_count": item_count,
+                "created_at": o.created_at,
+                "user": user_obj,
+                "shipping_address": shipping_address,
+            }
+        )
+    return {
+        "items": response_items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 @router.post("/fulfillments/{fid}/ready")

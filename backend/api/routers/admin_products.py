@@ -35,7 +35,7 @@ from mdv.schemas.admin_products import (
     OperationResponse, PaginatedResponse, BulkDeleteRequest
 )
 from mdv.cloudinary_utils import cloudinary_manager
-from mdv.utils import parse_actor_id
+from mdv.utils import parse_actor_id, audit
 from ..deps import get_db
 
 logger = logging.getLogger(__name__)
@@ -56,16 +56,9 @@ async def log_admin_action(
     before: Optional[dict] = None,
     after: Optional[dict] = None
 ):
-    """Log admin actions for audit trail."""
-    audit = AuditLog(
-        actor_id=actor_id,
-        action=action,
-        entity=entity,
-        entity_id=entity_id,
-        before=before,
-        after=after
-    )
-    db.add(audit)
+    """Log admin actions for audit trail (JSON-safe)."""
+    # Delegate to centralized audit utility which JSON-serializes Decimals/datetimes/etc.
+    await audit(db, actor_id, action, entity, entity_id, before, after)
 
 
 async def get_product_with_details(db: AsyncSession, product_id: int) -> Optional[Product]:
@@ -433,7 +426,7 @@ async def add_variant(
     product_id: int,
     request: VariantCreateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_any_permission(Permission.PRODUCT_CREATE, Permission.PRODUCT_EDIT))
 ):
     """Add a new variant to a product."""
     actor_id = parse_actor_id(claims)
@@ -502,7 +495,7 @@ async def update_variant(
     variant_id: int,
     request: VariantUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_EDIT))
 ):
     """Update variant details."""
     actor_id = parse_actor_id(claims)
@@ -577,7 +570,7 @@ async def update_variant(
 async def delete_variant(
     variant_id: int,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_DELETE))
 ):
     """Delete a variant."""
     actor_id = parse_actor_id(claims)
@@ -846,7 +839,7 @@ async def upload_product_image(
     alt_text: Optional[str] = Form(None),
     is_primary: bool = Form(False),
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_EDIT))
 ):
     """Upload a product image to Cloudinary."""
     actor_id = parse_actor_id(claims)
@@ -945,7 +938,7 @@ async def update_image(
     alt_text: Optional[str] = None,
     sort_order: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_EDIT))
 ):
     """Update image metadata."""
     actor_id = parse_actor_id(claims)
@@ -984,7 +977,7 @@ async def update_image(
 async def delete_image(
     image_id: int,
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_roles(*ADMINS))
+    claims: dict = Depends(require_permission(Permission.PRODUCT_EDIT))
 ):
     """Delete a product image."""
     actor_id = parse_actor_id(claims)
