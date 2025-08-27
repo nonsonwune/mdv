@@ -61,10 +61,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const userData = await response.json()
         setUser(userData.user)
       } else {
+        // Silently handle 401 errors on public pages
         setUser(null)
+        // Only log auth errors if they're not expected 401s
+        if (response.status !== 401) {
+          console.error('Auth check failed:', response.status)
+        }
       }
     } catch (error) {
-      console.error('Auth check failed:', error)
+      // Only log network errors, not auth failures
+      if (error instanceof TypeError) {
+        console.error('Auth check network error:', error)
+      }
       setUser(null)
     } finally {
       setLoading(false)

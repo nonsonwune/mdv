@@ -17,6 +17,10 @@ export default function StaffLoginPage() {
     const urlError = searchParams.get('error')
     if (urlError === 'insufficient_permissions') {
       setError('Access denied. Please use staff credentials.')
+    } else if (urlError === 'authentication_required') {
+      setError('Please sign in to access the admin dashboard.')
+    } else if (urlError === 'session_expired') {
+      setError('Your session has expired. Please sign in again.')
     }
   }, [searchParams])
 
@@ -112,6 +116,7 @@ export default function StaffLoginPage() {
               type="submit"
               disabled={loading}
               className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-maroon-600 hover:bg-maroon-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-maroon-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              style={{ backgroundColor: '#800000', color: '#ffffff' }}
             >
               {loading ? (
                 <>

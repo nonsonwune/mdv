@@ -42,21 +42,30 @@ export default function AdminLayout({
     try {
       const response = await fetch('/api/users/profile')
       if (!response.ok) {
-        router.push('/login')
+        // Handle authentication errors gracefully
+        if (response.status === 401) {
+          router.push('/staff-login?error=authentication_required')
+        } else {
+          console.error('Profile fetch failed:', response.status)
+          router.push('/staff-login')
+        }
         return
       }
       const userData = await response.json()
       
       // Check if user has admin or supervisor role
       if (userData.role !== 'admin' && userData.role !== 'supervisor') {
-        router.push('/account')
+        router.push('/staff-login?error=insufficient_permissions')
         return
       }
       
       setUser(userData)
     } catch (error) {
-      console.error('Failed to fetch user profile:', error)
-      router.push('/login')
+      // Only log network errors, not auth failures
+      if (error instanceof TypeError) {
+        console.error('Network error fetching profile:', error)
+      }
+      router.push('/staff-login')
     } finally {
       setLoading(false)
     }

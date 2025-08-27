@@ -75,7 +75,16 @@ export default function CheckoutPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    
     try {
+      // Check if cart is empty before proceeding
+      if (!cart || cart.items.length === 0) {
+        toast.error("Cart is empty", "Please add items to your cart before checkout");
+        setError("Your cart is empty. Please add some items before proceeding to checkout.");
+        setLoading(false);
+        return;
+      }
+      
       const cart_id = await ensureCartId();
       const res = await fetch(`${API_BASE}/api/checkout/init`, {
         method: "POST",
@@ -87,9 +96,21 @@ export default function CheckoutPage() {
           coupon_code: form.coupon || null,
         }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        // Handle specific error cases
+        if (errorText.includes('Cart is empty')) {
+          toast.error("Cart is empty", "Please add items to your cart before checkout");
+          setError("Your cart appears to be empty. Please refresh the page and add items to your cart.");
+          return;
+        }
+        throw new Error(errorText);
+      }
+      
       const data = await res.json() as CheckoutInitResponse;
       const useMock = process.env.NEXT_PUBLIC_ALLOW_MOCKS === 'true'
+      
       if (useMock && (data as any).order_id && (data as any).reference) {
         toast.info("Opening Paystack mock...")
         router.push(`/paystack-mock?order_id=${(data as any).order_id}&ref=${encodeURIComponent((data as any).reference)}`)
@@ -98,12 +119,23 @@ export default function CheckoutPage() {
         window.location.href = data.authorization_url;
       }
     } catch (err: any) {
-      const msg = err?.message || "Failed to start checkout. Please try again.";
+      let msg = "Failed to start checkout. Please try again.";
+      
+      // Parse error messages for better user experience
+      if (err?.message) {
+        if (err.message.includes('Cart is empty')) {
+          msg = "Your cart is empty. Please add some items before checking out.";
+        } else if (err.message.includes('Invalid')) {
+          msg = "Please check your information and try again.";
+        } else if (err.message.includes('network') || err.message.includes('fetch')) {
+          msg = "Connection error. Please check your internet and try again.";
+        } else {
+          msg = err.message;
+        }
+      }
+      
       setError(msg);
-      try {
-        toast.error("Checkout failed", typeof msg === "string" ? msg : undefined);
-      } catch {}
-      console.error(err);
+      toast.error("Checkout failed", msg);
     } finally {
       setLoading(false);
     }
@@ -186,7 +218,15 @@ export default function CheckoutPage() {
         <input className="border p-2 rounded w-full" placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
         <input className="border p-2 rounded w-full" placeholder="Coupon (optional)" value={form.coupon} onChange={e => setForm({ ...form, coupon: e.target.value })} />
         {error ? <p className="text-red-600 text-sm">{error}</p> : null}
-        <button className="btn-primary" disabled={loading}>{loading ? "Processing…" : "Pay with Paystack"}</button>
+        <button 
+          className={`btn-primary ${
+            (!cart || cart.items.length === 0) ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          disabled={loading || !cart || cart.items.length === 0}
+          type="submit"
+        >
+          {loading ? "Processing…" : (!cart || cart.items.length === 0) ? "Cart is Empty" : "Pay with Paystack"}
+        </button>
       </form>
       )}
     </div>

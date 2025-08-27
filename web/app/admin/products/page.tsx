@@ -52,8 +52,19 @@ export default function ProductsManagement() {
       const response = await api<any>(`/api/admin/products?${params}`)
       setProducts(response.items || [])
       setTotalPages(response.total_pages || 1)
-    } catch (error) {
-      console.error('Failed to fetch products:', error)
+    } catch (error: any) {
+      // Handle authentication errors gracefully
+      if (error?.message?.includes('Not authenticated') || error?.message?.includes('401')) {
+        // Redirect to staff login for authentication
+        window.location.href = '/staff-login?error=authentication_required'
+        return
+      }
+      
+      // Only log non-auth errors
+      if (!error?.message?.includes('401') && !error?.message?.includes('Not authenticated')) {
+        console.error('Failed to fetch products:', error)
+      }
+      
       setProducts([])
     } finally {
       setLoading(false)
