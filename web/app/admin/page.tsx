@@ -9,6 +9,8 @@ import {
   CurrencyDollarIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  EyeIcon,
+  UserIcon,
 } from '@heroicons/react/24/outline'
 
 interface DashboardStats {
@@ -99,9 +101,22 @@ export default function AdminHome() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome to MDV Admin Panel</p>
+      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Welcome to MDV Admin Panel</p>
+        </div>
+        
+        {/* Customer Dashboard View Button */}
+        <div className="flex items-center gap-4">
+          <Link 
+            href="/account" 
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <EyeIcon className="h-4 w-4" />
+            Customer View
+          </Link>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -195,6 +210,33 @@ export default function AdminHome() {
             <CurrencyDollarIcon className="h-8 w-8 text-maroon-700 mb-2" />
             <span className="text-sm font-medium text-gray-700">View Analytics</span>
           </Link>
+        </div>
+        
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Customer Experience</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link href="/account" className="flex items-center justify-between p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
+              <div className="flex items-center gap-3">
+                <UserIcon className="h-6 w-6 text-blue-600" />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Customer Dashboard</span>
+                  <p className="text-xs text-gray-600">View customer account interface</p>
+                </div>
+              </div>
+              <EyeIcon className="h-5 w-5 text-blue-600" />
+            </Link>
+            
+            <Link href="/" className="flex items-center justify-between p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
+              <div className="flex items-center gap-3">
+                <CubeIcon className="h-6 w-6 text-green-600" />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Store Front</span>
+                  <p className="text-xs text-gray-600">View public store interface</p>
+                </div>
+              </div>
+              <EyeIcon className="h-5 w-5 text-green-600" />
+            </Link>
+          </div>
         </div>
       </div>
     </div>

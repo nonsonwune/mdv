@@ -7,6 +7,8 @@ import SearchBar from "./_components/SearchBar"
 import MobileNav from "../components/navigation/MobileNav"
 import HeaderCartCount from "./_components/HeaderCartCount"
 import ToastProvider from "./_components/ToastProvider"
+import { AuthProvider } from "../lib/auth-context"
+import NavigationAuth from "./_components/NavigationAuth"
 
 export const metadata: Metadata = {
   title: "Maison De Valeur",
@@ -28,7 +30,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const role = cookies().get("mdv_role")?.value
-  const isStaff = role === "staff" || role === "admin"
+  const isStaff = role && ["admin", "supervisor", "operations", "logistics"].includes(role)
   
   return (
     <html lang="en">
@@ -36,7 +38,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body>
-        <ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
           <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 bg-maroon-700 text-white px-4 py-2 rounded">
             Skip to main content
           </a>
@@ -45,7 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <div className="flex items-center justify-between h-16">
                 {/* Logo and Mobile Menu */}
                 <div className="flex items-center gap-4">
-                  <MobileNav isStaff={isStaff} />
+                  <MobileNav />
                   <Link href="/" className="text-xl font-semibold" style={{color: "var(--maroon-700)"}}>
                     MDV
                   </Link>
@@ -65,23 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <SearchBar />
                   <HeaderCart />
                   {/* Desktop only account links */}
-                  <div className="hidden md:flex items-center gap-4 text-sm">
-                    {isStaff ? (
-                      <>
-                        <Link href="/account" className="hover:text-maroon-700 transition-colors">My Account</Link>
-                        <Link href="/admin" className="hover:text-maroon-700 transition-colors">Admin</Link>
-                        <Link href="/logout" className="hover:text-maroon-700 transition-colors">Sign out</Link>
-                      </>
-                    ) : (
-                      <>
-                        <Link href="/account" className="hover:text-maroon-700 transition-colors">My Account</Link>
-                        <span className="text-neutral-400">|</span>
-                        <Link href="/login" className="hover:text-maroon-700 transition-colors">Sign in</Link>
-                        <span className="text-neutral-400">|</span>
-                        <Link href="/register" className="hover:text-maroon-700 transition-colors">Register</Link>
-                      </>
-                    )}
-                  </div>
+                  <NavigationAuth />
                 </div>
               </div>
             </div>
@@ -151,7 +138,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </footer>
-        </ToastProvider>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   )

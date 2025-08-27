@@ -4,16 +4,17 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { createPortal } from "react-dom"
+import { useAuth } from "../../lib/auth-context"
 
 interface MobileNavProps {
-  isStaff?: boolean
   cartCount?: number
 }
 
-export default function MobileNav({ isStaff = false, cartCount = 0 }: MobileNavProps) {
+export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+  const { isAuthenticated, isStaff, isCustomer, user, logout, getRoleDisplayName } = useAuth()
 
   useEffect(() => {
     setMounted(true)
@@ -43,16 +44,34 @@ export default function MobileNav({ isStaff = false, cartCount = 0 }: MobileNavP
     { label: "Sale", href: "/sale", icon: "🏷️", accent: true },
   ]
 
-  const accountItems = isStaff
-    ? [
-        { label: "Admin Dashboard", href: "/admin", icon: "📊" },
-        { label: "Orders", href: "/admin/orders", icon: "📦" },
-        { label: "Sign Out", href: "/logout", icon: "🚪" },
-      ]
-    : [
-        { label: "Sign In / Register", href: "/login", icon: "👤" },
+  const getAccountItems = () => {
+    if (!isAuthenticated) {
+      return [
+        { label: "Customer Sign In", href: "/customer-login", icon: "👤" },
+        { label: "Staff Portal", href: "/staff-login", icon: "👔" },
         { label: "Track Order", href: "/track", icon: "📍" },
       ]
+    }
+    
+    if (isStaff) {
+      return [
+        { label: getRoleDisplayName(), href: "/admin", icon: "📊" },
+        { label: "Orders", href: "/admin/orders", icon: "📦" },
+        { label: "Customer View", href: "/account", icon: "👁️" },
+        { label: "Sign Out", href: "#", icon: "🚪", onClick: logout },
+      ]
+    }
+    
+    // Customer
+    return [
+      { label: "My Account", href: "/account", icon: "👤" },
+      { label: "Orders", href: "/account?tab=orders", icon: "📦" },
+      { label: "Track Order", href: "/track", icon: "📍" },
+      { label: "Sign Out", href: "#", icon: "🚪", onClick: logout },
+    ]
+  }
+  
+  const accountItems = getAccountItems()
 
   const infoItems = [
     { label: "About Us", href: "/about", icon: "ℹ️" },
@@ -212,17 +231,30 @@ export default function MobileNav({ isStaff = false, cartCount = 0 }: MobileNavP
                 <h3 className="text-xs font-semibold uppercase text-neutral-500 mb-2">Account</h3>
                 <ul className="space-y-1">
                   {accountItems.map((item) => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href as any}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors ${
-                          pathname === item.href ? "bg-neutral-100" : ""
-                        }`}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <span className="text-lg">{item.icon}</span>
-                        <span>{item.label}</span>
-                      </Link>
+                    <li key={item.href + item.label}>
+                      {item.onClick ? (
+                        <button
+                          onClick={() => {
+                            setIsOpen(false)
+                            item.onClick!()
+                          }}
+                          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors w-full text-left"
+                        >
+                          <span className="text-lg">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </button>
+                      ) : (
+                        <Link
+                          href={item.href as any}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors ${
+                            pathname === item.href ? "bg-neutral-100" : ""
+                          }`}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <span className="text-lg">{item.icon}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
