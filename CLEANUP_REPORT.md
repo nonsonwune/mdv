@@ -38,3 +38,17 @@
 ## Needs Manual Review
 
 - None
+
+## Additional Moves
+- redundant_files/backend/Dockerfile: Legacy Dockerfile not used by current Dockerfile.backend
+- redundant_files/backend/Procfile: Legacy Procfile superseded by root Procfile
+- redundant_files/backend/railway.json: Legacy Railway config superseded by root railway.json
+- redundant_files/backend/start.sh: Legacy start script; Dockerfile.backend uses backend/start.py
+- redundant_files/backend/start_backend.sh: Dev helper, not used in builds
+- redundant_files/backend/start_worker.sh: Dev helper, not used in builds
+- redundant_files/backend/test.png: Test artifact
+- redundant_files/web/cookies.txt: Local cookie export, not used in code
+- redundant_files/web/test-results/.last-run.json: Playwright artifact
+
+## Needs Manual Review
+- None
