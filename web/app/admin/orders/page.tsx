@@ -50,6 +50,16 @@ const statusIcons: Record<string, any> = {
   'Delivered': CheckCircleIcon
 }
 
+interface Stats {
+  total_orders: number
+  total_revenue: number
+  total_customers: number
+  average_order_value: number
+  recent_orders: number
+  recent_revenue: number
+  period_days: number
+}
+
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,10 +67,28 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => {
     fetchOrders()
   }, [currentPage, statusFilter])
+
+  useEffect(() => {
+    fetchStats()
+  }, [])
+
+  const fetchStats = async () => {
+    try {
+      setStatsLoading(true)
+      const statsData = await api<Stats>('/api/admin/stats')
+      setStats(statsData)
+    } catch (error) {
+      console.error('Failed to fetch stats:', error)
+    } finally {
+      setStatsLoading(false)
+    }
+  }
 
   const fetchOrders = async () => {
     try {
@@ -125,7 +153,35 @@ export default function AdminOrdersPage() {
         <p className="text-gray-600">Manage customer orders and fulfillment</p>
       </div>
 
-      {/* Stats cards removed to avoid showing dummy data. Can be reintroduced when backed by real API stats. */}
+      {/* Stats Cards */}
+      {!statsLoading && stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm font-medium text-gray-600">Total Orders</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{stats.total_orders.toLocaleString()}</p>
+            <p className="mt-1 text-sm text-gray-500">
+              {stats.recent_orders.toLocaleString()} in last {stats.period_days} days
+            </p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">₦{stats.total_revenue.toLocaleString()}</p>
+            <p className="mt-1 text-sm text-gray-500">
+              ₦{stats.recent_revenue.toLocaleString()} in last {stats.period_days} days
+            </p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm font-medium text-gray-600">Total Customers</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">{stats.total_customers.toLocaleString()}</p>
+            <p className="mt-1 text-sm text-gray-500">Unique customers</p>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm font-medium text-gray-600">Average Order Value</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">₦{stats.average_order_value.toLocaleString()}</p>
+            <p className="mt-1 text-sm text-gray-500">Per order</p>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow mb-6">

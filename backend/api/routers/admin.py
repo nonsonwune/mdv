@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, distinct
 from sqlalchemy.orm import selectinload
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 from typing import Literal, Optional
+from decimal import Decimal
 
 from mdv.auth import require_roles
 from mdv.rbac import ALL_STAFF, FULFILLMENT_STAFF, LOGISTICS_STAFF, SUPERVISORS
@@ -18,6 +19,7 @@ from mdv.models import (
     ShipmentStatus,
     ShipmentEvent,
     Refund,
+    User,
 )
 from mdv.utils import audit, parse_actor_id
 from ..deps import get_db
@@ -190,4 +192,71 @@ async def refund_order(oid: int, body: RefundRequest, db: AsyncSession = Depends
     await audit(db, actor_id, "order.refund", "Order", order.id, before=None, after={"refund": body.amount, "reason": body.reason, "method": body.method})
     await db.commit()
     return {"id": order.id, "refunded": body.amount, "reason": body.reason, "method": body.method}
+
+
+@router.get("/stats", dependencies=[Depends(require_roles(*ALL_STAFF))])
+async def get_admin_stats(db: AsyncSession = Depends(get_db)):
+    """Get dashboard statistics for the admin panel"""
+    # Get total orders count
+    total_orders_result = await db.execute(select(func.count(Order.id)))
+    total_orders = total_orders_result.scalar_one()
+    
+    # Get total revenue (sum of all order totals)
+    # First get all orders with totals
+    orders_with_totals = await db.execute(select(Order.totals).where(Order.totals.isnot(None)))
+    total_revenue = Decimal("0")
+    for (totals,) in orders_with_totals:
+        if totals and isinstance(totals, dict) and "total" in totals:
+            try:
+                # Convert to Decimal for accurate money calculations
+                amount = Decimal(str(totals["total"]))
+                total_revenue += amount
+            except (ValueError, TypeError):
+                pass
+    
+    # Get unique customer count
+    customer_count_result = await db.execute(
+        select(func.count(distinct(Order.user_id))).where(Order.user_id.isnot(None))
+    )
+    total_customers = customer_count_result.scalar_one() or 0
+    
+    # Calculate average order value
+    average_order_value = float(total_revenue / total_orders) if total_orders > 0 else 0.0
+    
+    # Get stats for the last 30 days
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    
+    # Orders in last 30 days
+    recent_orders_result = await db.execute(
+        select(func.count(Order.id)).where(Order.created_at >= thirty_days_ago)
+    )
+    recent_orders = recent_orders_result.scalar_one()
+    
+    # Revenue in last 30 days
+    recent_orders_with_totals = await db.execute(
+        select(Order.totals).where(
+            and_(
+                Order.totals.isnot(None),
+                Order.created_at >= thirty_days_ago
+            )
+        )
+    )
+    recent_revenue = Decimal("0")
+    for (totals,) in recent_orders_with_totals:
+        if totals and isinstance(totals, dict) and "total" in totals:
+            try:
+                amount = Decimal(str(totals["total"]))
+                recent_revenue += amount
+            except (ValueError, TypeError):
+                pass
+    
+    return {
+        "total_orders": total_orders,
+        "total_revenue": float(total_revenue),
+        "total_customers": total_customers,
+        "average_order_value": round(average_order_value, 2),
+        "recent_orders": recent_orders,
+        "recent_revenue": float(recent_revenue),
+        "period_days": 30
+    }
 
