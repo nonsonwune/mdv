@@ -116,11 +116,14 @@ const STATUS_CONFIG = {
 interface UserStats {
   total_users: number
   active_users: number
-  admin_count: number
-  supervisor_count: number
-  operations_count: number
-  logistics_count: number
-  recent_logins: number
+  inactive_users: number
+  by_role: {
+    admin?: number
+    supervisor?: number
+    operations?: number
+    logistics?: number
+  }
+  recent_users: number
 }
 
 const roleColors: Record<string, string> = {
@@ -163,6 +166,7 @@ function UserManagementContent() {
 
   useEffect(() => {
     fetchUsers()
+    fetchStats()
   }, [roleFilter])
 
   const fetchUsers = async () => {
@@ -178,8 +182,17 @@ function UserManagementContent() {
         params.append('search', searchTerm)
       }
 
-      const response = await api<User[]>(`/api/admin/users?${params}`)
-      setUsers(Array.isArray(response) ? response : [])
+      const response = await api<any>(`/api/admin/users?${params}`)
+      // Handle paginated response
+      if (response?.items && Array.isArray(response.items)) {
+        setUsers(response.items)
+        setTotalPages(Math.ceil(response.total / response.per_page) || 1)
+      } else if (Array.isArray(response)) {
+        // Fallback for direct array response
+        setUsers(response)
+      } else {
+        setUsers([])
+      }
     } catch (error) {
       console.error('Failed to fetch users:', error)
       setUsers([])
@@ -300,7 +313,6 @@ function UserManagementContent() {
     )
   }
 
-  // Fetch stats function
   const fetchStats = async () => {
     try {
       const response = await api<UserStats>('/api/admin/users/stats')
@@ -309,12 +321,6 @@ function UserManagementContent() {
       console.error('Failed to fetch user stats:', error)
     }
   }
-
-  // Add to useEffect
-  useEffect(() => {
-    fetchUsers()
-    fetchStats()
-  }, [currentPage, searchTerm, roleFilter, statusFilter])
 
   // Handle bulk actions
   const handleBulkStatusUpdate = async (status: string) => {
@@ -448,7 +454,7 @@ function UserManagementContent() {
               </div>
               <div className="ml-4">
                 <p className="text-sm text-gray-600">Administrators</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.admin_count}</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.by_role?.admin || 0}</p>
               </div>
             </div>
           </div>
@@ -459,8 +465,8 @@ function UserManagementContent() {
                 <ClockIcon className="h-6 w-6 text-purple-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm text-gray-600">Recent Logins</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.recent_logins}</p>
+                <p className="text-sm text-gray-600">Recent Users</p>
+                <p className="text-2xl font-semibold text-gray-900">{stats.recent_users}</p>
               </div>
             </div>
           </div>
