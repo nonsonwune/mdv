@@ -82,7 +82,7 @@ export default function ProductEditPage() {
       setTitle(product.title)
       setDescription(product.description || '')
       setCategoryId(product.category_id || '')
-      setIsActive(product.is_active)
+      setIsActive((product as any).is_active !== undefined ? Boolean((product as any).is_active) : true)
       setVariants([...product.variants])
       setImages([...product.images])
     }
@@ -200,7 +200,9 @@ export default function ProductEditPage() {
       formData.append('title', title)
       formData.append('description', description)
       if (categoryId) formData.append('category_id', categoryId.toString())
-      formData.append('is_active', isActive.toString())
+      if (typeof isActive === 'boolean') {
+        formData.append('is_active', String(isActive))
+      }
       
       // Add variants data
       formData.append('variants', JSON.stringify(variants))
