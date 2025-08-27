@@ -35,10 +35,13 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const ctrl = new AbortController()
   const id = setTimeout(() => ctrl.abort(), 12000)
   
-  // Build headers
+  // Build headers (avoid setting Content-Type for FormData bodies)
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData
   const headers: HeadersInit = {
-    "Content-Type": "application/json",
     ...(init?.headers || {}),
+  }
+  if (!isFormData && !('Content-Type' in (headers as Record<string, string>))) {
+    (headers as Record<string, string>)["Content-Type"] = "application/json"
   }
   
   // Route admin requests through Next.js proxy (uses HttpOnly cookie on server)

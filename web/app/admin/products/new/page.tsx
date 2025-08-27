@@ -47,6 +47,10 @@ export default function NewProductPage() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [success, setSuccess] = useState<string | null>(null)
+  const [createdProductId, setCreatedProductId] = useState<number | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   
   const [formData, setFormData] = useState<ProductFormData>({
     title: '',
@@ -196,7 +200,7 @@ export default function NewProductPage() {
         title: formData.title,
         slug: formData.slug,
         description: formData.description || undefined,
-        category_id: formData.category_id || undefined,
+        category_id: formData.category_id!,
         compare_at_price: formData.compare_at_price || undefined,
         variants: formData.variants.map(variant => ({
           sku: variant.sku,
@@ -208,18 +212,13 @@ export default function NewProductPage() {
         }))
       }
 
-      const response = await api('/api/admin/products', {
+      const response = await api<any>('/api/admin/products', {
         method: 'POST',
         body: JSON.stringify(payload)
       })
-      
-      // Show success message then redirect
-      setSuccess('Product created successfully')
-      
-      // Short delay before redirect for better UX
-      setTimeout(() => {
-        router.push('/admin/products')
-      }, 1500)
+      // Show image upload step
+      setCreatedProductId(response.id)
+      setSuccess('Product created. Add images below (first will be primary).')
     } catch (error: any) {
       console.error('Failed to create product:', error)
       if (error.message.includes('Slug already exists')) {
@@ -231,6 +230,41 @@ export default function NewProductPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : []
+    setSelectedFiles(files)
+    setUploadSuccess(null)
+  }
+
+  const handleUploadImages = async () => {
+    if (!createdProductId || selectedFiles.length === 0) return
+    setUploading(true)
+    setErrors({})
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const fd = new FormData()
+        fd.append('file', selectedFiles[i])
+        fd.append('alt_text', formData.title)
+        // First file becomes primary
+        fd.append('is_primary', i === 0 ? 'true' : 'false')
+        await api(`/api/admin/products/${createdProductId}/images`, {
+          method: 'POST',
+          body: fd
+        })
+      }
+      setUploadSuccess('Images uploaded successfully')
+      // Redirect after short delay
+      setTimeout(() => {
+        router.push('/admin/products')
+      }, 1200)
+    } catch (err: any) {
+      console.error('Failed to upload images:', err)
+      setErrors({ general: 'Failed to upload images. Please try again.' })
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -475,6 +509,40 @@ export default function NewProductPage() {
           </Button>
         </div>
       </form>
+
+      {/* Post-create image upload step */}
+      {createdProductId && (
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Add Images</h2>
+          <p className="text-gray-600 mb-4">Upload one or more images for this product. The first image becomes the primary image.</p>
+          {uploadSuccess && (
+            <Alert variant="success" className="mb-4">{uploadSuccess}</Alert>
+          )}
+          <div className="flex items-center gap-4">
+            <input
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleFileChange}
+              className="block w-full text-sm text-gray-900 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+            />
+            <Button
+              type="button"
+              onClick={handleUploadImages}
+              loading={uploading}
+              leftIcon={uploading ? undefined : <PhotoIcon className="h-4 w-4" />}
+              disabled={selectedFiles.length === 0}
+            >
+              {uploading ? 'Uploading...' : 'Upload Images'}
+            </Button>
+          </div>
+          {selectedFiles.length > 0 && (
+            <div className="mt-4 text-sm text-gray-600">
+              {selectedFiles.length} file(s) selected. First will be primary.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

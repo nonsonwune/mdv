@@ -115,21 +115,20 @@ async def create_product(
             if existing.scalar_one_or_none():
                 raise HTTPException(status_code=400, detail="Slug already exists")
         
+        # Validate and set category (required)
+        category = await db.get(Category, request.category_id)
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        
         # Create product
         product = Product(
             title=request.title,
             slug=request.slug or request.title.lower().replace(" ", "-"),
             description=request.description,
             compare_at_price=request.compare_at_price,
-            flags=request.flags
+            flags=request.flags,
+            category_id=request.category_id
         )
-        
-        # Add category if provided
-        if request.category_id:
-            category = await db.get(Category, request.category_id)
-            if not category:
-                raise HTTPException(status_code=404, detail="Category not found")
-            product.category_id = request.category_id
         
         db.add(product)
         await db.flush()
@@ -839,7 +838,7 @@ async def upload_product_image(
     alt_text: Optional[str] = Form(None),
     is_primary: bool = Form(False),
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(require_permission(Permission.PRODUCT_EDIT))
+    claims: dict = Depends(require_any_permission(Permission.PRODUCT_CREATE, Permission.PRODUCT_EDIT))
 ):
     """Upload a product image to Cloudinary."""
     actor_id = parse_actor_id(claims)
@@ -876,8 +875,19 @@ async def upload_product_image(
             upload_result["url"]
         )
         
+        # Determine if we should set as primary by default when none exists
+        result = await db.execute(
+            select(func.count(ProductImage.id))
+            .where(
+                ProductImage.product_id == product_id,
+                ProductImage.is_primary == True
+            )
+        )
+        has_primary = result.scalar_one() > 0
+        is_primary_flag = is_primary or (not has_primary)
+
         # If setting as primary, unset other primary images
-        if is_primary:
+        if is_primary_flag:
             await db.execute(
                 sql_update(ProductImage)
                 .where(ProductImage.product_id == product_id)
@@ -899,7 +909,7 @@ async def upload_product_image(
             width=upload_result.get("width"),
             height=upload_result.get("height"),
             sort_order=next_sort,
-            is_primary=is_primary,
+            is_primary=is_primary_flag,
             public_id=upload_result["public_id"]  # Store for deletion
         )
         db.add(image)

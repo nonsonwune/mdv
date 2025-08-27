@@ -30,7 +30,7 @@ class ProductCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Product title")
     slug: Optional[str] = Field(None, max_length=255, description="URL-friendly slug")
     description: Optional[str] = Field(None, description="Product description")
-    category_id: Optional[int] = Field(None, description="Category ID")
+    category_id: int = Field(..., description="Category ID")
     compare_at_price: Optional[Decimal] = Field(None, ge=0, decimal_places=2, description="Original price for comparison")
     variants: List[VariantCreateRequest] = Field(..., min_items=1, description="Product variants")
     flags: Optional[Dict[str, Any]] = Field(None, description="Additional product flags/metadata")

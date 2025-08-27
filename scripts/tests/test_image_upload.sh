@@ -48,27 +48,60 @@ echo ""
 echo "Step 2: Creating a test product..."
 echo "-----------------------------------------"
 
+# Step 2a: Get or create a test category
+echo "Step 2a: Getting categories..."
+echo "-----------------------------------------"
+
+CATEGORIES_RESPONSE=$(curl -s -X GET "$API_URL/api/admin/categories" \
+  -H "Authorization: Bearer $TOKEN")
+
+CATEGORY_ID=$(echo $CATEGORIES_RESPONSE | jq -r '.[0].id // empty')
+
+if [ -z "$CATEGORY_ID" ]; then
+    echo "No categories found, creating one..."
+    CREATE_CATEGORY_RESPONSE=$(curl -s -X POST "$API_URL/api/admin/categories" \
+      -H "Authorization: Bearer $TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{"name": "Test Category", "slug": "test-category"}')
+    
+    CATEGORY_ID=$(echo $CREATE_CATEGORY_RESPONSE | jq -r '.id')
+    
+    if [ "$CATEGORY_ID" == "null" ] || [ -z "$CATEGORY_ID" ]; then
+        echo "❌ Failed to create category. Response:"
+        echo $CREATE_CATEGORY_RESPONSE | jq
+        exit 1
+    fi
+    echo "✅ Created test category with ID: $CATEGORY_ID"
+else
+    echo "✅ Using existing category with ID: $CATEGORY_ID"
+fi
+
+# Step 2b: Create a test product
+echo ""
+echo "Step 2b: Creating a test product..."
+echo "-----------------------------------------"
+
 PRODUCT_RESPONSE=$(curl -s -X POST "$API_URL/api/admin/products" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "title": "Test Product for Image Upload",
-    "slug": "test-product-image-upload",
-    "description": "Testing Cloudinary image upload",
-    "compare_at_price": 15000,
-    "flags": {"is_new": true, "featured": false},
-    "category_id": null,
-    "variants": [
+  -d "{
+    \"title\": \"Test Product for Image Upload\",
+    \"slug\": \"test-product-image-upload-$(date +%s)\",
+    \"description\": \"Testing Cloudinary image upload\",
+    \"compare_at_price\": 15000,
+    \"flags\": {\"is_new\": true, \"featured\": false},
+    \"category_id\": $CATEGORY_ID,
+    \"variants\": [
       {
-        "sku": "TEST-IMG-001",
-        "size": "M",
-        "color": "Blue",
-        "price": 10000,
-        "initial_quantity": 10,
-        "safety_stock": 5
+        \"sku\": \"TEST-IMG-$(date +%s)\",
+        \"size\": \"M\",
+        \"color\": \"Blue\",
+        \"price\": 10000,
+        \"initial_quantity\": 10,
+        \"safety_stock\": 5
       }
     ]
-  }')
+  }")
 
 PRODUCT_ID=$(echo $PRODUCT_RESPONSE | jq -r '.id')
 
