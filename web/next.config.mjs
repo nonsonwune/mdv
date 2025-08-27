@@ -19,6 +19,9 @@ const nextConfig = {
       hostname,
       pathname: '/**',
     })),
+    // Enable rendering of SVGs from trusted sources only
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     // Remove deprecated domains configuration
   },
 }
