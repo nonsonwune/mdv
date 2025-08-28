@@ -24,6 +24,7 @@ from mdv.models import (
     User,
     Product,
     Category,
+    Address,
     Variant,
     Inventory,
     StockLedger,
@@ -530,6 +531,15 @@ async def get_admin_analytics(
         Order.status == OrderStatus.paid,
     )
 
+    # Previous period range (same length immediately before current period)
+    prev_end_date = start_date
+    prev_start_date = prev_end_date - timedelta(days=days)
+    prev_paid_filter = and_(
+        Order.created_at >= prev_start_date,
+        Order.created_at <= prev_end_date,
+        Order.status == OrderStatus.paid,
+    )
+
     # Total paid orders in period
     orders_count = (
         await db.execute(select(func.count(Order.id)).where(paid_filter))
@@ -550,6 +560,18 @@ async def get_admin_analytics(
             select(func.coalesce(func.sum(OrderItem.qty), 0))
             .join(Order, OrderItem.order_id == Order.id)
             .where(paid_filter)
+        )
+    ).scalar_one() or 0
+
+    # Previous period metrics (orders and revenue)
+    prev_orders_count = (
+        await db.execute(select(func.count(Order.id)).where(prev_paid_filter))
+    ).scalar_one() or 0
+    prev_revenue_total = (
+        await db.execute(
+            select(func.coalesce(func.sum(OrderItem.qty * OrderItem.unit_price), 0))
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(prev_paid_filter)
         )
     ).scalar_one() or 0
 
@@ -614,6 +636,15 @@ async def get_admin_analytics(
 
     returning_customers = max(total_customers - new_customers, 0)
 
+    # Previous period customers (distinct paid orders' users)
+    prev_total_customers = (
+        await db.execute(
+            select(func.count(func.distinct(Order.user_id))).where(
+                and_(prev_paid_filter, Order.user_id.isnot(None))
+            )
+        )
+    ).scalar_one() or 0
+
     # Daily trends (orders and revenue per day)
     daily_rows = (
         await db.execute(
@@ -637,6 +668,71 @@ async def get_admin_analytics(
     average_order_value = float(revenue_total) / orders_count if orders_count else 0.0
     customer_ltv = float(revenue_total) / total_customers if total_customers else 0.0
 
+    # Inventory stats (variant-level for consistent counts)
+    total_variants = (
+        await db.execute(select(func.count(Variant.id)))
+    ).scalar_one() or 0
+    out_of_stock_variants = (
+        await db.execute(
+            select(func.count(Variant.id))
+            .join(Inventory, Variant.id == Inventory.variant_id, isouter=True)
+            .where(or_(Inventory.quantity <= 0, Inventory.quantity.is_(None)))
+        )
+    ).scalar_one() or 0
+    low_stock_variants = (
+        await db.execute(
+            select(func.count(Variant.id))
+            .join(Inventory, Variant.id == Inventory.variant_id, isouter=True)
+            .where(
+                and_(
+                    Inventory.quantity.isnot(None),
+                    Inventory.quantity > 0,
+                    Inventory.quantity <= Inventory.safety_stock,
+                )
+            )
+        )
+    ).scalar_one() or 0
+
+    # Geographic performance (group by state as region)
+    geo_rows = (
+        await db.execute(
+            select(
+                Address.state.label("country"),
+                func.count(func.distinct(Order.id)).label("orders"),
+                func.coalesce(func.sum(OrderItem.qty * OrderItem.unit_price), 0).label("revenue"),
+            )
+            .join(Address, Address.order_id == Order.id)
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .where(paid_filter)
+            .group_by(Address.state)
+            .order_by(func.coalesce(func.sum(OrderItem.qty * OrderItem.unit_price), 0).desc())
+        )
+    ).all()
+    geographic = [
+        {
+            "country": r.country or "Unknown",
+            "orders": int(r.orders or 0),
+            "revenue": float(r.revenue or 0),
+        }
+        for r in geo_rows
+    ]
+
+    # Order status breakdown (all orders in period, regardless of payment status)
+    status_rows = (
+        await db.execute(
+            select(Order.status, func.count(Order.id).label("count"))
+            .where(and_(Order.created_at >= start_date, Order.created_at <= end_date))
+            .group_by(Order.status)
+        )
+    ).all()
+    orders_by_status = [
+        {
+            "status": (s.status.value if hasattr(s.status, "value") else s.status),
+            "count": int(s.count or 0),
+        }
+        for s in status_rows
+    ]
+
     return {
         "period": period,
         "start_date": start_date.isoformat(),
@@ -657,7 +753,21 @@ async def get_admin_analytics(
             "customer_lifetime_value": round(customer_ltv, 2),
         },
         "daily_trends": daily_trends,
+        # Previous period aggregates for UI comparisons
+        "revenue_prev": float(prev_revenue_total or 0),
+        "orders_prev": int(prev_orders_count or 0),
+        "customers_prev": int(prev_total_customers or 0),
+        # Order status breakdown and geographic performance
+        "orders_by_status": orders_by_status,
+        "geographic": geographic,
+        # Inventory stats used by admin UI Inventory Status card (variant-level)
+        "inventory_stats": {
+            "total_products": int(total_variants or 0),
+            "out_of_stock": int(out_of_stock_variants or 0),
+            "low_stock": int(low_stock_variants or 0),
+        },
     }
+
 
 
 @router.get("/stats", dependencies=[Depends(require_roles(*ALL_STAFF))])

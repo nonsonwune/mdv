@@ -65,6 +65,15 @@ interface AnalyticsData {
   }
 }
 
+// Helper to compute percentage change
+const pctChange = (current: number, previous: number) => {
+  if (!previous || !Number.isFinite(previous)) return 0
+  const c = Number(current || 0)
+  const p = Number(previous || 0)
+  if (p === 0) return 0
+  return ((c - p) / p) * 100
+}
+
 interface TimeRange {
   value: string
   label: string
@@ -118,6 +127,12 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
   const customer = raw?.customer_metrics || {}
   const daily = Array.isArray(raw?.daily_trends) ? raw.daily_trends : []
   const topProducts = Array.isArray(raw?.top_products) ? raw.top_products : []
+  const prevRevenue = Number(raw?.revenue_prev || 0)
+  const prevOrders = Number(raw?.orders_prev || 0)
+  const prevCustomers = Number(raw?.customers_prev || 0)
+  const byStatus = Array.isArray(raw?.orders_by_status) ? raw.orders_by_status : []
+  const inventory = raw?.inventory_stats || {}
+  const geographic = Array.isArray(raw?.geographic) ? raw.geographic : []
 
   const revenueDaily = daily.map((d: any) => ({ date: d.date, amount: Number(d.revenue || 0) }))
   const ordersDaily = daily.map((d: any) => ({ date: d.date, count: Number(d.orders || 0) }))
@@ -130,28 +145,28 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
     },
     revenue: {
       current: Number(sales.total_revenue || 0),
-      previous: 0,
-      change: 0,
+      previous: prevRevenue,
+      change: pctChange(Number(sales.total_revenue || 0), prevRevenue),
       daily: revenueDaily,
     },
     orders: {
       current: Number(sales.total_orders || 0),
-      previous: 0,
-      change: 0,
+      previous: prevOrders,
+      change: pctChange(Number(sales.total_orders || 0), prevOrders),
       daily: ordersDaily,
-      by_status: [],
+      by_status: byStatus.map((s: any) => ({ status: String(s.status), count: Number(s.count || 0) })),
     },
     customers: {
       current: Number(customer.total_customers || 0),
-      previous: 0,
-      change: 0,
+      previous: prevCustomers,
+      change: pctChange(Number(customer.total_customers || 0), prevCustomers),
       new_customers: Number(customer.new_customers || 0),
       returning_customers: Number(customer.returning_customers || 0),
     },
     products: {
-      total_products: 0,
-      out_of_stock: 0,
-      low_stock: 0,
+      total_products: Number(inventory.total_products || 0),
+      out_of_stock: Number(inventory.out_of_stock || 0),
+      low_stock: Number(inventory.low_stock || 0),
       top_selling: topProducts.map((p: any) => ({
         product_id: p.product_id,
         product_title: p.product_title,
@@ -159,7 +174,11 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
         revenue: Number(p.revenue || 0),
       })),
     },
-    geographic: [],
+    geographic: geographic.map((g: any) => ({
+      country: String(g.country || 'Unknown'),
+      orders: Number(g.orders || 0),
+      revenue: Number(g.revenue || 0),
+    })),
     conversion: {
       views: 0,
       add_to_cart: 0,
