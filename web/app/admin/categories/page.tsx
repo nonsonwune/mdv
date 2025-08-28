@@ -125,11 +125,8 @@ function CategoryManagementContent() {
     try {
       setLoading(true)
       setError(null)
-      const params = new URLSearchParams()
-      if (searchTerm) params.append('search', searchTerm)
-      if (statusFilter !== 'all') params.append('status', statusFilter)
-      
-      const response = await api<Category[]>(`/api/admin/categories?${params}`)
+      // Backend does not support filtering query params; fetch all and filter client-side
+      const response = await api<Category[]>('/api/admin/categories')
       setCategories(response)
     } catch (error: any) {
       if (error?.message?.includes('Not authenticated') || error?.message?.includes('401')) {
@@ -147,6 +144,11 @@ function CategoryManagementContent() {
       setLoading(false)
     }
   }
+
+  // Fetch categories on mount (must be before any early returns)
+  useEffect(() => {
+    fetchCategories()
+  }, [])
 
 
   // Handle form submission
@@ -276,11 +278,6 @@ function CategoryManagementContent() {
   }
 
   // Category stats endpoint is currently unavailable; UI will hide when stats is null
-
-  // Fetch categories when filters change
-  useEffect(() => {
-    fetchCategories()
-  }, [searchTerm, statusFilter])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-NG', {

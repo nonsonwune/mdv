@@ -70,9 +70,61 @@ interface TimeRange {
 const timeRanges: TimeRange[] = [
   { value: '7d', label: 'Last 7 days' },
   { value: '30d', label: 'Last 30 days' },
-  { value: '3m', label: 'Last 3 months' },
+  { value: '90d', label: 'Last 90 days' },
   { value: '1y', label: 'Last year' }
 ]
+
+// Normalize backend /admin/analytics response to the UI's expected shape
+function normalizeAnalyticsResponse(raw: any): AnalyticsData {
+  const sales = raw?.sales || {}
+  const customer = raw?.customer_metrics || {}
+  const daily = Array.isArray(raw?.daily_trends) ? raw.daily_trends : []
+  const topProducts = Array.isArray(raw?.top_products) ? raw.top_products : []
+
+  const revenueDaily = daily.map((d: any) => ({ date: d.date, amount: Number(d.revenue || 0) }))
+  const ordersDaily = daily.map((d: any) => ({ date: d.date, count: Number(d.orders || 0) }))
+
+  return {
+    revenue: {
+      current: Number(sales.total_revenue || 0),
+      previous: 0,
+      change: 0,
+      daily: revenueDaily,
+    },
+    orders: {
+      current: Number(sales.total_orders || 0),
+      previous: 0,
+      change: 0,
+      daily: ordersDaily,
+      by_status: [],
+    },
+    customers: {
+      current: Number(customer.total_customers || 0),
+      previous: 0,
+      change: 0,
+      new_customers: Number(customer.new_customers || 0),
+      returning_customers: Number(customer.returning_customers || 0),
+    },
+    products: {
+      total_products: 0,
+      out_of_stock: 0,
+      low_stock: 0,
+      top_selling: topProducts.map((p: any) => ({
+        product_id: p.product_id,
+        product_title: p.product_title,
+        quantity_sold: Number(p.units_sold || 0),
+        revenue: Number(p.revenue || 0),
+      })),
+    },
+    geographic: [],
+    conversion: {
+      views: 0,
+      add_to_cart: 0,
+      purchases: Number(sales.total_orders || 0),
+      conversion_rate: Number(sales.conversion_rate || 0),
+    },
+  }
+}
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
@@ -87,9 +139,15 @@ export default function AnalyticsPage() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
-      const response = await api<AnalyticsData>(`/api/admin/analytics?period=${timeRange}`)
-      setData(response)
+      const raw = await api<any>(`/api/admin/analytics?period=${timeRange}`)
+      const normalized = normalizeAnalyticsResponse(raw)
+      setData(normalized)
     } catch (error) {
+      const msg = (error as any)?.message || ''
+      if (msg.includes('Not authenticated') || msg.includes('401')) {
+        window.location.href = '/staff-login?error=authentication_required'
+        return
+      }
       console.error('Failed to fetch analytics:', error)
       // Don't set dummy data in production - keep data as null to show error state
       setData(null)
@@ -115,8 +173,16 @@ export default function AnalyticsPage() {
     return new Intl.NumberFormat('en-US').format(num)
   }
 
-  const formatPercentage = (percentage: number) => {
-    return `${percentage > 0 ? '+' : ''}${percentage.toFixed(1)}%`
+  // Safe numeric formatters
+  const safeToFixed = (value: number | null | undefined, digits = 1) => {
+    const n = typeof value === 'number' ? value : Number(value)
+    return Number.isFinite(n) ? n.toFixed(digits) : (0).toFixed(digits)
+  }
+
+  const formatPercentage = (percentage: number | null | undefined) => {
+    const n = typeof percentage === 'number' ? percentage : Number(percentage)
+    if (!Number.isFinite(n)) return '0.0%'
+    return `${n > 0 ? '+' : ''}${n.toFixed(1)}%`
   }
 
   const getTrendIcon = (change: number) => {
@@ -264,7 +330,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{data.conversion.conversion_rate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-gray-900">{safeToFixed(data.conversion?.conversion_rate, 1)}%</p>
                 <p className="text-gray-600 text-sm">Conversion Rate</p>
                 <p className="text-gray-500 text-xs">{formatNumber(data.conversion.purchases)} / {formatNumber(data.conversion.views)} visitors</p>
               </div>
@@ -289,7 +355,7 @@ export default function AnalyticsPage() {
                       <div className="flex-1 bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-green-500 h-2 rounded-full"
-                          style={{ width: `${(day.amount / Math.max(...data.revenue.daily.map(d => d.amount))) * 100}%` }}
+                          style={{ width: `${(() => { const max = Math.max(0, ...data.revenue.daily.map(d => d.amount)); return max > 0 ? (day.amount / max) * 100 : 0; })()}%` }}
                         />
                       </div>
                       <div className="w-20 text-xs text-gray-700 text-right">
@@ -381,7 +447,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="pt-3 border-t">
                     <div className="text-xs text-gray-500">
-                      {((data.customers.returning_customers / data.customers.current) * 100).toFixed(1)}% retention rate
+                      {safeToFixed((data.customers.current > 0 ? (data.customers.returning_customers / data.customers.current) * 100 : 0), 1)}% retention rate
                     </div>
                   </div>
                 </div>
@@ -416,7 +482,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="pt-3 border-t">
                     <div className="text-xs text-gray-500">
-                      {(((data.products.total_products - data.products.out_of_stock - data.products.low_stock) / data.products.total_products) * 100).toFixed(1)}% healthy stock
+                      {safeToFixed((data.products.total_products > 0 ? ((data.products.total_products - data.products.out_of_stock - data.products.low_stock) / data.products.total_products) * 100 : 0), 1)}% healthy stock
                     </div>
                   </div>
                 </div>
@@ -453,7 +519,7 @@ export default function AnalyticsPage() {
                         <td className="py-3 text-right text-sm text-gray-900">{formatNumber(country.orders)}</td>
                         <td className="py-3 text-right text-sm font-medium text-gray-900">{formatCurrency(country.revenue)}</td>
                         <td className="py-3 text-right text-sm text-gray-500">
-                          {((country.revenue / data.revenue.current) * 100).toFixed(1)}%
+                          {safeToFixed((data.revenue.current > 0 ? (country.revenue / data.revenue.current) * 100 : 0), 1)}%
                         </td>
                       </tr>
                     ))}

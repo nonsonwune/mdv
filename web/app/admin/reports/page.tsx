@@ -124,6 +124,9 @@ function ReportsDashboardContent() {
   const canViewCategoryReports = hasPermission(Permission.REPORT_VIEW)
   const canExportReports = hasPermission(Permission.REPORT_EXPORT)
 
+  // Only categories export is currently supported by the backend
+  const SUPPORTED_EXPORT_TYPES = new Set<('sales' | 'inventory' | 'customers' | 'categories')>(['categories'])
+
   // Fetch reports data
   const fetchReportsData = async () => {
     try {
@@ -226,11 +229,15 @@ function ReportsDashboardContent() {
   // Export functionality
   const handleExport = async (type: 'sales' | 'inventory' | 'customers' | 'categories') => {
     if (!canExportReports) return
+    if (!SUPPORTED_EXPORT_TYPES.has(type)) {
+      alert('Export is not available for this report type yet.')
+      return
+    }
     
     try {
-      const response = await api(`/api/admin/reports/export/${type}?period=${dateRange}`, {
-        method: 'GET'
-      })
+      // Backend currently exposes only /export/categories
+      const endpoint = `/api/admin/reports/export/categories?period=${dateRange}`
+      const response = await api(endpoint, { method: 'GET' })
       
       // Create download link
       const blob = new Blob([response as string], { type: 'text/csv' })
@@ -515,7 +522,7 @@ function ReportsDashboardContent() {
       {activeTab === 'categories' && canViewCategoryReports && categoriesReport && (
         <div className="space-y-6">
           {/* Export Button */}
-          {canExportReports && (
+          {canExportReports && SUPPORTED_EXPORT_TYPES.has('categories') && (
             <div className="flex justify-end">
               <button
                 onClick={() => handleExport('categories')}
@@ -652,7 +659,7 @@ function ReportsDashboardContent() {
       {activeTab === 'sales' && canViewSalesReports && salesMetrics && (
         <div className="space-y-6">
           {/* Export Button */}
-          {canExportReports && (
+          {canExportReports && SUPPORTED_EXPORT_TYPES.has('sales') && (
             <div className="flex justify-end">
               <button
                 onClick={() => handleExport('sales')}
@@ -781,7 +788,7 @@ function ReportsDashboardContent() {
       {activeTab === 'inventory' && canViewInventoryReports && inventoryMetrics && (
         <div className="space-y-6">
           {/* Export Button */}
-          {canExportReports && (
+          {canExportReports && SUPPORTED_EXPORT_TYPES.has('inventory') && (
             <div className="flex justify-end">
               <button
                 onClick={() => handleExport('inventory')}
@@ -901,7 +908,7 @@ function ReportsDashboardContent() {
       {activeTab === 'customers' && canViewCustomerReports && userMetrics && (
         <div className="space-y-6">
           {/* Export Button */}
-          {canExportReports && (
+          {canExportReports && SUPPORTED_EXPORT_TYPES.has('customers') && (
             <div className="flex justify-end">
               <button
                 onClick={() => handleExport('customers')}
