@@ -269,6 +269,13 @@ class Fulfillment(Base):
     
     # Relationships
     order: Mapped["Order"] = relationship("Order", back_populates="fulfillment")
+    # A fulfillment may have one shipment
+    shipment: Mapped[Optional["Shipment"]] = relationship(
+        "Shipment",
+        back_populates="fulfillment",
+        uselist=False,
+        lazy="selectin"
+    )
 
 
 class FulfillmentItem(Base):
@@ -290,6 +297,18 @@ class Shipment(Base):
     tracking_id: Mapped[str] = mapped_column(String(160), index=True)
     status: Mapped[ShipmentStatus] = mapped_column(SAEnum(ShipmentStatus, name="shipment_status", values_callable=lambda x: [e.value for e in x]), default=ShipmentStatus.dispatched, index=True)
     dispatched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    fulfillment: Mapped["Fulfillment"] = relationship(
+        "Fulfillment",
+        back_populates="shipment"
+    )
+    events: Mapped[list["ShipmentEvent"]] = relationship(
+        "ShipmentEvent",
+        back_populates="shipment",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
 
 
 class ShipmentEvent(Base):
@@ -301,6 +320,12 @@ class ShipmentEvent(Base):
     message: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Relationships
+    shipment: Mapped["Shipment"] = relationship(
+        "Shipment",
+        back_populates="events"
+    )
 
 
 # Pricing & Zones
