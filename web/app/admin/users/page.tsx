@@ -313,7 +313,7 @@ function UserManagementContent() {
     )
   }
 
-  const fetchStats = async () => {
+  async function fetchStats() {
     try {
       const response = await api<UserStats>('/api/admin/users/stats')
       setStats(response)
