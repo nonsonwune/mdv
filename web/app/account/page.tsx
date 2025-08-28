@@ -8,7 +8,6 @@ import UserDashboard from '../../components/account/UserDashboard'
 import UserProfile from '../../components/account/UserProfile'
 import OrderHistory from '../../components/account/OrderHistory'
 import AccountSettings from '../../components/account/AccountSettings'
-import { API_BASE } from '../../lib/api'
 import { useToast } from '../_components/ToastProvider'
 
 interface UserData {
@@ -350,7 +349,7 @@ function AddressManager({ userId }: { userId: number }) {
 
   async function loadAddresses() {
     try {
-      const response = await fetch(`${API_BASE}/api/users/addresses`, {
+      const response = await fetch('/api/users/addresses', {
         credentials: 'include'
       })
       
@@ -419,7 +418,7 @@ function WishlistManager() {
 
   async function loadWishlist() {
     try {
-      const response = await fetch(`${API_BASE}/api/wishlist`, {
+      const response = await fetch('/api/wishlist', {
         credentials: 'include'
       })
       
@@ -436,7 +435,7 @@ function WishlistManager() {
 
   async function removeItem(itemId: number) {
     try {
-      const response = await fetch(`${API_BASE}/api/wishlist/items/${itemId}`, {
+      const response = await fetch(`/api/wishlist/items/${itemId}`, {
         method: 'DELETE',
         credentials: 'include'
       })

@@ -1,0 +1,37 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+
+export async function GET(request: NextRequest) {
+  try {
+    const token = cookies().get('mdv_token')?.value
+    
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    
+    const response = await fetch(`${backendUrl}/api/wishlist`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: 'Failed to fetch wishlist' }, 
+        { status: response.status }
+      )
+    }
+
+    const data = await response.json()
+    return NextResponse.json({ items: data.items || [] })
+  } catch (error) {
+    console.error('Wishlist API error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
