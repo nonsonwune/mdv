@@ -19,6 +19,7 @@ from mdv.models import (
     ShipmentStatus,
     ShipmentEvent,
     Refund,
+    RefundMethod,
     User,
     Product,
     Variant,
@@ -60,22 +61,26 @@ async def admin_list_orders(
     if user_role == "operations":
         # Operations: Only see paid orders and later statuses
         allowed_statuses = [OrderStatus.paid, OrderStatus.cancelled, OrderStatus.refunded]
-        stmt = stmt.where(Order.status.in_([s.value for s in allowed_statuses]))
-        count_stmt = count_stmt.where(Order.status.in_([s.value for s in allowed_statuses]))
+        stmt = stmt.where(Order.status.in_(allowed_statuses))
+        count_stmt = count_stmt.where(Order.status.in_(allowed_statuses))
     elif user_role == "logistics":
         # Logistics: Only see orders with fulfillment ready to ship
         stmt = stmt.join(Fulfillment).where(
-            Fulfillment.status.in_([FulfillmentStatus.ready_to_ship.value])
+            Fulfillment.status.in_([FulfillmentStatus.ready_to_ship])
         )
         count_stmt = count_stmt.join(Fulfillment).where(
-            Fulfillment.status.in_([FulfillmentStatus.ready_to_ship.value])
+            Fulfillment.status.in_([FulfillmentStatus.ready_to_ship])
         )
     # Admin and Supervisor see all orders (no additional filtering)
     
     # Apply status filter if provided
     if status:
-        stmt = stmt.where(Order.status == status)
-        count_stmt = count_stmt.where(Order.status == status)
+        try:
+            status_enum = OrderStatus(status)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid order status")
+        stmt = stmt.where(Order.status == status_enum)
+        count_stmt = count_stmt.where(Order.status == status_enum)
         
     items = (await db.execute(stmt)).scalars().all()
     total = (await db.execute(count_stmt)).scalar_one()
@@ -151,13 +156,13 @@ async def admin_get_order_details(
     
     # Build tracking timeline if available
     timeline = []
-    if order.status == OrderStatus.paid.value or order.status == OrderStatus.refunded.value:
+    if order.status in (OrderStatus.paid, OrderStatus.refunded):
         timeline.append({
             "code": "order_placed",
             "at": order.created_at.isoformat(),
             "message": "Order placed"
         })
-        if order.status == OrderStatus.paid.value:
+        if order.status == OrderStatus.paid:
             timeline.append({
                 "code": "payment_confirmed",
                 "at": order.created_at.isoformat(),
@@ -202,14 +207,14 @@ async def set_ready_to_ship(fid: int, db: AsyncSession = Depends(get_db), claims
     ful = (await db.execute(select(Fulfillment).where(Fulfillment.id == fid))).scalar_one_or_none()
     if not ful:
         raise HTTPException(status_code=404, detail="Fulfillment not found")
-    if ful.status != FulfillmentStatus.processing.value:
+    if ful.status != FulfillmentStatus.processing:
         raise HTTPException(status_code=409, detail="Fulfillment not in Processing")
     # Ensure order is paid
     order = (await db.execute(select(Order).where(Order.id == ful.order_id))).scalar_one()
-    if order.status != OrderStatus.paid.value:
+    if order.status != OrderStatus.paid:
         raise HTTPException(status_code=409, detail="Order not Paid")
     before = {"status": ful.status.value}
-    ful.status = FulfillmentStatus.ready_to_ship.value
+    ful.status = FulfillmentStatus.ready_to_ship
     ful.packed_by = actor_id
     ful.packed_at = datetime.now(timezone.utc)
     await audit(db, actor_id, "fulfillment.ready", "Fulfillment", ful.id, before=before, after={"status": ful.status.value})
@@ -223,12 +228,12 @@ async def create_shipment(fulfillment_id: int, courier: str, tracking_id: str, d
     ful = (await db.execute(select(Fulfillment).where(Fulfillment.id == fulfillment_id))).scalar_one_or_none()
     if not ful:
         raise HTTPException(status_code=404, detail="Fulfillment not found")
-    if ful.status != FulfillmentStatus.ready_to_ship.value:
+    if ful.status != FulfillmentStatus.ready_to_ship:
         raise HTTPException(status_code=409, detail="Fulfillment not ReadyToShip")
     if not tracking_id:
         raise HTTPException(status_code=400, detail="tracking_id required")
     # Create shipment
-    shp = Shipment(fulfillment_id=ful.id, courier=courier, tracking_id=tracking_id, status=ShipmentStatus.dispatched.value, dispatched_at=datetime.now(timezone.utc))
+    shp = Shipment(fulfillment_id=ful.id, courier=courier, tracking_id=tracking_id, status=ShipmentStatus.dispatched, dispatched_at=datetime.now(timezone.utc))
     db.add(shp)
     await db.flush()
     db.add(ShipmentEvent(shipment_id=shp.id, code="Dispatched", message="Shipment dispatched", occurred_at=datetime.now(timezone.utc), meta={"tracking_id": tracking_id}))
@@ -254,7 +259,7 @@ async def update_shipment_status(sid: int, status: ShipmentStatus, db: AsyncSess
     if status not in ALLOWED_TRANSITIONS.get(shp.status, set()):
         raise HTTPException(status_code=409, detail="Invalid transition")
     before = {"status": shp.status.value}
-    shp.status = status.value
+    shp.status = status
     code = status.value
     db.add(ShipmentEvent(shipment_id=shp.id, code=code, message=f"{code}", occurred_at=datetime.now(timezone.utc)))
     await audit(db, actor_id, "shipment.status", "Shipment", shp.id, before=before, after={"status": shp.status.value})
@@ -268,7 +273,7 @@ async def cancel_order(oid: int, db: AsyncSession = Depends(get_db), claims=Depe
     order = (await db.execute(select(Order).where(Order.id == oid))).scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if order.status != OrderStatus.paid.value:
+    if order.status != OrderStatus.paid:
         raise HTTPException(status_code=409, detail="Only Paid orders can be cancelled pre-ship")
     # ensure no shipment exists
     ful = (await db.execute(select(Fulfillment).where(Fulfillment.order_id == order.id))).scalar_one_or_none()
@@ -277,7 +282,7 @@ async def cancel_order(oid: int, db: AsyncSession = Depends(get_db), claims=Depe
         if shp:
             raise HTTPException(status_code=409, detail="Cannot cancel: shipment exists")
     before = {"status": order.status.value}
-    order.status = OrderStatus.cancelled.value
+    order.status = OrderStatus.cancelled
     await audit(db, actor_id, "order.cancel", "Order", order.id, before=before, after={"status": order.status.value})
     await db.commit()
     return {"id": order.id, "status": order.status.value}
@@ -298,7 +303,7 @@ async def refund_order(oid: int, body: RefundRequest, db: AsyncSession = Depends
         raise HTTPException(status_code=404, detail="Order not found")
     if body.amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be > 0")
-    ref = Refund(order_id=order.id, amount=body.amount, reason=body.reason or "", created_by=actor_id, refund_method=body.method, manual_ref=body.manual_ref)
+    ref = Refund(order_id=order.id, amount=body.amount, reason=body.reason or "", created_by=actor_id, refund_method=RefundMethod(body.method), manual_ref=body.manual_ref)
     db.add(ref)
     await audit(db, actor_id, "order.refund", "Order", order.id, before=None, after={"refund": body.amount, "reason": body.reason, "method": body.method})
     await db.commit()
