@@ -26,7 +26,13 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     const contentType = request.headers.get('content-type') || ''
     if (contentType.startsWith('multipart/form-data')) {
+      // Rebuild FormData and let undici set the boundary automatically
       const formData = await request.formData()
+      // Remove potentially conflicting headers so undici can set correct values
+      headers.delete('content-type')
+      headers.delete('content-length')
+      headers.delete('transfer-encoding')
+      headers.delete('content-encoding')
       init.body = formData as any
     } else {
       const body = await request.text()
