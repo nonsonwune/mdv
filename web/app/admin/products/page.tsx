@@ -513,11 +513,11 @@ function InventoryManagementSection({ products, onUpdateStock }: {
             <div className="flex gap-2">
               <PermissionGuard permission={Permission.INVENTORY_ADJUST}>
                 <Link
-                  href={"/admin/inventory/bulk-update" as any}
+                  href={"/admin/inventory" as any}
                   className="flex items-center gap-2 px-3 py-2 text-sm bg-maroon-100 text-maroon-700 rounded-lg hover:bg-maroon-200 transition-colors"
                 >
                   <AdjustmentsHorizontalIcon className="h-4 w-4" />
-                  Bulk Update
+                  Manage Inventory
                 </Link>
               </PermissionGuard>
               

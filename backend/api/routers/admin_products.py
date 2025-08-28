@@ -276,7 +276,18 @@ async def delete_product(
         before={"title": product.title, "variants": len(product.variants)}
     )
     
-    # Delete product (cascades to variants, inventory, images)
+    # Manually delete inventory records first to avoid cascade issues
+    for variant in product.variants:
+        # Delete inventory for each variant
+        await db.execute(
+            sql_delete(Inventory).where(Inventory.variant_id == variant.id)
+        )
+        # Delete stock ledger entries
+        await db.execute(
+            sql_delete(StockLedger).where(StockLedger.variant_id == variant.id)
+        )
+    
+    # Now delete the product (cascades to variants and images)
     await db.delete(product)
     await db.commit()
     
