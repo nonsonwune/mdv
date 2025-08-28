@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api-client'
+import { usePathname } from 'next/navigation'
 import {
   ChartBarIcon,
   CurrencyDollarIcon,
@@ -74,6 +75,41 @@ const timeRanges: TimeRange[] = [
   { value: '1y', label: 'Last year' }
 ]
 
+// Supported period values for validation and URL parsing
+const VALID_PERIODS = new Set(timeRanges.map(t => t.value))
+
+// Lightweight runtime validation to guard against backend contract drift
+function validateAnalyticsResponse(raw: any) {
+  const errors: string[] = []
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Invalid analytics payload: expected an object')
+  }
+
+  const requiredRoots = ['sales', 'customer_metrics', 'daily_trends', 'top_products'] as const
+  for (const key of requiredRoots) {
+    if (!(key in raw)) errors.push(`Missing field: ${key}`)
+  }
+
+  const s = raw.sales || {}
+  for (const k of ['total_revenue', 'total_orders', 'average_order_value', 'total_items_sold', 'conversion_rate']) {
+    if (!(k in s)) errors.push(`Missing sales.${k}`)
+  }
+
+  const c = raw.customer_metrics || {}
+  for (const k of ['total_customers', 'new_customers', 'returning_customers']) {
+    if (!(k in c)) errors.push(`Missing customer_metrics.${k}`)
+  }
+
+  if (!Array.isArray(raw.daily_trends)) errors.push('daily_trends must be an array')
+  if (!Array.isArray(raw.top_products)) errors.push('top_products must be an array')
+
+  if (errors.length) {
+    const err = new Error(`Analytics payload validation failed: ${errors.join(', ')}`)
+    ;(err as any).validationErrors = errors
+    throw err
+  }
+}
+
 // Normalize backend /admin/analytics response to the UI's expected shape
 function normalizeAnalyticsResponse(raw: any): AnalyticsData {
   const sales = raw?.sales || {}
@@ -129,17 +165,40 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [timeRange, setTimeRange] = useState('30d')
+  const [timeRange, setTimeRange] = useState<string>(() => {
+    const defaultPeriod = '30d'
+    if (typeof window === 'undefined') return defaultPeriod
+    const params = new URLSearchParams(window.location.search)
+    const p = params.get('period') || ''
+    return VALID_PERIODS.has(p) ? p : defaultPeriod
+  })
   const [refreshing, setRefreshing] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     fetchAnalytics()
   }, [timeRange])
 
+  // Keep URL query param in sync with selected period for shareable links/navigation
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
+      if (params.get('period') !== timeRange) {
+        params.set('period', timeRange)
+        const url = `${pathname}?${params.toString()}`
+        // Avoid Next typedRoutes constraints by updating history directly
+        window.history.replaceState(null, '', url)
+      }
+    } catch (e) {
+      // no-op: best effort URL sync
+    }
+  }, [timeRange, pathname])
+
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
       const raw = await api<any>(`/api/admin/analytics?period=${timeRange}`)
+      validateAnalyticsResponse(raw)
       const normalized = normalizeAnalyticsResponse(raw)
       setData(normalized)
     } catch (error) {
