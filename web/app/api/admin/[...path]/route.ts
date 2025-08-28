@@ -12,7 +12,7 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
   const search = request.nextUrl.search
   // Support both standard /api/admin/* routes and special admin routers without /api prefix
   const first = pathSegments[0] || ''
-  const basePath = (first === 'analytics' || first === 'inventory') ? 'admin' : 'api/admin'
+  const basePath = (first === 'inventory') ? 'admin' : 'api/admin'
   const target = `${API_BASE}/${basePath}/${pathSegments.join('/')}${search}`
 
   const headers = new Headers(request.headers)
