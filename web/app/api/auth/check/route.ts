@@ -13,12 +13,17 @@ export async function GET(request: NextRequest) {
     // Call the backend to get user profile
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     
+    console.log('Auth check: calling backend at', backendUrl)
+    console.log('Auth check: token length', token.length)
+    
     try {
       const response = await fetch(`${backendUrl}/api/users/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        // Add timeout and error handling
+        signal: AbortSignal.timeout(10000) // 10 second timeout
       })
 
       if (!response.ok) {

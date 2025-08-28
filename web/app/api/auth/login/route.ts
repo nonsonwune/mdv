@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
       secure: prod,
       sameSite: "lax" as const,
       path: "/",
-      domain: prod ? ".mdv.ng" : undefined  // Ensure cookies are shared across subdomains in production
+      // Remove domain restriction for Railway - let browser handle same-origin
+      domain: undefined
     }
     res.cookies.set("mdv_token", token, cookieOptions)
     res.cookies.set("mdv_role", role, cookieOptions)
