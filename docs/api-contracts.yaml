@@ -292,6 +292,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/CategoriesReportResponse'
 
+  /api/admin/reports/export/categories:
+    get:
+      summary: Export categories report as CSV
+      description: Returns a JSON string that contains the CSV text for the categories report.
+      parameters:
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: ["7d", "30d", "90d", "365d"]
+          description: Time window for sales metrics
+      responses:
+        200:
+          description: CSV content as JSON string
+          content:
+            application/json:
+              schema:
+                type: string
+
 components:
   schemas:
     HealthResponse:

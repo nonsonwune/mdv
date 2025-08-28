@@ -336,6 +336,28 @@ export interface paths {
       };
     };
   };
+  "/api/admin/reports/export/categories": {
+    /**
+     * Export categories report as CSV
+     * @description Returns a JSON string that contains the CSV text for the categories report.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Time window for sales metrics */
+          period?: "7d" | "30d" | "90d" | "365d";
+        };
+      };
+      responses: {
+        /** @description CSV content as JSON string */
+        200: {
+          content: {
+            "application/json": string;
+          };
+        };
+      };
+    };
+  };
 }
 
 export type webhooks = Record<string, never>;

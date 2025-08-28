@@ -4,12 +4,15 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, func, and_, cast, Date, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mdv.models import Order, OrderItem, Inventory, Variant, Product, User, Category
 from mdv.rbac import require_permission, Permission
 from ..deps import get_db
+import csv
+import io
 
 
 router = APIRouter(prefix="/api/admin/reports", tags=["admin-reports"])
@@ -314,3 +317,52 @@ async def categories_report(
         "categories": categories,
     }
 
+
+@router.get("/export/categories")
+async def export_categories_csv(
+    period: str = Query("30d", description="Time window: 7d|30d|90d|365d"),
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_permission(Permission.REPORT_EXPORT)),
+):
+    """Export Categories Report as CSV.
+
+    Returns a JSON string containing CSV content so that the frontend typed API client
+    (which expects JSON) can parse it and download as a CSV file.
+    """
+    # Reuse existing computation to ensure parity with the JSON report
+    data = await categories_report(period=period, db=db, claims=claims)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row
+    writer.writerow([
+        "Category ID",
+        "Category Name",
+        "Products",
+        "Variants",
+        "Inventory Qty",
+        "Inventory Value",
+        "Low Stock",
+        "Sales Revenue",
+        "Orders",
+    ])
+
+    for cat in data.get("categories", []):
+        writer.writerow([
+            cat.get("id", ""),
+            cat.get("name", ""),
+            int(cat.get("product_count", 0) or 0),
+            int(cat.get("variant_count", 0) or 0),
+            int(cat.get("total_inventory_qty", 0) or 0),
+            float(cat.get("inventory_value", 0.0) or 0.0),
+            int(cat.get("low_stock_count", 0) or 0),
+            float(cat.get("sales_revenue", 0.0) or 0.0),
+            int(cat.get("orders_count", 0) or 0),
+        ])
+
+    csv_text = output.getvalue()
+    output.close()
+
+    # Return as JSON string (not text/csv) for compatibility with frontend api() helper
+    return JSONResponse(content=csv_text)
