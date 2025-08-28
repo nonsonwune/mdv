@@ -383,7 +383,7 @@ function ReportsDashboardContent() {
                     <div>
                       <p className="text-sm text-gray-500">Total Orders</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {salesMetrics.total_orders.toLocaleString()}
+                        {(salesMetrics?.total_orders ?? 0).toLocaleString()}
                       </p>
                       <p className={`text-sm flex items-center gap-1 ${
                         salesMetrics.order_growth >= 0 ? 'text-green-600' : 'text-red-600'
@@ -407,7 +407,7 @@ function ReportsDashboardContent() {
                   <div>
                     <p className="text-sm text-gray-500">Total Customers</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {userMetrics.total_users.toLocaleString()}
+                      {(userMetrics?.total_users ?? 0).toLocaleString()}
                     </p>
                     <p className={`text-sm flex items-center gap-1 ${
                       userMetrics.user_growth >= 0 ? 'text-green-600' : 'text-red-600'
@@ -480,7 +480,7 @@ function ReportsDashboardContent() {
                   <ArrowRightIcon className="h-5 w-5 text-gray-400" />
                 </div>
                 <div className="space-y-3">
-                  {salesMetrics.top_selling_products.slice(0, 3).map((product, index) => (
+                  {(salesMetrics.top_selling_products ?? []).slice(0, 3).map((product, index) => (
                     <div key={product.id} className="flex justify-between items-center">
                       <div>
                         <p className="text-sm font-medium text-gray-900 truncate">
@@ -532,7 +532,7 @@ function ReportsDashboardContent() {
                 <div>
                   <p className="text-sm text-gray-500">Products</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {(categoriesReport.summary?.product_count || 0).toLocaleString()}
+                    {(categoriesReport.summary?.product_count ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <ShoppingBagIcon className="h-8 w-8 text-blue-600" />
@@ -544,7 +544,7 @@ function ReportsDashboardContent() {
                 <div>
                   <p className="text-sm text-gray-500">Variants</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {(categoriesReport.summary?.variant_count || 0).toLocaleString()}
+                    {(categoriesReport.summary?.variant_count ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <ChartBarIcon className="h-8 w-8 text-purple-600" />
@@ -694,7 +694,7 @@ function ReportsDashboardContent() {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Sales by Category</h3>
             <div className="space-y-4">
-              {salesMetrics.sales_by_category.map((category, index) => (
+              {(salesMetrics.sales_by_category ?? []).map((category, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
@@ -702,13 +702,13 @@ function ReportsDashboardContent() {
                         {category.category_name}
                       </span>
                       <span className="text-sm text-gray-500">
-                        {formatCurrency(category.total_sales)} ({category.percentage.toFixed(1)}%)
+                        {formatCurrency(category.total_sales)} ({Number(category.percentage ?? 0).toFixed(1)}%)
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
                         className="bg-maroon-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${category.percentage}%` }}
+                        style={{ width: `${Number(category.percentage ?? 0)}%` }}
                       />
                     </div>
                   </div>
@@ -746,7 +746,7 @@ function ReportsDashboardContent() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {salesMetrics.top_selling_products.map((product) => (
+                  {(salesMetrics.top_selling_products ?? []).map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
@@ -866,7 +866,7 @@ function ReportsDashboardContent() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {inventoryMetrics.top_categories.map((category, index) => (
+                  {(inventoryMetrics.top_categories ?? []).map((category, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
@@ -918,7 +918,7 @@ function ReportsDashboardContent() {
                 <div>
                   <p className="text-sm text-gray-500">Total Customers</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {userMetrics.total_users.toLocaleString()}
+                    {(userMetrics?.total_users ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <UsersIcon className="h-8 w-8 text-blue-600" />
@@ -930,7 +930,7 @@ function ReportsDashboardContent() {
                 <div>
                   <p className="text-sm text-gray-500">New This Month</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {userMetrics.new_users_this_month.toLocaleString()}
+                    {(userMetrics?.new_users_this_month ?? 0).toLocaleString()}
                   </p>
                 </div>
                 <ArrowTrendingUpIcon className="h-8 w-8 text-green-600" />
@@ -958,7 +958,7 @@ function ReportsDashboardContent() {
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Registration Trend</h3>
             <div className="space-y-4">
-              {userMetrics.user_registration_trend.slice(-10).map((trend, index) => (
+              {(userMetrics.user_registration_trend ?? []).slice(-10).map((trend, index) => (
                 <div key={index} className="flex justify-between items-center">
                   <span className="text-sm text-gray-600">
                     {new Date(trend.date).toLocaleDateString()}
