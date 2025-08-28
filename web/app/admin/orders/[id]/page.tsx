@@ -19,6 +19,89 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline'
 
+// Helper to format status labels safely (handles camel case like "PendingPayment")
+const labelize = (s?: string) => {
+  if (!s) return 'Unknown'
+  const str = String(s)
+  const spaced = str.replace(/([a-z])([A-Z])/g, '$1 $2')
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+// Normalize backend admin order response into this page's Order shape
+const normalizeOrderData = (raw: any): Order => {
+  // Derive order status for this UI from backend status/timeline
+  const backendStatus = String(raw?.status || '')
+  const timeline: Array<{ code: string; at: string; message?: string; tracking_id?: string }> = raw?.tracking_timeline || []
+
+  // Determine shipment milestones
+  const hasDelivered = timeline.some(e => (e.code || '').toLowerCase() === 'delivered')
+  const hasShipped = hasDelivered || timeline.some(e => (e.code || '').toLowerCase() === 'shipped' || (e.code || '').toLowerCase() === 'dispatched')
+
+  // Map backend OrderStatus -> UI status
+  let uiStatus: Order['status'] = 'pending'
+  const b = backendStatus.toLowerCase()
+  if (hasDelivered) uiStatus = 'delivered'
+  else if (hasShipped) uiStatus = 'shipped'
+  else if (b === 'cancelled') uiStatus = 'cancelled'
+  else if (b === 'paid') uiStatus = 'processing'
+  else if (b === 'refunded') uiStatus = 'cancelled' // show as terminal
+  else uiStatus = 'pending'
+
+  // Derive payment status from backend OrderStatus
+  let paymentStatus: Order['payment_status'] = 'pending'
+  if (b === 'paid') paymentStatus = 'paid'
+  else if (b === 'refunded') paymentStatus = 'refunded'
+  else if (b === 'cancelled') paymentStatus = 'pending'
+
+  // Derive shipped/delivered timestamps
+  const shippedEvent = timeline.find(e => ['shipped', 'dispatched'].includes((e.code || '').toLowerCase()))
+  const deliveredEvent = timeline.find(e => (e.code || '').toLowerCase() === 'delivered')
+
+  // Best-effort tracking details
+  const trackingNumber = shippedEvent?.tracking_id || ''
+  // carrier isn't explicitly provided in raw; keep empty
+
+  const user = raw?.user || {}
+  const addr = raw?.shipping_address || {}
+
+  return {
+    id: raw?.id,
+    order_number: String(raw?.id ?? ''),
+    status: uiStatus,
+    payment_status: paymentStatus,
+    payment_method: undefined,
+    total_amount: Number(raw?.total ?? 0),
+    subtotal: 0,
+    shipping_cost: 0,
+    tax_amount: 0,
+    discount_amount: 0,
+    coupon_code: undefined,
+    customer_id: undefined,
+    customer_name: user?.name || addr?.name || 'Guest',
+    customer_email: user?.email || '',
+    customer_phone: undefined,
+    shipping_address: {
+      full_name: addr?.name || user?.name || '',
+      address_line_1: addr?.street || addr?.city || '',
+      address_line_2: '',
+      city: addr?.city || '',
+      state: addr?.state || '',
+      postal_code: '',
+      country: ''
+    },
+    billing_address: undefined,
+    created_at: raw?.created_at || new Date().toISOString(),
+    updated_at: raw?.created_at || new Date().toISOString(),
+    shipped_at: shippedEvent?.at,
+    delivered_at: deliveredEvent?.at,
+    tracking_number: trackingNumber,
+    carrier: '',
+    items: Array.isArray(raw?.items) ? raw.items : [],
+    notes: undefined,
+    customer_notes: undefined,
+  }
+}
+
 interface OrderItem {
   id: number
   product_id: number
@@ -111,8 +194,8 @@ export default function OrderDetailPage() {
 
   useEffect(() => {
     if (order) {
-      setNewStatus(order.status)
-      setNewPaymentStatus(order.payment_status)
+      setNewStatus(order.status || 'pending')
+      setNewPaymentStatus(order.payment_status || 'pending')
       setTrackingNumber(order.tracking_number || '')
       setCarrier(order.carrier || '')
       setNotes(order.notes || '')
@@ -122,8 +205,8 @@ export default function OrderDetailPage() {
   const fetchOrder = async () => {
     try {
       setLoading(true)
-      const response = await api<Order>(`/api/admin/orders/${params.id}`)
-      setOrder(response)
+      const response = await api<any>(`/api/admin/orders/${params.id}`)
+      setOrder(normalizeOrderData(response))
     } catch (error) {
       console.error('Failed to fetch order:', error)
       alert('Failed to load order details')
@@ -163,24 +246,31 @@ export default function OrderDetailPage() {
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const s = (status || '').toLowerCase()
+    switch (s) {
       case 'pending':
+      case 'pendingpayment':
         return 'bg-yellow-100 text-yellow-800'
       case 'processing':
         return 'bg-blue-100 text-blue-800'
       case 'shipped':
+      case 'dispatched':
         return 'bg-purple-100 text-purple-800'
       case 'delivered':
         return 'bg-green-100 text-green-800'
       case 'cancelled':
-        return 'bg-red-100 text-red-800'
+      case 'refunded':
+        return 'bg-gray-100 text-gray-800'
+      case 'paid':
+        return 'bg-green-100 text-green-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
   }
 
   const getPaymentStatusColor = (status: string) => {
-    switch (status) {
+    const s = (status || '').toLowerCase()
+    switch (s) {
       case 'paid':
         return 'bg-green-100 text-green-800'
       case 'pending':
@@ -258,10 +348,10 @@ export default function OrderDetailPage() {
         {/* Status Badges */}
         <div className="flex gap-3 mb-4">
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(order.status)}`}>
-            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            {labelize(order.status)}
           </span>
           <span className={`px-3 py-1 text-sm font-medium rounded-full ${getPaymentStatusColor(order.payment_status)}`}>
-            Payment {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+            Payment {labelize(order.payment_status)}
           </span>
         </div>
 
@@ -295,7 +385,7 @@ export default function OrderDetailPage() {
             </div>
             <div className="p-6">
               <div className="space-y-4">
-                {order.items.map((item) => (
+                {(order.items || []).map((item) => (
                   <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
                     {item.image_url && (
                       <img
