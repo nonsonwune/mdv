@@ -127,36 +127,8 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
   const [security, setSecurity] = useState<SecuritySettings>({
     twoFactorEnabled: false,
     loginAlerts: true,
-    trustedDevices: [
-      {
-        id: '1',
-        name: 'MacBook Pro',
-        lastUsed: '2024-01-20',
-        current: true
-      },
-      {
-        id: '2',
-        name: 'iPhone 13',
-        lastUsed: '2024-01-19',
-        current: false
-      }
-    ],
-    sessions: [
-      {
-        id: '1',
-        device: 'Chrome on MacOS',
-        location: 'Lagos, Nigeria',
-        lastActive: '2 minutes ago',
-        current: true
-      },
-      {
-        id: '2',
-        device: 'Safari on iOS',
-        location: 'Lagos, Nigeria',
-        lastActive: '1 hour ago',
-        current: false
-      }
-    ]
+    trustedDevices: [],
+    sessions: []
   })
 
   const [preferences, setPreferences] = useState<PreferencesSettings>({
@@ -187,14 +159,60 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
     }
   }, [showToast])
 
-  const loadSettings = () => {
+  const loadSecurityData = async () => {
+    try {
+      // Load trusted devices
+      const devicesResponse = await fetch('/api/security/devices', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      // Load active sessions
+      const sessionsResponse = await fetch('/api/security/sessions', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      const devices = devicesResponse.ok ? (await devicesResponse.json()).devices || [] : []
+      const sessions = sessionsResponse.ok ? (await sessionsResponse.json()).sessions || [] : []
+      
+      return { devices, sessions }
+    } catch (error) {
+      console.error('Error loading security data:', error)
+      return { devices: [], sessions: [] }
+    }
+  }
+
+  const loadSettings = async () => {
+    // Load security data from API
+    const { devices, sessions } = await loadSecurityData()
+    
     const savedSettings = localStorage.getItem('mdv_account_settings')
     if (savedSettings) {
       const settings = JSON.parse(savedSettings)
       setNotifications(settings.notifications || notifications)
       setPrivacy(settings.privacy || privacy)
-      setSecurity(settings.security || security)
+      setSecurity({
+        ...settings.security,
+        trustedDevices: devices,
+        sessions: sessions
+      } || {
+        ...security,
+        trustedDevices: devices,
+        sessions: sessions
+      })
       setPreferences(settings.preferences || preferences)
+    } else {
+      // No saved settings, use defaults with API data
+      setSecurity({
+        ...security,
+        trustedDevices: devices,
+        sessions: sessions
+      })
     }
   }
 
@@ -683,31 +701,42 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Trusted Devices</h3>
               <div className="space-y-3">
-                {security.trustedDevices.map(device => (
-                  <div key={device.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div>
-                      <p className="font-medium flex items-center gap-2">
-                        {device.name}
-                        {device.current && (
-                          <Badge variant="success" size="sm">Current</Badge>
-                        )}
-                      </p>
-                      <p className="text-sm text-neutral-600">
-                        Last used: {new Date(device.lastUsed).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {!device.current && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeDevice(device.id)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        Remove
-                      </Button>
-                    )}
+                {security.trustedDevices.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="w-12 h-12 mx-auto mb-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-neutral-600 mb-2">No trusted devices</p>
+                    <p className="text-sm text-neutral-500">Your trusted devices will appear here</p>
                   </div>
-                ))}
+                ) : (
+                  security.trustedDevices.map(device => (
+                    <div key={device.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                      <div>
+                        <p className="font-medium flex items-center gap-2">
+                          {device.name}
+                          {device.current && (
+                            <Badge variant="success" size="sm">Current</Badge>
+                          )}
+                        </p>
+                        <p className="text-sm text-neutral-600">
+                          Last used: {new Date(device.lastUsed).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {!device.current && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeDevice(device.id)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </Card>
@@ -716,31 +745,42 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Active Sessions</h3>
               <div className="space-y-3">
-                {security.sessions.map(session => (
-                  <div key={session.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
-                    <div>
-                      <p className="font-medium flex items-center gap-2">
-                        {session.device}
-                        {session.current && (
-                          <Badge variant="success" size="sm">Current</Badge>
-                        )}
-                      </p>
-                      <p className="text-sm text-neutral-600">
-                        {session.location} • {session.lastActive}
-                      </p>
-                    </div>
-                    {!session.current && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => endSession(session.id)}
-                        className="text-red-600 hover:bg-red-50"
-                      >
-                        End Session
-                      </Button>
-                    )}
+                {security.sessions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="w-12 h-12 mx-auto mb-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <p className="text-neutral-600 mb-2">No active sessions</p>
+                    <p className="text-sm text-neutral-500">Your login sessions will appear here</p>
                   </div>
-                ))}
+                ) : (
+                  security.sessions.map(session => (
+                    <div key={session.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                      <div>
+                        <p className="font-medium flex items-center gap-2">
+                          {session.device}
+                          {session.current && (
+                            <Badge variant="success" size="sm">Current</Badge>
+                          )}
+                        </p>
+                        <p className="text-sm text-neutral-600">
+                          {session.location} • {session.lastActive}
+                        </p>
+                      </div>
+                      {!session.current && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => endSession(session.id)}
+                          className="text-red-600 hover:bg-red-50"
+                        >
+                          End Session
+                        </Button>
+                      )}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </Card>
@@ -926,37 +966,42 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
         title="Enable Two-Factor Authentication"
       >
         <div className="space-y-4">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 font-medium mb-2">
+              🚧 Two-Factor Authentication Setup
+            </p>
+            <p className="text-sm text-blue-700">
+              This feature is currently being implemented. Please check back later for full 2FA setup functionality.
+            </p>
+          </div>
+          
           <p className="text-sm text-neutral-600">
-            Scan this QR code with your authenticator app to enable two-factor authentication.
+            Two-factor authentication will provide an extra layer of security for your account by requiring a second form of verification.
           </p>
-          <div className="flex justify-center p-4 bg-neutral-100 rounded-lg">
-            <div className="w-48 h-48 bg-white p-4">
-              {/* QR Code placeholder */}
-              <div className="w-full h-full bg-neutral-300 rounded flex items-center justify-center">
-                <span className="text-xs text-neutral-600">QR Code</span>
-              </div>
-            </div>
+          
+          <div className="bg-neutral-50 p-4 rounded-lg">
+            <h4 className="font-medium mb-2">What you'll get:</h4>
+            <ul className="text-sm text-neutral-600 space-y-1">
+              <li>• Enhanced account security</li>
+              <li>• Protection against unauthorized access</li>
+              <li>• Support for authenticator apps</li>
+              <li>• Backup recovery codes</li>
+            </ul>
           </div>
-          <div>
-            <p className="text-sm font-medium mb-2">Manual Entry Code</p>
-            <code className="block p-3 bg-neutral-100 rounded text-sm">
-              MDVS-HOPI-XABC-1234-5678
-            </code>
-          </div>
-          <Input
-            label="Verification Code"
-            placeholder="Enter 6-digit code"
-            maxLength={6}
-          />
+          
           <div className="flex gap-3 justify-end">
             <Button
               variant="secondary"
               onClick={() => setShow2FAModal(false)}
             >
-              Cancel
+              Close
             </Button>
-            <Button onClick={enable2FA}>
-              Enable 2FA
+            <Button 
+              variant="primary"
+              disabled
+              className="opacity-50 cursor-not-allowed"
+            >
+              Coming Soon
             </Button>
           </div>
         </div>

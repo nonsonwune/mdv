@@ -39,39 +39,62 @@ export default function UserDashboard({ user }: UserDashboardProps) {
     loadDashboardData()
   }, [])
 
-  const loadDashboardData = () => {
-    // Load orders
-    const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]') as Order[]
-    
-    // Load wishlist
-    const wishlist = JSON.parse(localStorage.getItem('mdv_wishlist') || '[]')
-    
-    // Calculate stats
-    const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
-    const loyaltyPoints = Math.floor(totalSpent / 100) // 1 point per ₦100
-    
-    // Get recent orders
-    const recentOrders = orders
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 3)
-    
-    // Calculate monthly spending
-    const monthlySpending = calculateMonthlySpending(orders)
-    
-    // Mock recommendations
-    const recommendations = generateRecommendations()
-    
-    setStats({
-      totalOrders: orders.length,
-      totalSpent,
-      loyaltyPoints,
-      savedItems: wishlist.length,
-      recentOrders,
-      recommendations,
-      monthlySpending
-    })
-    
-    setLoading(false)
+  const loadDashboardData = async () => {
+    try {
+      // Load orders
+      const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]') as Order[]
+      
+      // Load wishlist
+      const wishlist = JSON.parse(localStorage.getItem('mdv_wishlist') || '[]')
+      
+      // Calculate stats
+      const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
+      const loyaltyPoints = Math.floor(totalSpent / 100) // 1 point per ₦100
+      
+      // Get recent orders
+      const recentOrders = orders
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 3)
+      
+      // Calculate monthly spending
+      const monthlySpending = calculateMonthlySpending(orders)
+      
+      // Load real product recommendations
+      const recommendations = await loadRecommendations()
+      
+      setStats({
+        totalOrders: orders.length,
+        totalSpent,
+        loyaltyPoints,
+        savedItems: wishlist.length,
+        recentOrders,
+        recommendations,
+        monthlySpending
+      })
+    } catch (error) {
+      console.error('Error loading dashboard data:', error)
+      // Set stats with empty recommendations on error
+      const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]') as Order[]
+      const wishlist = JSON.parse(localStorage.getItem('mdv_wishlist') || '[]')
+      const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
+      const loyaltyPoints = Math.floor(totalSpent / 100)
+      const recentOrders = orders
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 3)
+      const monthlySpending = calculateMonthlySpending(orders)
+      
+      setStats({
+        totalOrders: orders.length,
+        totalSpent,
+        loyaltyPoints,
+        savedItems: wishlist.length,
+        recentOrders,
+        recommendations: [],
+        monthlySpending
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const calculateMonthlySpending = (orders: Order[]) => {
@@ -95,34 +118,24 @@ export default function UserDashboard({ user }: UserDashboardProps) {
     return spending
   }
 
-  const generateRecommendations = (): Product[] => {
-    return [
-      {
-        id: 1,
-        slug: 'summer-dress',
-        title: 'Summer Floral Dress',
-        description: 'Light and breezy for warm days',
-        images: [{ id: 1, url: '/api/placeholder/200/200', alt_text: 'Summer Dress', sort_order: 0, is_primary: true }],
-        variants: [{ id: 1, sku: 'SFD-001-M', price: 45000, size: 'M' }],
-        compare_at_price: 55000
-      },
-      {
-        id: 2,
-        slug: 'casual-shirt',
-        title: 'Casual Button Shirt',
-        description: 'Perfect for any occasion',
-        images: [{ id: 2, url: '/api/placeholder/200/200', alt_text: 'Casual Shirt', sort_order: 0, is_primary: true }],
-        variants: [{ id: 2, sku: 'CBS-001-L', price: 28000, size: 'L' }]
-      },
-      {
-        id: 3,
-        slug: 'denim-jacket',
-        title: 'Classic Denim Jacket',
-        description: 'Timeless style',
-        images: [{ id: 3, url: '/api/placeholder/200/200', alt_text: 'Denim Jacket', sort_order: 0, is_primary: true }],
-        variants: [{ id: 3, sku: 'CDJ-001-L', price: 65000, size: 'L' }]
+  const loadRecommendations = async (): Promise<Product[]> => {
+    try {
+      // Fetch real product recommendations from backend API
+      const response = await fetch('/api/products/recommendations', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.products || []
       }
-    ]
+    } catch (error) {
+      console.error('Error loading recommendations:', error)
+    }
+    return []
   }
 
   const getGreeting = () => {
@@ -402,39 +415,58 @@ export default function UserDashboard({ user }: UserDashboardProps) {
             </Link>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {stats.recommendations.map(product => (
-              <Link key={product.id} href={`/product/${product.slug}`}>
-                <div className="group cursor-pointer">
-                  <div className="aspect-square bg-neutral-100 rounded-lg overflow-hidden mb-3">
-                    {product.images?.[0] && (
-                      <Image
-                        src={product.images[0].url}
-                        alt={product.images[0].alt_text || product.title}
-                        width={200}
-                        height={200}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    )}
-                  </div>
-                  <h4 className="font-medium text-sm group-hover:text-maroon-700 transition-colors">
-                    {product.title}
-                  </h4>
-                  <p className="text-xs text-neutral-600 mb-1">{product.description}</p>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">
-                      {formatNaira(product.variants?.[0]?.price || 0)}
-                    </span>
-                    {product.compare_at_price && (
-                      <span className="text-xs text-neutral-500 line-through">
-                        {formatNaira(product.compare_at_price)}
+          {stats.recommendations.length === 0 ? (
+            <EmptyState
+              icon={
+                <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              }
+              title="No recommendations yet"
+              description="Browse our collection to see personalized recommendations"
+              size="sm"
+              action={
+                <Link href="/">
+                  <Button>Explore Products</Button>
+                </Link>
+              }
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {stats.recommendations.map(product => (
+                <Link key={product.id} href={`/product/${product.slug}`}>
+                  <div className="group cursor-pointer">
+                    <div className="aspect-square bg-neutral-100 rounded-lg overflow-hidden mb-3">
+                      {product.images?.[0] && (
+                        <Image
+                          src={product.images[0].url}
+                          alt={product.images[0].alt_text || product.title}
+                          width={200}
+                          height={200}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      )}
+                    </div>
+                    <h4 className="font-medium text-sm group-hover:text-maroon-700 transition-colors">
+                      {product.title}
+                    </h4>
+                    <p className="text-xs text-neutral-600 mb-1">{product.description}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">
+                        {formatNaira(product.variants?.[0]?.price || 0)}
                       </span>
-                    )}
+                      {product.compare_at_price && (
+                        <span className="text-xs text-neutral-500 line-through">
+                          {formatNaira(product.compare_at_price)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 

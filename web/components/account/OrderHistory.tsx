@@ -55,21 +55,49 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
 
   useEffect(() => {
-    // Load orders from localStorage
-    const storedOrders = localStorage.getItem('mdv_orders')
-    if (storedOrders) {
-      const parsed = JSON.parse(storedOrders)
-      setOrders(parsed)
-      setFilteredOrders(parsed)
-    } else {
-      // Generate mock orders for demo
-      const mockOrders = generateMockOrders()
-      setOrders(mockOrders)
-      setFilteredOrders(mockOrders)
-      localStorage.setItem('mdv_orders', JSON.stringify(mockOrders))
-    }
-    setLoading(false)
+    loadOrders()
   }, [])
+
+  const loadOrders = async () => {
+    try {
+      // First try to load from API
+      const apiOrders = await loadOrdersFromAPI()
+      
+      // If API returns orders, use those and cache them
+      if (apiOrders.length > 0) {
+        setOrders(apiOrders)
+        setFilteredOrders(apiOrders)
+        // Cache in localStorage for offline access
+        localStorage.setItem('mdv_orders', JSON.stringify(apiOrders))
+      } else {
+        // If no orders from API, check localStorage for cached orders
+        const storedOrders = localStorage.getItem('mdv_orders')
+        if (storedOrders) {
+          const parsed = JSON.parse(storedOrders)
+          setOrders(parsed)
+          setFilteredOrders(parsed)
+        } else {
+          // No orders at all - show empty state
+          setOrders([])
+          setFilteredOrders([])
+        }
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error)
+      // Fallback to localStorage if API fails
+      const storedOrders = localStorage.getItem('mdv_orders')
+      if (storedOrders) {
+        const parsed = JSON.parse(storedOrders)
+        setOrders(parsed)
+        setFilteredOrders(parsed)
+      } else {
+        setOrders([])
+        setFilteredOrders([])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     filterOrders()
@@ -147,87 +175,23 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
     }
   }
 
-  const generateMockOrders = (): Order[] => {
-    return [
-      {
-        id: '1',
-        orderNumber: 'MDV-2024-001',
-        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'delivered',
-        items: [
-          {
-            id: '1',
-            productId: 'p1',
-            title: 'Classic White T-Shirt',
-            variant: 'Size: L, Color: White',
-            quantity: 2,
-            price: 15000,
-            image: '/api/placeholder/100/100'
-          },
-          {
-            id: '2',
-            productId: 'p2',
-            title: 'Denim Jeans',
-            variant: 'Size: 32, Color: Blue',
-            quantity: 1,
-            price: 35000,
-            image: '/api/placeholder/100/100'
-          }
-        ],
-        subtotal: 65000,
-        shipping: 2500,
-        tax: 5063,
-        discount: 6500,
-        total: 66063,
-        shippingAddress: {
-          name: 'John Doe',
-          address: '123 Victoria Island',
-          city: 'Lagos',
-          state: 'Lagos',
-          phone: '+234 813 651 4087'
+  const loadOrdersFromAPI = async (): Promise<Order[]> => {
+    try {
+      const response = await fetch('/api/orders', {
+        headers: {
+          'Accept': 'application/json'
         },
-        paymentMethod: {
-          type: 'Card',
-          last4: '4242'
-        },
-        trackingNumber: 'TRK123456789',
-        deliveredDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: '2',
-        orderNumber: 'MDV-2024-002',
-        date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'shipped',
-        items: [
-          {
-            id: '3',
-            productId: 'p3',
-            title: 'Summer Dress',
-            variant: 'Size: M, Color: Floral',
-            quantity: 1,
-            price: 45000,
-            image: '/api/placeholder/100/100'
-          }
-        ],
-        subtotal: 45000,
-        shipping: 0,
-        tax: 3375,
-        discount: 0,
-        total: 48375,
-        shippingAddress: {
-          name: 'John Doe',
-          address: '123 Victoria Island',
-          city: 'Lagos',
-          state: 'Lagos',
-          phone: '+234 813 651 4087'
-        },
-        paymentMethod: {
-          type: 'Bank Transfer'
-        },
-        trackingNumber: 'TRK987654321',
-        estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.orders || []
       }
-    ]
+    } catch (error) {
+      console.error('Error loading orders from API:', error)
+    }
+    return []
   }
 
   const handleReorder = (order: Order) => {
