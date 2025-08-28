@@ -204,11 +204,13 @@ function ReportsDashboardContent() {
   // Format currency
   const formatCurrency = (amount: number | undefined) => {
     if (amount === undefined || amount === null || isNaN(amount)) {
-      return '$0.00'
+      return '₦0.00'
     }
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'NGN',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount)
   }
 
