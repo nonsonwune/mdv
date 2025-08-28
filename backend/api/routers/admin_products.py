@@ -276,6 +276,9 @@ async def delete_product(
         before={"title": product.title, "variants": len(product.variants)}
     )
     
+    # Capture IDs up-front to avoid lazy-loads after rollback
+    variant_ids = [v.id for v in (product.variants or [])]
+
     # Delete product - SQLAlchemy will handle cascading to variants, inventory, and images
     # But we need to handle inventory and stock ledger manually due to the primary key constraint
     try:
@@ -286,23 +289,22 @@ async def delete_product(
         # If cascade fails, rollback and handle manually
         await db.rollback()
         
-        # Delete related records in proper order
-        for variant in product.variants:
+        # Delete related records in proper order using captured IDs
+        if variant_ids:
             # Delete stock ledger entries first
             await db.execute(
-                sql_delete(StockLedger).where(StockLedger.variant_id == variant.id)
+                sql_delete(StockLedger).where(StockLedger.variant_id.in_(variant_ids))
             )
             # Delete inventory records
             await db.execute(
-                sql_delete(Inventory).where(Inventory.variant_id == variant.id)
+                sql_delete(Inventory).where(Inventory.variant_id.in_(variant_ids))
+            )
+            # Delete variants manually
+            await db.execute(
+                sql_delete(Variant).where(Variant.id.in_(variant_ids))
             )
         
-        # Delete variants manually
-        await db.execute(
-            sql_delete(Variant).where(Variant.product_id == product_id)
-        )
-        
-        # Delete product images (should cascade automatically)
+        # Delete product images (defensive)
         await db.execute(
             sql_delete(ProductImage).where(ProductImage.product_id == product_id)
         )
