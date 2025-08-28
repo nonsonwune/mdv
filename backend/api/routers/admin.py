@@ -189,14 +189,51 @@ async def admin_get_order_details(
                         "message": event.message
                     })
     
+    # Build items with product/variant details (shape tailored for admin UI)
+    items_response = []
+    for it in (order.items or []):
+        variant = await db.get(Variant, it.variant_id)
+        product = None
+        if variant:
+            product = (
+                await db.execute(select(Product).where(Product.id == variant.product_id))
+            ).scalar_one_or_none()
+        items_response.append(
+            {
+                "id": it.id,
+                "product_id": product.id if product else None,
+                "variant_id": it.variant_id,
+                "product_title": product.title if product else None,
+                "variant_name": None,
+                "sku": getattr(variant, "sku", None),
+                "size": getattr(variant, "size", None),
+                "color": getattr(variant, "color", None),
+                "quantity": it.qty,
+                "unit_price": float(it.unit_price),
+                "total_price": float(it.unit_price * it.qty),
+                "image_url": None,
+            }
+        )
+
+    # Derive a simple payment_status for admin UI convenience
+    if order.status == OrderStatus.paid:
+        payment_status = "paid"
+    elif order.status == OrderStatus.refunded:
+        payment_status = "refunded"
+    else:
+        # cancelled and pending_payment both show as pending for payment
+        payment_status = "pending"
+
     return {
         "id": order.id,
         "status": order.status.value if hasattr(order.status, "value") else order.status,
+        "payment_status": payment_status,
         "total": total_value,
         "item_count": item_count,
         "created_at": order.created_at,
         "user": user_obj,
         "shipping_address": shipping_address,
+        "items": items_response,
         "tracking_timeline": sorted(timeline, key=lambda x: x["at"]) if timeline else []
     }
 
@@ -309,6 +346,163 @@ async def refund_order(oid: int, body: RefundRequest, db: AsyncSession = Depends
     await db.commit()
     return {"id": order.id, "refunded": body.amount, "reason": body.reason, "method": body.method}
 
+
+class AdminOrderUpdateRequest(BaseModel):
+    status: Optional[Literal["pending", "processing", "shipped", "delivered", "cancelled"]] = None
+    payment_status: Optional[Literal["pending", "paid", "failed", "refunded"]] = None
+    tracking_number: Optional[str] = None
+    carrier: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.put("/orders/{oid}")
+async def admin_update_order(
+    oid: int,
+    body: AdminOrderUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    claims=Depends(require_roles(*ALL_STAFF))
+):
+    """Update order fields from the admin UI.
+
+    Supported updates:
+    - payment_status: maps to Order.status (pending|failed -> PendingPayment, paid -> Paid, refunded -> Refunded)
+    - status: high-level UI status; "cancelled" maps to Order.status Cancelled; other values primarily affect fulfillment/shipment timeline
+    - tracking_number/carrier: creates or updates Shipment (and Fulfillment if missing)
+    - notes: stored on Fulfillment.notes
+    """
+    actor_id = parse_actor_id(claims)
+
+    # Load order with related fulfillment/shipment
+    stmt = (
+        select(Order)
+        .where(Order.id == oid)
+        .options(
+            selectinload(Order.fulfillment).selectinload(Fulfillment.shipment).selectinload(Shipment.events)
+        )
+    )
+    order = (await db.execute(stmt)).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    before = {
+        "order_status": order.status.value if hasattr(order.status, "value") else str(order.status),
+        "has_fulfillment": bool(order.fulfillment),
+        "has_shipment": bool(order.fulfillment and order.fulfillment.shipment),
+    }
+
+    changed = False
+
+    # Map payment_status -> OrderStatus
+    if body.payment_status is not None:
+        mapping = {
+            "pending": OrderStatus.pending_payment,
+            "failed": OrderStatus.pending_payment,  # we treat failed as pending (unpaid)
+            "paid": OrderStatus.paid,
+            "refunded": OrderStatus.refunded,
+        }
+        new_os = mapping.get(body.payment_status)
+        if new_os and order.status != new_os:
+            order.status = new_os
+            changed = True
+
+    # Handle UI status updates
+    if body.status is not None:
+        s = body.status
+        # Cancellation flows through order status
+        if s == "cancelled" and order.status != OrderStatus.cancelled:
+            # Basic guard: do not cancel if a shipment already exists
+            if order.fulfillment and order.fulfillment.shipment:
+                raise HTTPException(status_code=409, detail="Cannot cancel: shipment exists")
+            order.status = OrderStatus.cancelled
+            changed = True
+
+    # Ensure fulfillment exists if we need to store notes or handle shipment fields
+    need_fulfillment = bool(body.notes) or bool(body.tracking_number) or bool(body.carrier) or (body.status in {"processing", "shipped", "delivered"} if body.status else False)
+    if need_fulfillment and not order.fulfillment:
+        order.fulfillment = Fulfillment(
+            order_id=order.id,
+            status=FulfillmentStatus.processing,
+            packed_by=actor_id,
+            packed_at=datetime.now(timezone.utc),
+            notes=body.notes or None,
+        )
+        changed = True
+    elif body.notes is not None and order.fulfillment:
+        order.fulfillment.notes = body.notes
+        changed = True
+
+    # Shipment updates based on tracking/carrier or status hints
+    if order.fulfillment:
+        shp = order.fulfillment.shipment
+        wants_shipment = bool(body.tracking_number or body.carrier or (body.status in {"shipped", "delivered"} if body.status else False))
+        if wants_shipment and not shp:
+            shp = Shipment(
+                fulfillment_id=order.fulfillment.id if order.fulfillment.id else None,
+                courier=body.carrier or "",
+                tracking_id=body.tracking_number or "",
+                status=ShipmentStatus.dispatched,
+                dispatched_at=datetime.now(timezone.utc),
+            )
+            # We may not have fulfillment.id yet until flush; add and flush to get IDs
+            db.add(shp)
+            await db.flush()
+            db.add(
+                ShipmentEvent(
+                    shipment_id=shp.id,
+                    code="Dispatched",
+                    message="Shipment dispatched",
+                    occurred_at=datetime.now(timezone.utc),
+                    meta={"tracking_id": shp.tracking_id} if shp.tracking_id else None,
+                )
+            )
+            # Attach to relationship so subsequent code sees it
+            order.fulfillment.shipment = shp
+            changed = True
+        elif shp:
+            # Update fields if provided
+            updated = False
+            if body.carrier is not None and body.carrier != shp.courier:
+                shp.courier = body.carrier
+                updated = True
+            if body.tracking_number is not None and body.tracking_number != shp.tracking_id:
+                shp.tracking_id = body.tracking_number
+                updated = True
+            # Handle status transitions requested by UI
+            if body.status == "delivered" and shp.status != ShipmentStatus.delivered:
+                shp.status = ShipmentStatus.delivered
+                db.add(
+                    ShipmentEvent(
+                        shipment_id=shp.id,
+                        code="Delivered",
+                        message="Shipment delivered",
+                        occurred_at=datetime.now(timezone.utc),
+                    )
+                )
+                updated = True
+            if updated:
+                changed = True
+
+    if changed:
+        await audit(
+            db,
+            actor_id,
+            "order.update",
+            "Order",
+            order.id,
+            before=before,
+            after={
+                "order_status": order.status.value if hasattr(order.status, "value") else str(order.status),
+                "has_fulfillment": bool(order.fulfillment),
+                "has_shipment": bool(order.fulfillment and order.fulfillment.shipment),
+            },
+        )
+        await db.commit()
+
+    return {
+        "id": order.id,
+        "status": order.status.value if hasattr(order.status, "value") else str(order.status),
+        "updated": changed,
+    }
 
 @router.get("/analytics", dependencies=[Depends(require_roles(*ALL_STAFF))])
 async def get_admin_analytics(
