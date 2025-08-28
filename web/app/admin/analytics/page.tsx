@@ -10,15 +10,17 @@ import {
   UsersIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  CalendarIcon,
   ArrowPathIcon,
   EyeIcon,
-  StarIcon,
-  ClockIcon,
   MapPinIcon
 } from '@heroicons/react/24/outline'
 
 interface AnalyticsData {
+  meta: {
+    period: string
+    start_date: string
+    end_date: string
+  }
   revenue: {
     current: number
     previous: number
@@ -85,7 +87,7 @@ function validateAnalyticsResponse(raw: any) {
     throw new Error('Invalid analytics payload: expected an object')
   }
 
-  const requiredRoots = ['sales', 'customer_metrics', 'daily_trends', 'top_products'] as const
+  const requiredRoots = ['sales', 'customer_metrics', 'daily_trends', 'top_products', 'start_date', 'end_date', 'period'] as const
   for (const key of requiredRoots) {
     if (!(key in raw)) errors.push(`Missing field: ${key}`)
   }
@@ -121,6 +123,11 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
   const ordersDaily = daily.map((d: any) => ({ date: d.date, count: Number(d.orders || 0) }))
 
   return {
+    meta: {
+      period: String(raw?.period || ''),
+      start_date: String(raw?.start_date || ''),
+      end_date: String(raw?.end_date || ''),
+    },
     revenue: {
       current: Number(sales.total_revenue || 0),
       previous: 0,
@@ -270,7 +277,17 @@ export default function AnalyticsPage() {
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
-            <p className="text-gray-600">Business insights and performance metrics</p>
+            <p className="text-gray-600">
+              {data?.meta?.start_date && data?.meta?.end_date ? (
+                <>
+                  {new Date(data.meta.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  {' '}–{' '}
+                  {new Date(data.meta.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </>
+              ) : (
+                'Business insights and performance metrics'
+              )}
+            </p>
           </div>
           <div className="flex gap-3">
             <select
@@ -393,46 +410,51 @@ export default function AnalyticsPage() {
                 <p className="text-gray-600 text-sm">Conversion Rate</p>
                 <p className="text-gray-500 text-xs">{formatNumber(data.conversion.purchases)} / {formatNumber(data.conversion.views)} visitors</p>
               </div>
+          </div>
+
+          
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Revenue Chart */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Revenue Trend</h3>
+              <p className="text-sm text-gray-600">Daily revenue over the selected period</p>
+            </div>
+            <div className="p-6">
+              {/* Simple Chart Representation */}
+              <div className="space-y-2">
+                {data.revenue.daily.slice(-7).map((day) => (
+                  <div key={day.date} className="flex items-center gap-3">
+                    <div className="w-16 text-xs text-gray-500">
+                      {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-500 h-2 rounded-full"
+                        style={{ width: `${(() => { const max = Math.max(0, ...data.revenue.daily.map(d => d.amount)); return max > 0 ? (day.amount / max) * 100 : 0; })()}%` }}
+                      />
+                    </div>
+                    <div className="w-20 text-xs text-gray-700 text-right">
+                      {formatCurrency(day.amount)}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Revenue Chart */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Revenue Trend</h3>
-                <p className="text-sm text-gray-600">Daily revenue over the selected period</p>
-              </div>
-              <div className="p-6">
-                {/* Simple Chart Representation */}
-                <div className="space-y-2">
-                  {data.revenue.daily.slice(-7).map((day, index) => (
-                    <div key={day.date} className="flex items-center gap-3">
-                      <div className="w-16 text-xs text-gray-500">
-                        {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </div>
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-green-500 h-2 rounded-full"
-                          style={{ width: `${(() => { const max = Math.max(0, ...data.revenue.daily.map(d => d.amount)); return max > 0 ? (day.amount / max) * 100 : 0; })()}%` }}
-                        />
-                      </div>
-                      <div className="w-20 text-xs text-gray-700 text-right">
-                        {formatCurrency(day.amount)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+          {/* Top Products */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Top Selling Products</h3>
+              <p className="text-sm text-gray-600">Best performers by quantity sold</p>
             </div>
-
-            {/* Top Products */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Top Selling Products</h3>
-                <p className="text-sm text-gray-600">Best performers by quantity sold</p>
-              </div>
-              <div className="p-6">
+            <div className="p-6">
+              {data.products.top_selling.length === 0 ? (
+                <div className="text-sm text-gray-500">No top selling products for this period.</div>
+              ) : (
                 <div className="space-y-4">
                   {data.products.top_selling.map((product, index) => (
                     <div key={product.product_id} className="flex items-center justify-between">
@@ -451,12 +473,14 @@ export default function AnalyticsPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Order Status Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Order Status Breakdown */}
+          {data.orders.by_status.length > 0 && (
             <div className="bg-white rounded-lg shadow">
               <div className="p-6 border-b border-gray-200">
                 <h3 className="text-lg font-medium text-gray-900">Order Status</h3>
@@ -481,37 +505,38 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+          )}
 
-            {/* Customer Insights */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Customer Insights</h3>
-                <p className="text-sm text-gray-600">New vs returning customers</p>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                      <span className="text-sm text-gray-700">New Customers</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">{formatNumber(data.customers.new_customers)}</span>
+          {/* Customer Insights */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Customer Insights</h3>
+              <p className="text-sm text-gray-600">New vs returning customers</p>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className="text-sm text-gray-700">New Customers</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      <span className="text-sm text-gray-700">Returning Customers</span>
-                    </div>
-                    <span className="text-sm font-medium text-gray-900">{formatNumber(data.customers.returning_customers)}</span>
+                  <span className="text-sm font-medium text-gray-900">{formatNumber(data.customers.new_customers)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className="text-sm text-gray-700">Returning Customers</span>
                   </div>
-                  <div className="pt-3 border-t">
-                    <div className="text-xs text-gray-500">
-                      {safeToFixed((data.customers.current > 0 ? (data.customers.returning_customers / data.customers.current) * 100 : 0), 1)}% retention rate
-                    </div>
+                  <span className="text-sm font-medium text-gray-900">{formatNumber(data.customers.returning_customers)}</span>
+                </div>
+                <div className="pt-3 border-t">
+                  <div className="text-xs text-gray-500">
+                    {safeToFixed((data.customers.current > 0 ? (data.customers.returning_customers / data.customers.current) * 100 : 0), 1)}% retention rate
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
             {/* Inventory Status */}
             <div className="bg-white rounded-lg shadow">
@@ -556,35 +581,39 @@ export default function AnalyticsPage() {
               <p className="text-sm text-gray-600">Sales by country/region</p>
             </div>
             <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left py-2 text-sm font-medium text-gray-700">Country</th>
-                      <th className="text-right py-2 text-sm font-medium text-gray-700">Orders</th>
-                      <th className="text-right py-2 text-sm font-medium text-gray-700">Revenue</th>
-                      <th className="text-right py-2 text-sm font-medium text-gray-700">Share</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.geographic.map((country, index) => (
-                      <tr key={country.country}>
-                        <td className="py-3">
-                          <div className="flex items-center gap-2">
-                            <MapPinIcon className="h-4 w-4 text-gray-400" />
-                            <span className="text-sm text-gray-900">{country.country}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 text-right text-sm text-gray-900">{formatNumber(country.orders)}</td>
-                        <td className="py-3 text-right text-sm font-medium text-gray-900">{formatCurrency(country.revenue)}</td>
-                        <td className="py-3 text-right text-sm text-gray-500">
-                          {safeToFixed((data.revenue.current > 0 ? (country.revenue / data.revenue.current) * 100 : 0), 1)}%
-                        </td>
+              {data.geographic.length === 0 ? (
+                <div className="text-sm text-gray-500">No geographic data for this period.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 text-sm font-medium text-gray-700">Country</th>
+                        <th className="text-right py-2 text-sm font-medium text-gray-700">Orders</th>
+                        <th className="text-right py-2 text-sm font-medium text-gray-700">Revenue</th>
+                        <th className="text-right py-2 text-sm font-medium text-gray-700">Share</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {data.geographic.map((country) => (
+                        <tr key={country.country}>
+                          <td className="py-3">
+                            <div className="flex items-center gap-2">
+                              <MapPinIcon className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm text-gray-900">{country.country}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 text-right text-sm text-gray-900">{formatNumber(country.orders)}</td>
+                          <td className="py-3 text-right text-sm font-medium text-gray-900">{formatCurrency(country.revenue)}</td>
+                          <td className="py-3 text-right text-sm text-gray-500">
+                            {safeToFixed((data.revenue.current > 0 ? (country.revenue / data.revenue.current) * 100 : 0), 1)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
