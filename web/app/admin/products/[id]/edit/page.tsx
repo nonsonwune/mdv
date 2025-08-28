@@ -84,8 +84,19 @@ export default function ProductEditPage() {
       setDescription(product.description || '')
       setCategoryId(product.category_id || '')
       setIsActive((product as any).is_active !== undefined ? Boolean((product as any).is_active) : true)
-      setVariants([...product.variants])
-      setImages([...product.images])
+      // Normalize variants to ensure inventory fields are present for editing
+      const normalizedVariants: ProductVariant[] = (product.variants || []).map((v: any) => ({
+        id: v.id,
+        sku: v.sku,
+        size: v.size,
+        color: v.color,
+        price: typeof v.price === 'number' ? v.price : parseFloat(String(v.price) || '0') || 0,
+        stock_quantity: v?.inventory?.quantity ?? 0,
+        safety_stock: v?.inventory?.safety_stock ?? 0,
+        is_active: true,
+      }))
+      setVariants(normalizedVariants)
+      setImages([...(product.images || [])])
     }
   }, [product])
 
@@ -232,8 +243,8 @@ export default function ProductEditPage() {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              quantity: v.stock_quantity,
-              safety_stock: v.safety_stock,
+              quantity: (v as any).stock_quantity ?? (v as any)?.inventory?.quantity ?? 0,
+              safety_stock: (v as any).safety_stock ?? (v as any)?.inventory?.safety_stock ?? 0,
               reason: 'Admin product edit',
               reference_type: 'product_edit',
               reference_id: Number(params.id)
