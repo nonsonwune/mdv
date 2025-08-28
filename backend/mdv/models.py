@@ -128,13 +128,23 @@ class Variant(Base):
     color: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     price: Mapped[Numeric] = mapped_column(Numeric(12, 2))
     # Relationships
-    inventory: Mapped[Optional["Inventory"]] = relationship("Inventory", back_populates="variant", uselist=False)
+    inventory: Mapped[Optional["Inventory"]] = relationship(
+        "Inventory",
+        back_populates="variant",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True
+    )
 
 
 class Inventory(Base):
     __tablename__ = "inventory"
 
-    variant_id: Mapped[int] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), primary_key=True)
+    variant_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("variants.id", ondelete="CASCADE"),
+        primary_key=True
+    )
     quantity: Mapped[int] = mapped_column(Integer, default=0)
     safety_stock: Mapped[int] = mapped_column(Integer, default=0)
     # Relationships
