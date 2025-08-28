@@ -276,20 +276,43 @@ async def delete_product(
         before={"title": product.title, "variants": len(product.variants)}
     )
     
-    # Manually delete inventory records first to avoid cascade issues
-    for variant in product.variants:
-        # Delete inventory for each variant
+    # Delete product - SQLAlchemy will handle cascading to variants, inventory, and images
+    # But we need to handle inventory and stock ledger manually due to the primary key constraint
+    try:
+        # First, let's try to delete just the product and let cascades handle the rest
+        await db.delete(product)
+        await db.commit()
+    except Exception as e:
+        # If cascade fails, rollback and handle manually
+        await db.rollback()
+        
+        # Delete related records in proper order
+        for variant in product.variants:
+            # Delete stock ledger entries first
+            await db.execute(
+                sql_delete(StockLedger).where(StockLedger.variant_id == variant.id)
+            )
+            # Delete inventory records
+            await db.execute(
+                sql_delete(Inventory).where(Inventory.variant_id == variant.id)
+            )
+        
+        # Delete variants manually
         await db.execute(
-            sql_delete(Inventory).where(Inventory.variant_id == variant.id)
+            sql_delete(Variant).where(Variant.product_id == product_id)
         )
-        # Delete stock ledger entries
+        
+        # Delete product images (should cascade automatically)
         await db.execute(
-            sql_delete(StockLedger).where(StockLedger.variant_id == variant.id)
+            sql_delete(ProductImage).where(ProductImage.product_id == product_id)
         )
-    
-    # Now delete the product (cascades to variants and images)
-    await db.delete(product)
-    await db.commit()
+        
+        # Finally delete the product
+        await db.execute(
+            sql_delete(Product).where(Product.id == product_id)
+        )
+        
+        await db.commit()
     
     return OperationResponse(
         success=True,
