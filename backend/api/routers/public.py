@@ -173,6 +173,54 @@ async def get_popular_products(db: AsyncSession = Depends(get_db)):
     return {"popular": popular}
 
 
+@router.get("/api/products/recommendations")
+async def get_product_recommendations(
+    user_id: int = Query(None),
+    limit: int = Query(6, ge=1, le=20),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get product recommendations for a user or general recommendations"""
+    # For MVP, return recent products as recommendations
+    # In production, this would use ML/collaborative filtering
+    stmt = (
+        select(Product)
+        .order_by(Product.id.desc())
+        .limit(limit)
+    )
+    results = await db.execute(stmt)
+    products = results.scalars().all()
+    
+    recommendations = []
+    for product in products:
+        # Get first variant price
+        variant_stmt = select(Variant).where(Variant.product_id == product.id).limit(1)
+        variant_result = await db.execute(variant_stmt)
+        variant = variant_result.scalar_one_or_none()
+        
+        # Get first image
+        image_stmt = (
+            select(ProductImage.url)
+            .where(ProductImage.product_id == product.id)
+            .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+            .limit(1)
+        )
+        image_result = await db.execute(image_stmt)
+        image_url = image_result.scalar_one_or_none()
+        
+        recommendations.append({
+            "id": product.id,
+            "title": product.title,
+            "description": product.description,
+            "image": image_url,
+            "slug": product.slug,
+            "price": float(variant.price) if variant else None,
+            "originalPrice": float(variant.price) if variant else None,
+            "discount": 0
+        })
+    
+    return {"products": recommendations}
+
+
 @router.get("/api/products/filters")
 async def get_product_filters(db: AsyncSession = Depends(get_db)):
     """Get available filter options for products"""

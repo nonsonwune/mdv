@@ -15,6 +15,7 @@ from sqlalchemy import select
 from .routers import public, admin, payments
 from .routers import auth as auth_router
 from .routers import users, orders, wishlist, reviews, admin_users, admin_products, admin_system, admin_reports
+from .routers import security
 from . import inventory as inventory_router
 from . import analytics as analytics_router
 
@@ -226,3 +227,4 @@ app.include_router(users.router)
 app.include_router(orders.router)
 app.include_router(wishlist.router)
 app.include_router(reviews.router)
+app.include_router(security.router)

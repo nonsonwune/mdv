@@ -236,7 +236,7 @@ async def reset_password_confirm(
 
 
 # Address Management
-@router.get("/addresses", response_model=List[AddressResponse])
+@router.get("/users/addresses", response_model=List[AddressResponse])
 async def get_user_addresses(
     claims: dict = Depends(get_current_claims),
     db: AsyncSession = Depends(get_db)
