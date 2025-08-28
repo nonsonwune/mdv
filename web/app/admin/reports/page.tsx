@@ -24,6 +24,7 @@ import {
   EyeIcon,
   ArrowRightIcon
 } from '@heroicons/react/24/outline'
+import type { components } from '@/lib/generated/api'
 
 interface SalesMetrics {
   total_revenue: number
@@ -97,12 +98,14 @@ interface UserTrend {
   total_users: number
 }
 
+type CategoriesReportResponse = components['schemas']['CategoriesReportResponse']
+
 // Main reports dashboard content component
 function ReportsDashboardContent() {
   const { user, hasPermission } = useAuth()
   const router = useRouter()
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'inventory' | 'customers'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'inventory' | 'categories' | 'customers'>('overview')
   const [loading, setLoading] = useState(true)
   const [dateRange, setDateRange] = useState('30d')
   const [refreshing, setRefreshing] = useState(false)
@@ -111,12 +114,14 @@ function ReportsDashboardContent() {
   const [salesMetrics, setSalesMetrics] = useState<SalesMetrics | null>(null)
   const [inventoryMetrics, setInventoryMetrics] = useState<InventoryMetrics | null>(null)
   const [userMetrics, setUserMetrics] = useState<UserMetrics | null>(null)
+  const [categoriesReport, setCategoriesReport] = useState<CategoriesReportResponse | null>(null)
   
   // Permission checks
   const canViewReports = hasPermission(Permission.REPORT_VIEW)
   const canViewSalesReports = hasPermission(Permission.REPORT_VIEW)
   const canViewInventoryReports = hasPermission(Permission.REPORT_VIEW)
   const canViewCustomerReports = hasPermission(Permission.REPORT_VIEW)
+  const canViewCategoryReports = hasPermission(Permission.REPORT_VIEW)
   const canExportReports = hasPermission(Permission.REPORT_EXPORT)
 
   // Fetch reports data
@@ -144,6 +149,17 @@ function ReportsDashboardContent() {
             .catch(error => {
               console.error('Failed to fetch inventory report:', error)
               setInventoryMetrics(null)
+            })
+        )
+      }
+      
+      if (canViewCategoryReports) {
+        promises.push(
+          api<CategoriesReportResponse>(`/api/admin/reports/categories?period=${dateRange}`)
+            .then(data => setCategoriesReport(data))
+            .catch(error => {
+              console.error('Failed to fetch categories report:', error)
+              setCategoriesReport(null)
             })
         )
       }
@@ -206,7 +222,7 @@ function ReportsDashboardContent() {
   }
 
   // Export functionality
-  const handleExport = async (type: 'sales' | 'inventory' | 'customers') => {
+  const handleExport = async (type: 'sales' | 'inventory' | 'customers' | 'categories') => {
     if (!canExportReports) return
     
     try {
@@ -307,6 +323,7 @@ function ReportsDashboardContent() {
               { key: 'overview', label: 'Overview', icon: ChartBarIcon, permission: Permission.REPORT_VIEW },
               { key: 'sales', label: 'Sales Analytics', icon: CurrencyDollarIcon, permission: Permission.REPORT_VIEW },
               { key: 'inventory', label: 'Inventory Reports', icon: BuildingStorefrontIcon, permission: Permission.REPORT_VIEW },
+              { key: 'categories', label: 'Categories Report', icon: ChartPieIcon, permission: Permission.REPORT_VIEW },
               { key: 'customers', label: 'Customer Insights', icon: UsersIcon, permission: Permission.REPORT_VIEW }
             ].map(tab => {
               const Icon = tab.icon
@@ -488,6 +505,143 @@ function ReportsDashboardContent() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Categories Report Tab */}
+      {activeTab === 'categories' && canViewCategoryReports && categoriesReport && (
+        <div className="space-y-6">
+          {/* Export Button */}
+          {canExportReports && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => handleExport('categories')}
+                className="flex items-center gap-2 px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 transition-colors"
+              >
+                <DocumentArrowDownIcon className="h-4 w-4" />
+                Export Categories Report
+              </button>
+            </div>
+          )}
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Products</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {(categoriesReport.summary?.product_count || 0).toLocaleString()}
+                  </p>
+                </div>
+                <ShoppingBagIcon className="h-8 w-8 text-blue-600" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Variants</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {(categoriesReport.summary?.variant_count || 0).toLocaleString()}
+                  </p>
+                </div>
+                <ChartBarIcon className="h-8 w-8 text-purple-600" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Inventory Value</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {formatCurrency(categoriesReport.summary?.inventory_value)}
+                  </p>
+                </div>
+                <CurrencyDollarIcon className="h-8 w-8 text-green-600" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Sales Revenue</p>
+                  <p className="text-2xl font-bold text-maroon-600">
+                    {formatCurrency(categoriesReport.summary?.sales_revenue)}
+                  </p>
+                </div>
+                <CurrencyDollarIcon className="h-8 w-8 text-maroon-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Categories Table */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Categories</h3>
+                <p className="text-sm text-gray-500">{categoriesReport.total_categories || 0} total</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Products</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Variants</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Inventory Qty</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Inventory Value</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Low Stock</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sales Revenue</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Orders</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {categoriesReport.categories && categoriesReport.categories.length > 0 ? (
+                    categoriesReport.categories.map((cat) => (
+                      <tr key={`${cat.id}-${cat.name}`} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{cat.name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {cat.product_count || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {cat.variant_count || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {cat.total_inventory_qty || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(cat.inventory_value)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`text-sm ${
+                            (cat.low_stock_count || 0) > 0 ? 'text-yellow-600' : 'text-green-600'
+                          }`}>
+                            {cat.low_stock_count || 0}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatCurrency(cat.sales_revenue)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {cat.orders_count || 0}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                        No categories found for the selected period.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

@@ -4,10 +4,10 @@ from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy import select, func, and_, cast, Date
+from sqlalchemy import select, func, and_, cast, Date, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mdv.models import Order, OrderItem, Inventory, Variant, Product, User
+from mdv.models import Order, OrderItem, Inventory, Variant, Product, User, Category
 from mdv.rbac import require_permission, Permission
 from ..deps import get_db
 
@@ -21,6 +21,8 @@ def _cutoff_from_period(period: str) -> datetime:
         return now - timedelta(days=7)
     if period == "90d":
         return now - timedelta(days=90)
+    if period == "365d":
+        return now - timedelta(days=365)
     # default 30d
     return now - timedelta(days=30)
 
@@ -89,9 +91,9 @@ async def inventory_report(
         await db.execute(select(func.coalesce(func.sum(Inventory.quantity), 0)))
     ).scalar_one()
 
-    # Calculate inventory value (quantity * unit_price from variants)
+    # Calculate inventory value (quantity * price from variants)
     inventory_value_query = (
-        select(func.coalesce(func.sum(Inventory.quantity * Variant.unit_price), 0))
+        select(func.coalesce(func.sum(Inventory.quantity * Variant.price), 0))
         .select_from(Inventory)
         .join(Variant, Variant.id == Inventory.variant_id)
     )
@@ -192,4 +194,123 @@ async def customers_report(
         "recent": recent,
     }
 
+
+
+@router.get("/categories")
+async def categories_report(
+    period: str = Query("30d", description="Time window: 7d|30d|90d|365d (for sales metrics)"),
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_permission(Permission.REPORT_VIEW))
+):
+    """Category-level statistics combining inventory and sales.
+
+    Returns overall counts and per-category breakdown including:
+    - product_count
+    - variant_count
+    - total_inventory_qty
+    - inventory_value
+    - low_stock_count (number of variants below safety stock)
+    - sales_revenue (within selected period)
+    - orders_count (within selected period)
+    """
+    cutoff = _cutoff_from_period(period)
+
+    # Base inventory/category aggregation
+    inv_query = (
+        select(
+            Category.id.label("category_id"),
+            Category.name.label("category_name"),
+            func.count(func.distinct(Product.id)).label("product_count"),
+            func.count(func.distinct(Variant.id)).label("variant_count"),
+            func.coalesce(func.sum(Inventory.quantity), 0).label("total_inventory_qty"),
+            func.coalesce(func.sum(Inventory.quantity * Variant.price), 0).label("inventory_value"),
+            func.coalesce(
+                func.sum(
+                    case((Inventory.quantity < Inventory.safety_stock, 1), else_=0)
+                ),
+                0,
+            ).label("low_stock_count"),
+        )
+        .select_from(Category)
+        .join(Product, Product.category_id == Category.id, isouter=True)
+        .join(Variant, Variant.product_id == Product.id, isouter=True)
+        .join(Inventory, Inventory.variant_id == Variant.id, isouter=True)
+        .group_by(Category.id, Category.name)
+        .order_by(Category.name)
+    )
+
+    inv_rows = (await db.execute(inv_query)).all()
+    categories = []
+
+    # Sales by category within period (use ON-clause filter to preserve categories without sales)
+    sales_query = (
+        select(
+            Category.id.label("category_id"),
+            func.coalesce(func.sum(OrderItem.unit_price * OrderItem.qty), 0).label("sales_revenue"),
+            func.count(func.distinct(Order.id)).label("orders_count"),
+        )
+        .select_from(Category)
+        .join(Product, Product.category_id == Category.id, isouter=True)
+        .join(Variant, Variant.product_id == Product.id, isouter=True)
+        .join(OrderItem, OrderItem.variant_id == Variant.id, isouter=True)
+        .join(
+            Order,
+            and_(Order.id == OrderItem.order_id, Order.created_at >= cutoff),
+            isouter=True,
+        )
+        .group_by(Category.id)
+    )
+    sales_rows = (await db.execute(sales_query)).all()
+    sales_map = {row.category_id: row for row in sales_rows}
+
+    # Build response
+    total_products = 0
+    total_variants = 0
+    total_qty = 0
+    total_value = 0.0
+    total_low_stock = 0
+    total_sales_revenue = 0.0
+    total_orders = 0
+
+    for r in inv_rows:
+        sr = sales_map.get(r.category_id)
+        sales_revenue = float((sr.sales_revenue if sr else 0) or 0)
+        orders_count = int((sr.orders_count if sr else 0) or 0)
+
+        categories.append(
+            {
+                "id": r.category_id,
+                "name": r.category_name,
+                "product_count": int(r.product_count or 0),
+                "variant_count": int(r.variant_count or 0),
+                "total_inventory_qty": int(r.total_inventory_qty or 0),
+                "inventory_value": float(r.inventory_value or 0),
+                "low_stock_count": int(r.low_stock_count or 0),
+                "sales_revenue": sales_revenue,
+                "orders_count": orders_count,
+            }
+        )
+
+        total_products += int(r.product_count or 0)
+        total_variants += int(r.variant_count or 0)
+        total_qty += int(r.total_inventory_qty or 0)
+        total_value += float(r.inventory_value or 0)
+        total_low_stock += int(r.low_stock_count or 0)
+        total_sales_revenue += sales_revenue
+        total_orders += orders_count
+
+    return {
+        "period": period,
+        "total_categories": len(inv_rows),
+        "summary": {
+            "product_count": total_products,
+            "variant_count": total_variants,
+            "total_inventory_qty": total_qty,
+            "inventory_value": total_value,
+            "low_stock_count": total_low_stock,
+            "sales_revenue": total_sales_revenue,
+            "orders_count": total_orders,
+        },
+        "categories": categories,
+    }
 

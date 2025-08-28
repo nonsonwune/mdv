@@ -43,20 +43,9 @@ interface Category {
   id: number
   name: string
   slug: string
-  description?: string
-  parent_id?: number
-  parent_name?: string
-  level: number
-  sort_order: number
-  is_active: boolean
-  is_featured: boolean
-  image_url?: string
-  meta_title?: string
-  meta_description?: string
   product_count: number
-  created_at: string
-  updated_at: string
-  children?: Category[]
+  description?: string
+  is_active?: boolean
 }
 
 interface CategoryStats {
@@ -71,12 +60,13 @@ interface CategoryStats {
 
 interface CategoryFormData {
   name: string
-  slug: string
-  description: string
-  parent_id?: number
-  sort_order: number
+  slug?: string
+  description?: string
   is_active: boolean
-  is_featured: boolean
+  // Optional fields for future extension; not required by backend
+  parent_id?: number
+  sort_order?: number
+  is_featured?: boolean
   image_url?: string
   meta_title?: string
   meta_description?: string
@@ -118,6 +108,9 @@ function CategoryManagementContent() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   
+  // Error state
+  const [error, setError] = useState<string | null>(null)
+  
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<Category | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -131,6 +124,7 @@ function CategoryManagementContent() {
   const fetchCategories = async () => {
     try {
       setLoading(true)
+      setError(null)
       const params = new URLSearchParams()
       if (searchTerm) params.append('search', searchTerm)
       if (statusFilter !== 'all') params.append('status', statusFilter)
@@ -147,15 +141,13 @@ function CategoryManagementContent() {
         console.error('Failed to fetch categories:', error)
       }
       
+      setError('Failed to load categories. Please try again.')
       setCategories([])
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => {
-    fetchCategories()
-  }, [searchTerm, statusFilter])
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,10 +170,7 @@ function CategoryManagementContent() {
     setSaving(true)
     try {
       const slug = generateSlug(formData.name)
-      const payload = {
-        ...formData,
-        slug
-      }
+      const payload = { name: formData.name, slug }
 
       if (editingCategory) {
         // Update existing category
@@ -249,7 +238,7 @@ function CategoryManagementContent() {
     setFormData({
       name: category.name,
       description: category.description || '',
-      is_active: category.is_active
+      is_active: category.is_active ?? true
     })
     setIsModalOpen(true)
   }
@@ -267,12 +256,14 @@ function CategoryManagementContent() {
 
   // Filter categories
   const filteredCategories = categories.filter(category => {
-    const matchesSearch = category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         category.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && category.is_active) ||
-                         (statusFilter === 'inactive' && !category.is_active)
-    
+    const nameMatch = category.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const descMatch = (category.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+    const isActive = category.is_active ?? true
+    const matchesSearch = nameMatch || descMatch
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && isActive) ||
+      (statusFilter === 'inactive' && !isActive)
     return matchesSearch && matchesStatus
   })
 
@@ -284,20 +275,11 @@ function CategoryManagementContent() {
     )
   }
 
-  // Fetch stats function
-  const fetchStats = async () => {
-    try {
-      const response = await api<CategoryStats>('/api/admin/categories/stats')
-      setStats(response)
-    } catch (error) {
-      console.error('Failed to fetch category stats:', error)
-    }
-  }
+  // Category stats endpoint is currently unavailable; UI will hide when stats is null
 
-  // Update useEffect to include stats
+  // Fetch categories when filters change
   useEffect(() => {
     fetchCategories()
-    fetchStats()
   }, [searchTerm, statusFilter])
 
   const formatDate = (dateString: string) => {

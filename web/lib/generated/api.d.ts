@@ -314,6 +314,28 @@ export interface paths {
       };
     };
   };
+  "/api/admin/reports/categories": {
+    /**
+     * Admin categories report
+     * @description Aggregated category-level inventory and sales metrics.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Time window for sales metrics */
+          period?: "7d" | "30d" | "90d" | "365d";
+        };
+      };
+      responses: {
+        /** @description Categories report */
+        200: {
+          content: {
+            "application/json": components["schemas"]["CategoriesReportResponse"];
+          };
+        };
+      };
+    };
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -426,6 +448,32 @@ export interface components {
           at?: string;
           message?: string | null;
         })[];
+    };
+    CategoriesReportCategory: {
+      id?: number;
+      name?: string;
+      product_count?: number;
+      variant_count?: number;
+      total_inventory_qty?: number;
+      inventory_value?: number;
+      low_stock_count?: number;
+      sales_revenue?: number;
+      orders_count?: number;
+    };
+    CategoriesReportSummary: {
+      product_count?: number;
+      variant_count?: number;
+      total_inventory_qty?: number;
+      inventory_value?: number;
+      low_stock_count?: number;
+      sales_revenue?: number;
+      orders_count?: number;
+    };
+    CategoriesReportResponse: {
+      period?: string;
+      total_categories?: number;
+      summary?: components["schemas"]["CategoriesReportSummary"];
+      categories?: components["schemas"]["CategoriesReportCategory"][];
     };
   };
   responses: never;

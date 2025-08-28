@@ -273,6 +273,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthLoginResponse'
+  /api/admin/reports/categories:
+    get:
+      summary: Admin categories report
+      description: Aggregated category-level inventory and sales metrics.
+      parameters:
+        - in: query
+          name: period
+          schema:
+            type: string
+            enum: ["7d", "30d", "90d", "365d"]
+          description: Time window for sales metrics
+      responses:
+        200:
+          description: Categories report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriesReportResponse'
 
 components:
   schemas:
@@ -413,4 +431,34 @@ components:
               code: { type: string }
               at: { type: string, format: date-time }
               message: { type: string, nullable: true }
-
+    CategoriesReportCategory:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        product_count: { type: integer }
+        variant_count: { type: integer }
+        total_inventory_qty: { type: integer }
+        inventory_value: { type: number }
+        low_stock_count: { type: integer }
+        sales_revenue: { type: number }
+        orders_count: { type: integer }
+    CategoriesReportSummary:
+      type: object
+      properties:
+        product_count: { type: integer }
+        variant_count: { type: integer }
+        total_inventory_qty: { type: integer }
+        inventory_value: { type: number }
+        low_stock_count: { type: integer }
+        sales_revenue: { type: number }
+        orders_count: { type: integer }
+    CategoriesReportResponse:
+      type: object
+      properties:
+        period: { type: string }
+        total_categories: { type: integer }
+        summary: { $ref: '#/components/schemas/CategoriesReportSummary' }
+        categories:
+          type: array
+          items: { $ref: '#/components/schemas/CategoriesReportCategory' }
