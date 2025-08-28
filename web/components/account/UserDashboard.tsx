@@ -41,13 +41,13 @@ export default function UserDashboard({ user }: UserDashboardProps) {
 
   const loadDashboardData = async () => {
     try {
-      // Load orders
-      const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]') as Order[]
+      // Load orders from API
+      const orders = await loadOrdersFromAPI()
       
-      // Load wishlist
-      const wishlist = JSON.parse(localStorage.getItem('mdv_wishlist') || '[]')
+      // Load wishlist from API
+      const wishlist = await loadWishlistFromAPI()
       
-      // Calculate stats
+      // Calculate stats from real data
       const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
       const loyaltyPoints = Math.floor(totalSpent / 100) // 1 point per ₦100
       
@@ -71,27 +71,49 @@ export default function UserDashboard({ user }: UserDashboardProps) {
         recommendations,
         monthlySpending
       })
+      
+      // Cache the data in localStorage for offline access
+      if (orders.length > 0) {
+        localStorage.setItem('mdv_orders', JSON.stringify(orders))
+      }
+      if (wishlist.length > 0) {
+        localStorage.setItem('mdv_wishlist', JSON.stringify(wishlist))
+      }
     } catch (error) {
       console.error('Error loading dashboard data:', error)
-      // Set stats with empty recommendations on error
-      const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]') as Order[]
-      const wishlist = JSON.parse(localStorage.getItem('mdv_wishlist') || '[]')
-      const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
-      const loyaltyPoints = Math.floor(totalSpent / 100)
-      const recentOrders = orders
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 3)
-      const monthlySpending = calculateMonthlySpending(orders)
+      // Fallback to cached data if API fails
+      const cachedOrders = JSON.parse(localStorage.getItem('mdv_orders') || '[]') as Order[]
+      const cachedWishlist = JSON.parse(localStorage.getItem('mdv_wishlist') || '[]')
       
-      setStats({
-        totalOrders: orders.length,
-        totalSpent,
-        loyaltyPoints,
-        savedItems: wishlist.length,
-        recentOrders,
-        recommendations: [],
-        monthlySpending
-      })
+      if (cachedOrders.length > 0 || cachedWishlist.length > 0) {
+        const totalSpent = cachedOrders.reduce((sum, order) => sum + order.total, 0)
+        const loyaltyPoints = Math.floor(totalSpent / 100)
+        const recentOrders = cachedOrders
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 3)
+        const monthlySpending = calculateMonthlySpending(cachedOrders)
+        
+        setStats({
+          totalOrders: cachedOrders.length,
+          totalSpent,
+          loyaltyPoints,
+          savedItems: cachedWishlist.length,
+          recentOrders,
+          recommendations: [],
+          monthlySpending
+        })
+      } else {
+        // No cached data, show empty state
+        setStats({
+          totalOrders: 0,
+          totalSpent: 0,
+          loyaltyPoints: 0,
+          savedItems: 0,
+          recentOrders: [],
+          recommendations: [],
+          monthlySpending: []
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -116,6 +138,44 @@ export default function UserDashboard({ user }: UserDashboardProps) {
     }
     
     return spending
+  }
+
+  const loadOrdersFromAPI = async (): Promise<Order[]> => {
+    try {
+      const response = await fetch('/api/orders', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.orders || []
+      }
+    } catch (error) {
+      console.error('Error loading orders from API:', error)
+    }
+    return []
+  }
+
+  const loadWishlistFromAPI = async (): Promise<any[]> => {
+    try {
+      const response = await fetch('/api/wishlist', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.items || []
+      }
+    } catch (error) {
+      console.error('Error loading wishlist from API:', error)
+    }
+    return []
   }
 
   const loadRecommendations = async (): Promise<Product[]> => {
