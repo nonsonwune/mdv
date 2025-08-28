@@ -13,6 +13,7 @@ from mdv.rbac import ALL_STAFF, FULFILLMENT_STAFF, LOGISTICS_STAFF, SUPERVISORS
 from mdv.models import (
     Order,
     OrderStatus,
+    OrderItem,
     Fulfillment,
     FulfillmentStatus,
     Shipment,
@@ -22,6 +23,7 @@ from mdv.models import (
     RefundMethod,
     User,
     Product,
+    Category,
     Variant,
     Inventory,
     StockLedger,
@@ -509,66 +511,152 @@ async def get_admin_analytics(
     period: str = Query("30d", description="Time period: 7d, 30d, 90d, 1y"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get analytics data for the admin panel"""
-    from datetime import datetime, timezone, timedelta
-    
+    """Get analytics data for the admin panel matching the frontend contract."""
     # Parse period
     period_map = {
         "7d": 7,
         "30d": 30,
         "90d": 90,
-        "1y": 365
+        "1y": 365,
     }
-    
     days = period_map.get(period, 30)
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
-    
-    # Get orders in the period
-    orders_result = await db.execute(
-        select(func.count(Order.id)).where(Order.created_at >= start_date)
+
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days)
+
+    paid_filter = and_(
+        Order.created_at >= start_date,
+        Order.created_at <= end_date,
+        Order.status == OrderStatus.paid,
     )
-    orders_count = orders_result.scalar_one()
-    
-    # Get revenue in the period
-    orders_with_totals = await db.execute(
-        select(Order.totals).where(
-            and_(
-                Order.totals.isnot(None),
-                Order.created_at >= start_date
+
+    # Total paid orders in period
+    orders_count = (
+        await db.execute(select(func.count(Order.id)).where(paid_filter))
+    ).scalar_one() or 0
+
+    # Revenue = sum of order item line amounts for paid orders in period
+    revenue_total = (
+        await db.execute(
+            select(func.coalesce(func.sum(OrderItem.qty * OrderItem.unit_price), 0))
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(paid_filter)
+        )
+    ).scalar_one() or 0
+
+    # Total items sold in period
+    items_sold = (
+        await db.execute(
+            select(func.coalesce(func.sum(OrderItem.qty), 0))
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(paid_filter)
+        )
+    ).scalar_one() or 0
+
+    # Top products by revenue
+    top_products_rows = (
+        await db.execute(
+            select(
+                Product.id.label("product_id"),
+                Product.title.label("product_title"),
+                func.sum(OrderItem.qty).label("units_sold"),
+                func.sum(OrderItem.qty * OrderItem.unit_price).label("revenue"),
+                func.avg(OrderItem.unit_price).label("avg_price"),
+            )
+            .join(Variant, Variant.product_id == Product.id)
+            .join(OrderItem, OrderItem.variant_id == Variant.id)
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(paid_filter)
+            .group_by(Product.id, Product.title)
+            .order_by(func.sum(OrderItem.qty * OrderItem.unit_price).desc())
+            .limit(10)
+        )
+    ).all()
+
+    top_products = [
+        {
+            "product_id": r.product_id,
+            "product_title": r.product_title,
+            "units_sold": int(r.units_sold or 0),
+            "revenue": float(r.revenue or 0),
+            "average_price": float(r.avg_price or 0),
+        }
+        for r in top_products_rows
+    ]
+
+    # Customer metrics
+    total_customers = (
+        await db.execute(
+            select(func.count(func.distinct(Order.user_id))).where(
+                and_(paid_filter, Order.user_id.isnot(None))
             )
         )
+    ).scalar_one() or 0
+
+    # Users who ordered before start_date (existing customers)
+    pre_period_users_sq = (
+        select(func.distinct(Order.user_id).label("user_id"))
+        .where(and_(Order.user_id.isnot(None), Order.created_at < start_date))
+        .subquery()
     )
-    revenue = Decimal("0")
-    for (totals,) in orders_with_totals:
-        if totals and isinstance(totals, dict) and "total" in totals:
-            try:
-                amount = Decimal(str(totals["total"]))
-                revenue += amount
-            except (ValueError, TypeError):
-                pass
-    
-    # Get unique customers in period
-    customers_result = await db.execute(
-        select(func.count(distinct(Order.user_id))).where(
-            and_(
-                Order.user_id.isnot(None),
-                Order.created_at >= start_date
+
+    new_customers = (
+        await db.execute(
+            select(func.count(func.distinct(Order.user_id))).where(
+                and_(
+                    paid_filter,
+                    Order.user_id.isnot(None),
+                    Order.user_id.notin_(select(pre_period_users_sq.c.user_id)),
+                )
             )
         )
-    )
-    customers_count = customers_result.scalar_one()
-    
-    # Average order value
-    avg_order_value = float(revenue / orders_count) if orders_count > 0 else 0.0
-    
+    ).scalar_one() or 0
+
+    returning_customers = max(total_customers - new_customers, 0)
+
+    # Daily trends (orders and revenue per day)
+    daily_rows = (
+        await db.execute(
+            select(
+                func.date(Order.created_at).label("date"),
+                func.count(func.distinct(Order.id)).label("orders"),
+                func.coalesce(func.sum(OrderItem.qty * OrderItem.unit_price), 0).label("revenue"),
+            )
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .where(paid_filter)
+            .group_by(func.date(Order.created_at))
+            .order_by(func.date(Order.created_at))
+        )
+    ).all()
+
+    daily_trends = [
+        {"date": str(r.date), "orders": int(r.orders or 0), "revenue": float(r.revenue or 0)}
+        for r in daily_rows
+    ]
+
+    average_order_value = float(revenue_total) / orders_count if orders_count else 0.0
+    customer_ltv = float(revenue_total) / total_customers if total_customers else 0.0
+
     return {
         "period": period,
-        "orders": orders_count,
-        "revenue": float(revenue),
-        "customers": customers_count,
-        "average_order_value": round(avg_order_value, 2),
         "start_date": start_date.isoformat(),
-        "end_date": datetime.now(timezone.utc).isoformat()
+        "end_date": end_date.isoformat(),
+        "sales": {
+            "total_revenue": float(revenue_total),
+            "total_orders": int(orders_count),
+            "average_order_value": round(average_order_value, 2),
+            "total_items_sold": int(items_sold or 0),
+            "conversion_rate": 0.0,
+        },
+        "top_products": top_products,
+        # Category performance is optional for the current UI; omit or extend later
+        "customer_metrics": {
+            "total_customers": int(total_customers),
+            "new_customers": int(new_customers),
+            "returning_customers": int(returning_customers),
+            "customer_lifetime_value": round(customer_ltv, 2),
+        },
+        "daily_trends": daily_trends,
     }
 
 
