@@ -89,6 +89,14 @@ async def inventory_report(
         await db.execute(select(func.coalesce(func.sum(Inventory.quantity), 0)))
     ).scalar_one()
 
+    # Calculate inventory value (quantity * unit_price from variants)
+    inventory_value_query = (
+        select(func.coalesce(func.sum(Inventory.quantity * Variant.unit_price), 0))
+        .select_from(Inventory)
+        .join(Variant, Variant.id == Inventory.variant_id)
+    )
+    inventory_value = (await db.execute(inventory_value_query)).scalar_one()
+
     # Low stock count
     low_stock_count = (
         await db.execute(
@@ -111,7 +119,7 @@ async def inventory_report(
         .join(Inventory, Inventory.variant_id == Variant.id)
         .join(Product, Product.id == Variant.product_id)
         .where(Inventory.quantity < Inventory.safety_stock)
-        .order_by(func.nulls_last((Inventory.safety_stock - Inventory.quantity).desc()))
+        .order_by((Inventory.safety_stock - Inventory.quantity).desc().nulls_last())
         .limit(10)
     )
     low_rows = (await db.execute(low_stock_query)).all()
@@ -131,6 +139,7 @@ async def inventory_report(
         "total_skus": int(total_skus or 0),
         "total_quantity": int(total_qty or 0),
         "low_stock_count": int(low_stock_count or 0),
+        "inventory_value": float(inventory_value or 0),
         "low_stock": low_stock,
     }
 

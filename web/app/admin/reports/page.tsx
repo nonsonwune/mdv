@@ -130,7 +130,10 @@ function ReportsDashboardContent() {
         promises.push(
           api<SalesMetrics>(`/api/admin/reports/sales?period=${dateRange}`)
             .then(data => setSalesMetrics(data))
-            .catch(console.error)
+            .catch(error => {
+              console.error('Failed to fetch sales report:', error)
+              setSalesMetrics(null)
+            })
         )
       }
       
@@ -138,7 +141,10 @@ function ReportsDashboardContent() {
         promises.push(
           api<InventoryMetrics>(`/api/admin/reports/inventory`)
             .then(data => setInventoryMetrics(data))
-            .catch(console.error)
+            .catch(error => {
+              console.error('Failed to fetch inventory report:', error)
+              setInventoryMetrics(null)
+            })
         )
       }
       
@@ -146,7 +152,10 @@ function ReportsDashboardContent() {
         promises.push(
           api<UserMetrics>(`/api/admin/reports/customers?period=${dateRange}`)
             .then(data => setUserMetrics(data))
-            .catch(console.error)
+            .catch(error => {
+              console.error('Failed to fetch customer report:', error)
+              setUserMetrics(null)
+            })
         )
       }
       
@@ -177,7 +186,10 @@ function ReportsDashboardContent() {
   }, [dateRange])
 
   // Format currency
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined) => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return '$0.00'
+    }
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
@@ -185,7 +197,10 @@ function ReportsDashboardContent() {
   }
 
   // Format percentage
-  const formatPercentage = (value: number) => {
+  const formatPercentage = (value: number | undefined) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '0.0%'
+    }
     const sign = value >= 0 ? '+' : ''
     return `${sign}${value.toFixed(1)}%`
   }
