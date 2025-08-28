@@ -22,11 +22,17 @@ export async function POST(req: NextRequest) {
     }
     const res = NextResponse.json({ ok: true })
     const prod = process.env.NODE_ENV === "production"
-    res.cookies.set("mdv_token", token, { httpOnly: true, secure: prod, sameSite: "lax", path: "/" })
-    res.cookies.set("mdv_role", role, { httpOnly: true, secure: prod, sameSite: "lax", path: "/" })
+    const cookieOptions = {
+      httpOnly: true,
+      secure: prod,
+      sameSite: "lax" as const,
+      path: "/",
+      domain: prod ? ".mdv.ng" : undefined  // Ensure cookies are shared across subdomains in production
+    }
+    res.cookies.set("mdv_token", token, cookieOptions)
+    res.cookies.set("mdv_role", role, cookieOptions)
     return res
   } catch (e) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 }
-

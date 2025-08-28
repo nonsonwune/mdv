@@ -117,6 +117,85 @@ async def admin_list_orders(
     }
 
 
+@router.get("/orders/{order_id}")
+async def admin_get_order_details(
+    order_id: int, 
+    db: AsyncSession = Depends(get_db),
+    claims=Depends(require_roles(*ALL_STAFF))
+):
+    """Get detailed information about a specific order for admin users."""
+    # Get order with related data
+    stmt = (
+        select(Order)
+        .where(Order.id == order_id)
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.address),
+            selectinload(Order.user),
+            selectinload(Order.fulfillment).selectinload(Fulfillment.shipment).selectinload(Shipment.events)
+        )
+    )
+    result = await db.execute(stmt)
+    order = result.scalar_one_or_none()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Format response
+    total_amount = (order.totals or {}).get("total")
+    total_value = float(total_amount) if total_amount is not None else None
+    item_count = sum(i.qty for i in (order.items or []))
+    user_obj = {"name": order.user.name, "email": order.user.email} if getattr(order, "user", None) else None
+    addr = getattr(order, "address", None)
+    shipping_address = {"name": addr.name, "city": addr.city, "state": addr.state} if addr else None
+    
+    # Build tracking timeline if available
+    timeline = []
+    if order.status == OrderStatus.paid.value or order.status == OrderStatus.refunded.value:
+        timeline.append({
+            "code": "order_placed",
+            "at": order.created_at.isoformat(),
+            "message": "Order placed"
+        })
+        if order.status == OrderStatus.paid.value:
+            timeline.append({
+                "code": "payment_confirmed",
+                "at": order.created_at.isoformat(),
+                "message": "Payment confirmed"
+            })
+        if order.fulfillment:
+            timeline.append({
+                "code": "processing",
+                "at": order.fulfillment.packed_at.isoformat() if order.fulfillment.packed_at else order.created_at.isoformat(),
+                "message": "Order being prepared"
+            })
+            if order.fulfillment.shipment:
+                shipment = order.fulfillment.shipment
+                timeline.append({
+                    "code": "shipped",
+                    "at": shipment.dispatched_at.isoformat() if shipment.dispatched_at else order.created_at.isoformat(),
+                    "message": f"Shipped via {shipment.courier}",
+                    "tracking_id": shipment.tracking_id
+                })
+                for event in shipment.events:
+                    timeline.append({
+                        "code": event.code,
+                        "at": event.occurred_at.isoformat(),
+                        "message": event.message
+                    })
+    
+    return {
+        "id": order.id,
+        "status": order.status.value if hasattr(order.status, "value") else order.status,
+        "total": total_value,
+        "item_count": item_count,
+        "created_at": order.created_at,
+        "user": user_obj,
+        "shipping_address": shipping_address,
+        "tracking_timeline": sorted(timeline, key=lambda x: x["at"]) if timeline else []
+    }
+
+
 @router.post("/fulfillments/{fid}/ready")
 async def set_ready_to_ship(fid: int, db: AsyncSession = Depends(get_db), claims=Depends(require_roles(*FULFILLMENT_STAFF))):
     actor_id = parse_actor_id(claims)
@@ -535,4 +614,3 @@ async def update_inventory(
         "delta": delta,
         "reason": update_request.reason
     }
-

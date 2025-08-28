@@ -22,16 +22,9 @@ export async function GET(request: NextRequest) {
       })
 
       if (!response.ok) {
-        // Token might be expired or invalid, clear cookies
-        const responseWithClearedCookies = NextResponse.json(
-          { authenticated: false }, 
-          { status: 401 }
-        )
-        
-        responseWithClearedCookies.cookies.delete('mdv_token')
-        responseWithClearedCookies.cookies.delete('mdv_role')
-        
-        return responseWithClearedCookies
+        // Token might be expired or invalid, but don't clear cookies immediately
+        // Allow for potential token refresh or fallback
+        return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
       const userData = await response.json()
