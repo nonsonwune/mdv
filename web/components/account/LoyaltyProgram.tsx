@@ -146,7 +146,7 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
     }
   }, [showToast])
 
-  const loadLoyaltyData = () => {
+  const loadLoyaltyData = async () => {
     // Load orders to calculate points
     const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]')
     const totalSpent = orders.reduce((sum: number, order: any) => sum + order.total, 0)
@@ -189,131 +189,59 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
       expiringDate: '2024-03-31'
     })
     
-    // Load rewards
-    setRewards(generateRewards(currentPoints))
+    // Load rewards from API
+    const rewardsData = await loadRewardsFromAPI(Math.max(currentPoints, 0))
+    setRewards(rewardsData)
     
-    // Load activities
-    setActivities(generateActivities())
+    // Load activities from API
+    const activitiesData = await loadActivitiesFromAPI()
+    setActivities(activitiesData)
     
     setLoading(false)
   }
 
-  const generateRewards = (availablePoints: number): Reward[] => {
-    return [
-      {
-        id: '1',
-        name: '₦5,000 Off',
-        description: 'Get ₦5,000 off your next purchase',
-        pointsCost: 500,
-        value: 5000,
-        type: 'discount',
-        available: availablePoints >= 500,
-        imageUrl: '/api/placeholder/100/100'
-      },
-      {
-        id: '2',
-        name: 'Free Shipping',
-        description: 'Free standard shipping on your next order',
-        pointsCost: 200,
-        value: 2000,
-        type: 'free-shipping',
-        available: availablePoints >= 200,
-        imageUrl: '/api/placeholder/100/100'
-      },
-      {
-        id: '3',
-        name: '10% Off Coupon',
-        description: '10% off your entire purchase',
-        pointsCost: 750,
-        value: 0,
-        type: 'discount',
-        available: availablePoints >= 750,
-        imageUrl: '/api/placeholder/100/100'
-      },
-      {
-        id: '4',
-        name: 'VIP Early Access',
-        description: '48-hour early access to sales',
-        pointsCost: 1000,
-        value: 0,
-        type: 'exclusive',
-        available: availablePoints >= 1000,
-        imageUrl: '/api/placeholder/100/100'
-      },
-      {
-        id: '5',
-        name: 'Birthday Gift',
-        description: 'Special birthday surprise package',
-        pointsCost: 1500,
-        value: 10000,
-        type: 'gift',
-        available: availablePoints >= 1500,
-        imageUrl: '/api/placeholder/100/100'
-      },
-      {
-        id: '6',
-        name: '₦10,000 Off',
-        description: 'Get ₦10,000 off orders over ₦50,000',
-        pointsCost: 900,
-        value: 10000,
-        type: 'discount',
-        available: availablePoints >= 900,
-        imageUrl: '/api/placeholder/100/100'
+  const loadRewardsFromAPI = async (availablePoints: number): Promise<Reward[]> => {
+    try {
+      const response = await fetch('/api/loyalty/rewards', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Mark rewards as available based on current points
+        return (data.rewards || []).map((reward: Reward) => ({
+          ...reward,
+          available: availablePoints >= reward.pointsCost
+        }))
       }
-    ]
+    } catch (error) {
+      console.error('Error loading rewards from API:', error)
+    }
+    return []
   }
 
-  const generateActivities = (): PointsActivity[] => {
-    const activities: PointsActivity[] = [
-      {
-        id: '1',
-        date: '2024-01-20',
-        description: 'Order #ORD-2024-001',
-        points: 450,
-        type: 'earned',
-        orderId: 'ORD-2024-001'
-      },
-      {
-        id: '2',
-        date: '2024-01-15',
-        description: 'Redeemed: Free Shipping',
-        points: -200,
-        type: 'redeemed'
-      },
-      {
-        id: '3',
-        date: '2024-01-10',
-        description: 'Order #ORD-2024-002',
-        points: 320,
-        type: 'earned',
-        orderId: 'ORD-2024-002'
-      },
-      {
-        id: '4',
-        date: '2024-01-05',
-        description: 'Birthday Bonus',
-        points: 500,
-        type: 'earned'
-      },
-      {
-        id: '5',
-        date: '2024-01-01',
-        description: 'New Year Promotion',
-        points: 100,
-        type: 'earned'
-      },
-      {
-        id: '6',
-        date: '2023-12-31',
-        description: 'Points Expired',
-        points: -150,
-        type: 'expired'
+  const loadActivitiesFromAPI = async (): Promise<PointsActivity[]> => {
+    try {
+      const response = await fetch('/api/loyalty/activities', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return (data.activities || []).sort((a: PointsActivity, b: PointsActivity) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
       }
-    ]
-    
-    return activities.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
+    } catch (error) {
+      console.error('Error loading activities from API:', error)
+    }
+    return []
   }
 
   const handleRedeemReward = (reward: Reward) => {
@@ -327,7 +255,7 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
     setShowRedeemModal(true)
   }
 
-  const confirmRedemption = () => {
+  const confirmRedemption = async () => {
     if (!selectedReward) return
     
     // Generate reward code
@@ -348,7 +276,8 @@ export default function LoyaltyProgram({ user }: LoyaltyProgramProps) {
     setActivities([newActivity, ...activities])
     
     // Update rewards availability
-    setRewards(generateRewards(newPoints))
+    const updatedRewards = await loadRewardsFromAPI(newPoints)
+    setRewards(updatedRewards)
     
     // Show success message
     setToastMessage(`Reward redeemed! Your code is: ${code}`)

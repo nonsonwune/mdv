@@ -93,127 +93,88 @@ export default function ReviewsRatings() {
     }
   }, [showToast])
 
-  const loadReviewsData = () => {
-    // Load mock reviews
-    const mockReviews: Review[] = [
-      {
-        id: '1',
-        productId: 1,
-        productName: 'Classic White Shirt',
-        productImage: '/api/placeholder/100/100',
-        rating: 5,
-        title: 'Perfect fit and quality!',
-        comment: 'This shirt exceeded my expectations. The fabric is soft yet durable, and the fit is exactly as described. Great value for money!',
-        pros: ['Excellent fabric quality', 'True to size', 'Wrinkle-resistant'],
-        cons: ['Slightly see-through'],
-        images: ['/api/placeholder/200/200', '/api/placeholder/200/200'],
-        verified: true,
-        helpful: 24,
-        notHelpful: 2,
-        date: '2024-01-15',
-        status: 'published',
-        response: {
-          message: 'Thank you for your wonderful review! We\'re thrilled you love your shirt.',
-          date: '2024-01-16'
-        }
-      },
-      {
-        id: '2',
-        productId: 2,
-        productName: 'Denim Jeans',
-        productImage: '/api/placeholder/100/100',
-        rating: 4,
-        title: 'Good quality, runs small',
-        comment: 'The jeans are well-made with good stitching. However, they run about one size smaller than expected. I recommend ordering a size up.',
-        pros: ['Durable material', 'Nice color'],
-        cons: ['Runs small', 'Tight around waist'],
-        verified: true,
-        helpful: 18,
-        notHelpful: 3,
-        date: '2024-01-10',
-        status: 'published'
-      },
-      {
-        id: '3',
-        productId: 3,
-        productName: 'Summer Dress',
-        productImage: '/api/placeholder/100/100',
-        rating: 5,
-        title: 'Beautiful and comfortable',
-        comment: 'Absolutely love this dress! Perfect for summer events.',
-        verified: true,
-        helpful: 12,
-        notHelpful: 0,
-        date: '2024-01-08',
-        status: 'pending'
-      },
-      {
-        id: '4',
-        productId: 4,
-        productName: 'Leather Boots',
-        productImage: '/api/placeholder/100/100',
-        rating: 3,
-        title: 'Quality issues',
-        comment: 'The boots looked great initially but started showing wear after just a few uses.',
-        pros: ['Stylish design'],
-        cons: ['Poor durability', 'Uncomfortable'],
-        verified: true,
-        helpful: 8,
-        notHelpful: 15,
-        date: '2024-01-05',
-        status: 'rejected'
+  const loadReviewsFromAPI = async (): Promise<Review[]> => {
+    try {
+      const response = await fetch('/api/reviews', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.reviews || []
       }
-    ]
+    } catch (error) {
+      console.error('Error loading reviews from API:', error)
+    }
+    return []
+  }
 
-    // Load purchased products
-    const mockPurchasedProducts: PurchasedProduct[] = [
-      {
-        id: 5,
-        name: 'Cotton T-Shirt',
-        image: '/api/placeholder/100/100',
-        purchaseDate: '2024-01-20',
-        orderId: 'ORD-2024-001',
-        reviewed: false
-      },
-      {
-        id: 6,
-        name: 'Wool Sweater',
-        image: '/api/placeholder/100/100',
-        purchaseDate: '2024-01-18',
-        orderId: 'ORD-2024-002',
-        reviewed: false
-      },
-      {
-        id: 7,
-        name: 'Running Shoes',
-        image: '/api/placeholder/100/100',
-        purchaseDate: '2024-01-15',
-        orderId: 'ORD-2024-003',
-        reviewed: false
+  const loadPurchasedProductsFromAPI = async (): Promise<PurchasedProduct[]> => {
+    try {
+      const response = await fetch('/api/orders/reviewable-products', {
+        headers: {
+          'Accept': 'application/json'
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        return data.products || []
       }
-    ]
+    } catch (error) {
+      console.error('Error loading purchased products from API:', error)
+    }
+    return []
+  }
 
-    setReviews(mockReviews)
-    setPurchasedProducts(mockPurchasedProducts)
+  const loadReviewsData = async () => {
+    try {
+      // Load reviews from API
+      const reviewsData = await loadReviewsFromAPI()
+      const purchasedData = await loadPurchasedProductsFromAPI()
+      
+      setReviews(reviewsData)
+      setPurchasedProducts(purchasedData)
 
-    // Calculate stats
-    const published = mockReviews.filter(r => r.status === 'published').length
-    const pending = mockReviews.filter(r => r.status === 'pending').length
-    const rejected = mockReviews.filter(r => r.status === 'rejected').length
-    const avgRating = mockReviews.reduce((sum, r) => sum + r.rating, 0) / mockReviews.length || 0
-    const totalHelpful = mockReviews.reduce((sum, r) => sum + r.helpful, 0)
+      // Calculate stats from real data
+      const published = reviewsData.filter(r => r.status === 'published').length
+      const pending = reviewsData.filter(r => r.status === 'pending').length
+      const rejected = reviewsData.filter(r => r.status === 'rejected').length
+      const avgRating = reviewsData.length > 0 
+        ? reviewsData.reduce((sum, r) => sum + r.rating, 0) / reviewsData.length 
+        : 0
+      const totalHelpful = reviewsData.reduce((sum, r) => sum + r.helpful, 0)
 
-    setStats({
-      totalReviews: mockReviews.length,
-      averageRating: avgRating,
-      publishedReviews: published,
-      pendingReviews: pending,
-      rejectedReviews: rejected,
-      pointsEarned: published * 50, // 50 points per published review
-      helpfulVotes: totalHelpful
-    })
-
-    setLoading(false)
+      setStats({
+        totalReviews: reviewsData.length,
+        averageRating: avgRating,
+        publishedReviews: published,
+        pendingReviews: pending,
+        rejectedReviews: rejected,
+        pointsEarned: published * 50, // 50 points per published review
+        helpfulVotes: totalHelpful
+      })
+    } catch (error) {
+      console.error('Error loading reviews data:', error)
+      // Set empty state on error
+      setReviews([])
+      setPurchasedProducts([])
+      setStats({
+        totalReviews: 0,
+        averageRating: 0,
+        publishedReviews: 0,
+        pendingReviews: 0,
+        rejectedReviews: 0,
+        pointsEarned: 0,
+        helpfulVotes: 0
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleWriteReview = (product: PurchasedProduct) => {
@@ -831,19 +792,44 @@ export default function ReviewsRatings() {
 
           <Card>
             <div className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Top Reviewed Categories</h3>
+              <h3 className="text-lg font-semibold mb-4">Review Activity</h3>
               <div className="space-y-3">
-                {['Shirts', 'Dresses', 'Jeans', 'Shoes'].map((category, idx) => (
-                  <div key={category} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-maroon-100 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-bold text-maroon-700">{idx + 1}</span>
-                      </div>
-                      <span className="font-medium">{category}</span>
+                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-maroon-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg">📝</span>
                     </div>
-                    <span className="text-sm text-neutral-600">{Math.floor(Math.random() * 5) + 1} reviews</span>
+                    <div>
+                      <p className="font-medium">Total Reviews Written</p>
+                      <p className="text-sm text-neutral-600">All time</p>
+                    </div>
                   </div>
-                ))}
+                  <span className="text-2xl font-bold text-maroon-700">{stats.totalReviews}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg">⭐</span>
+                    </div>
+                    <div>
+                      <p className="font-medium">Average Rating Given</p>
+                      <p className="text-sm text-neutral-600">Across all reviews</p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-green-700">{stats.averageRating.toFixed(1)}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg">👍</span>
+                    </div>
+                    <div>
+                      <p className="font-medium">Helpful Votes Received</p>
+                      <p className="text-sm text-neutral-600">From community</p>
+                    </div>
+                  </div>
+                  <span className="text-2xl font-bold text-purple-700">{stats.helpfulVotes}</span>
+                </div>
               </div>
             </div>
           </Card>

@@ -204,8 +204,9 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
 
   const handleTrackOrder = (order: Order) => {
     if (order.trackingNumber) {
-      // In a real app, this would open tracking page
-      window.open(`https://track.example.com/${order.trackingNumber}`, '_blank')
+      // TODO: Integrate with real shipping provider tracking API
+      console.log('Track order:', order.trackingNumber)
+      alert(`Tracking Number: ${order.trackingNumber}\n\nPlease contact customer service for tracking details.`)
     }
   }
 

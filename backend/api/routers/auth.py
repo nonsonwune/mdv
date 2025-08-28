@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
-from mdv.auth import create_access_token
+from mdv.auth import create_access_token, get_current_claims
 from mdv.models import User, Role
 from mdv.password import hash_password, verify_password, needs_rehash
 from mdv.rate_limit import limiter, RATE_LIMITS
@@ -10,6 +11,10 @@ from mdv.schemas import AuthLoginRequest, AuthLoginResponse
 from ..deps import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+class AuthCheckResponse(BaseModel):
+    user: dict
 
 
 @router.post("/login", response_model=AuthLoginResponse)
@@ -74,5 +79,35 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
         token=token,
         role=user.role.value,
         token_type="bearer"
+    )
+
+
+@router.get("/check", response_model=AuthCheckResponse)
+async def check_auth(
+    claims: dict = Depends(get_current_claims),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Check current authentication status and return user information.
+    Requires valid JWT token in Authorization header.
+    """
+    user_id = int(claims["sub"])
+    user = await db.get(User, user_id)
+    
+    if not user or not user.active:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found or inactive"
+        )
+    
+    return AuthCheckResponse(
+        user={
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "role": user.role.value,
+            "active": user.active,
+            "created_at": user.created_at.isoformat()
+        }
     )
 
