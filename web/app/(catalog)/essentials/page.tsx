@@ -5,7 +5,7 @@ import CategoryLayout from "../../../components/catalog/CategoryLayout"
 
 async function getProducts(): Promise<Product[]> {
   try {
-    const data = await api<ProductListResponse>("/api/products?page_size=50")
+    const data = await api<ProductListResponse>("/api/products/category/essentials?page_size=50")
     return (data.items as Product[]) || []
   } catch {
     return []

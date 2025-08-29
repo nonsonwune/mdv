@@ -5,7 +5,7 @@ import EnhancedCategoryPage from "../../../components/catalog/EnhancedCategoryPa
 
 async function getProducts(): Promise<Product[]> {
   try {
-    const data = await api<ProductListResponse>("/api/products?page_size=100")
+    const data = await api<ProductListResponse>("/api/products/category/men?page_size=100")
     return (data.items as Product[]) || []
   } catch {
     return []

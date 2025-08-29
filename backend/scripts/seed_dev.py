@@ -5,16 +5,54 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from backend.mdv.db import session_scope
-from backend.mdv.models import Product, Variant, Inventory, Coupon, ProductImage
+from mdv.db import session_scope
+from mdv.models import Product, Variant, Inventory, Coupon, ProductImage, Category
+
+
+async def seed_categories(db):
+    """Seed default categories that match frontend navigation."""
+    default_categories = [
+        {"name": "Men's Collection", "slug": "men"},
+        {"name": "Women's Collection", "slug": "women"},
+        {"name": "Essentials", "slug": "essentials"},
+        {"name": "Sale & Clearance", "slug": "sale"},
+    ]
+
+    for cat_data in default_categories:
+        existing = (await db.execute(
+            select(Category).where(Category.slug == cat_data["slug"])
+        )).scalar_one_or_none()
+
+        if not existing:
+            category = Category(
+                name=cat_data["name"],
+                slug=cat_data["slug"]
+            )
+            db.add(category)
+            print(f"Created category: {cat_data['name']} ({cat_data['slug']})")
+        else:
+            print(f"Category already exists: {cat_data['name']} ({cat_data['slug']})")
 
 
 async def main() -> None:
     async with session_scope() as db:
-        # Product
+        # Seed categories first
+        await seed_categories(db)
+        # Product (assign to Men's Collection category)
         prod = (await db.execute(select(Product).where(Product.slug == "basic-tee"))).scalar_one_or_none()
         if not prod:
-            prod = Product(title="Basic Tee", slug="basic-tee", description="Cotton tee", compare_at_price=19990)
+            # Get Men's Collection category
+            men_category = (await db.execute(
+                select(Category).where(Category.slug == "men")
+            )).scalar_one_or_none()
+
+            prod = Product(
+                title="Basic Tee",
+                slug="basic-tee",
+                description="Cotton tee",
+                compare_at_price=19990,
+                category_id=men_category.id if men_category else None
+            )
             db.add(prod)
             await db.flush()
         # Variant
