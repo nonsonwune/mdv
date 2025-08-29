@@ -12,12 +12,36 @@ export default function RecentlyViewed({ currentProductId }: { currentProductId?
   useEffect(() => {
     const stored = localStorage.getItem("mdv_recently_viewed")
     if (stored) {
-      const parsed = JSON.parse(stored) as Product[]
-      // Filter out current product if viewing a product page
-      const filtered = currentProductId 
-        ? parsed.filter(p => p.id !== currentProductId)
-        : parsed
-      setProducts(filtered.slice(0, 4))
+      try {
+        const parsed = JSON.parse(stored) as Product[]
+
+        // Filter out current product if viewing a product page
+        const filtered = currentProductId
+          ? parsed.filter(p => p.id !== currentProductId)
+          : parsed
+
+        // Basic data validation - ensure products have required fields
+        const validProducts = filtered.filter(product =>
+          product &&
+          product.id &&
+          product.title &&
+          product.slug &&
+          Array.isArray(product.variants) &&
+          Array.isArray(product.images)
+        )
+
+        // If we filtered out invalid products, update localStorage
+        if (validProducts.length !== parsed.length) {
+          localStorage.setItem("mdv_recently_viewed", JSON.stringify(validProducts))
+        }
+
+        setProducts(validProducts.slice(0, 4))
+      } catch (error) {
+        console.error('Error parsing recently viewed products:', error)
+        // Clear corrupted data
+        localStorage.removeItem("mdv_recently_viewed")
+        setProducts([])
+      }
     }
   }, [currentProductId])
 

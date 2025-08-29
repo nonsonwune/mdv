@@ -55,6 +55,44 @@ export const recentlyViewed = {
   clear() {
     if (typeof window === 'undefined') return
     localStorage.removeItem(RECENTLY_VIEWED_KEY)
+  },
+
+  // Clean up old entries (older than 30 days) and invalid data
+  cleanup() {
+    if (typeof window === 'undefined') return
+
+    try {
+      const items = this.getAll()
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+      // Filter out old entries and validate data structure
+      const validItems = items.filter(item => {
+        // Check if item is valid and not too old
+        const isValid = item &&
+          item.productId &&
+          item.viewedAt &&
+          item.product &&
+          item.product.id &&
+          item.product.title &&
+          item.product.slug
+
+        if (!isValid) return false
+
+        // Check if not too old
+        const viewedDate = new Date(item.viewedAt)
+        return viewedDate > thirtyDaysAgo
+      })
+
+      // Update localStorage if we cleaned anything
+      if (validItems.length !== items.length) {
+        localStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(validItems))
+      }
+    } catch (error) {
+      console.error('Error cleaning up recently viewed:', error)
+      // If cleanup fails, clear all data to prevent corruption
+      this.clear()
+    }
   }
 }
 

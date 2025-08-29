@@ -249,17 +249,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Check Authentication Status
-   * 
+   *
    * Validates current session with the server and updates user state.
+   * Only makes the request if there's likely a token present (to reduce 401 noise).
    * Handles 401 errors gracefully - only logs non-authentication errors.
    * Used automatically on app startup and can be called manually to refresh state.
    */
   const checkAuth = async () => {
     try {
+      // Quick check: if document.cookie doesn't contain mdv_token, skip the request
+      // This reduces unnecessary 401 requests for users who are definitely not logged in
+      if (typeof document !== 'undefined' && !document.cookie.includes('mdv_token=')) {
+        setUser(null)
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/auth/check', {
         credentials: 'include'
       })
-      
+
       if (response.ok) {
         const userData = await response.json()
         setUser(userData.user)
