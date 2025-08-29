@@ -6,12 +6,28 @@ import Image from "next/image"
 import type { Product } from "../../lib/types"
 import { Card } from "../ui"
 
+// Version for localStorage cleanup - increment when validation logic changes
+const RECENTLY_VIEWED_VERSION = "v2.0"
+const VERSION_KEY = "mdv_recently_viewed_version"
+
 export default function RecentlyViewed({ currentProductId }: { currentProductId?: number }) {
   const [products, setProducts] = useState<Product[]>([])
+  const [isValidating, setIsValidating] = useState(false)
 
   useEffect(() => {
-    const stored = localStorage.getItem("mdv_recently_viewed")
-    if (stored) {
+    const validateAndLoadProducts = async () => {
+      // Check if we need to force cleanup due to version change
+      const currentVersion = localStorage.getItem(VERSION_KEY)
+      const forceCleanup = currentVersion !== RECENTLY_VIEWED_VERSION
+
+      const stored = localStorage.getItem("mdv_recently_viewed")
+      if (!stored) {
+        if (forceCleanup) {
+          localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
+        }
+        return
+      }
+
       try {
         const parsed = JSON.parse(stored) as Product[]
 
@@ -21,7 +37,7 @@ export default function RecentlyViewed({ currentProductId }: { currentProductId?
           : parsed
 
         // Basic data validation - ensure products have required fields
-        const validProducts = filtered.filter(product =>
+        let validProducts = filtered.filter(product =>
           product &&
           product.id &&
           product.title &&
@@ -30,19 +46,75 @@ export default function RecentlyViewed({ currentProductId }: { currentProductId?
           Array.isArray(product.images)
         )
 
-        // If we filtered out invalid products, update localStorage
+        // Show products immediately, then validate in background
+        setProducts(validProducts.slice(0, 4))
+
+        // If force cleanup, validate products exist in database (background)
+        if (forceCleanup && validProducts.length > 0) {
+          setIsValidating(true)
+
+          // Validate products exist in database in background
+          const validateProducts = async () => {
+            const existingProducts = []
+
+            // Check each product individually (more reliable than batch)
+            for (const product of validProducts.slice(0, 4)) {
+              try {
+                // Use HEAD request to check if product exists (lightweight)
+                const response = await fetch(`/api/products/${product.id}`, {
+                  method: 'HEAD',
+                  cache: 'no-cache'
+                })
+
+                if (response.ok) {
+                  existingProducts.push(product)
+                } else if (response.status === 404) {
+                  // Product was deleted, don't include it
+                  console.log(`Removing deleted product from recently viewed: ${product.title}`)
+                } else {
+                  // Other error (network, server), keep the product
+                  existingProducts.push(product)
+                }
+              } catch (error) {
+                // Network error, keep the product
+                console.warn(`Could not validate product ${product.id}:`, error)
+                existingProducts.push(product)
+              }
+            }
+
+            // Update localStorage and state if products were removed
+            if (existingProducts.length !== validProducts.length) {
+              localStorage.setItem("mdv_recently_viewed", JSON.stringify(existingProducts))
+              setProducts(existingProducts.slice(0, 4))
+              console.log(`Cleaned up recently viewed: removed ${validProducts.length - existingProducts.length} deleted products`)
+            }
+
+            localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
+            setIsValidating(false)
+          }
+
+          // Run validation in background
+          validateProducts()
+        } else if (forceCleanup) {
+          // No products to validate, just update version
+          localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
+        }
+
+        // Update localStorage if we cleaned anything during basic validation
         if (validProducts.length !== parsed.length) {
           localStorage.setItem("mdv_recently_viewed", JSON.stringify(validProducts))
         }
-
-        setProducts(validProducts.slice(0, 4))
       } catch (error) {
         console.error('Error parsing recently viewed products:', error)
-        // Clear corrupted data
+        // Clear corrupted data and set version
         localStorage.removeItem("mdv_recently_viewed")
+        localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
         setProducts([])
+        setIsValidating(false)
       }
     }
+
+    validateAndLoadProducts()
   }, [currentProductId])
 
   if (products.length === 0) return null
