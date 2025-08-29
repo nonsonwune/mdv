@@ -13,7 +13,7 @@ from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 
 from mdv.auth import get_current_claims, create_access_token
-from mdv.models import User, Role, Address as AddressModel, Order
+from mdv.models import User, Role, Address as AddressModel, Order, UserAddress
 from ..deps import get_db
 
 # Password hashing
@@ -241,12 +241,28 @@ async def get_user_addresses(
     claims: dict = Depends(get_current_claims),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all addresses for the current user."""
+    """Get all saved addresses for the current user."""
     user_id = int(claims["sub"])
-    
-    # Note: We need to create a UserAddress table for proper address management
-    # For now, return empty list as addresses are tied to orders
-    return []
+    rows = (
+        await db.execute(
+            select(UserAddress).where(UserAddress.user_id == user_id).order_by(UserAddress.is_default.desc(), UserAddress.created_at.desc())
+        )
+    ).scalars().all()
+    out: list[AddressResponse] = []
+    for a in rows:
+        out.append(
+            AddressResponse(
+                id=a.id,
+                name=a.name,
+                phone=a.phone,
+                state=a.state,
+                city=a.city,
+                street=a.street,
+                is_default=a.is_default,
+                user_id=a.user_id,
+            )
+        )
+    return out
 
 
 @router.post("/addresses", response_model=AddressResponse)
@@ -257,18 +273,37 @@ async def create_address(
 ):
     """Create a new address for the current user."""
     user_id = int(claims["sub"])
-    
-    # TODO: Create UserAddress model and table
-    # For now, return a mock response
-    return AddressResponse(
-        id=1,
+
+    # If setting default, unset others
+    if address.is_default:
+        await db.execute(
+            UserAddress.__table__.update()
+            .where(UserAddress.user_id == user_id)
+            .values(is_default=False)
+        )
+
+    ua = UserAddress(
+        user_id=user_id,
+        label=None,
         name=address.name,
         phone=address.phone,
         state=address.state,
         city=address.city,
         street=address.street,
         is_default=address.is_default,
-        user_id=user_id
+    )
+    db.add(ua)
+    await db.flush()
+    await db.commit()
+    return AddressResponse(
+        id=ua.id,
+        name=ua.name,
+        phone=ua.phone,
+        state=ua.state,
+        city=ua.city,
+        street=ua.street,
+        is_default=ua.is_default,
+        user_id=user_id,
     )
 
 
@@ -281,9 +316,47 @@ async def update_address(
 ):
     """Update an existing address."""
     user_id = int(claims["sub"])
-    
-    # TODO: Implement with UserAddress model
-    raise HTTPException(status_code=404, detail="Address not found")
+
+    ua = (
+        await db.execute(
+            select(UserAddress).where((UserAddress.id == address_id) & (UserAddress.user_id == user_id))
+        )
+    ).scalar_one_or_none()
+    if not ua:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    if address_update.is_default is True:
+        await db.execute(
+            UserAddress.__table__.update()
+            .where(UserAddress.user_id == user_id)
+            .values(is_default=False)
+        )
+
+    if address_update.name is not None:
+        ua.name = address_update.name
+    if address_update.phone is not None:
+        ua.phone = address_update.phone
+    if address_update.state is not None:
+        ua.state = address_update.state
+    if address_update.city is not None:
+        ua.city = address_update.city
+    if address_update.street is not None:
+        ua.street = address_update.street
+    if address_update.is_default is not None:
+        ua.is_default = address_update.is_default
+
+    await db.commit()
+    await db.refresh(ua)
+    return AddressResponse(
+        id=ua.id,
+        name=ua.name,
+        phone=ua.phone,
+        state=ua.state,
+        city=ua.city,
+        street=ua.street,
+        is_default=ua.is_default,
+        user_id=user_id,
+    )
 
 
 @router.delete("/addresses/{address_id}")
@@ -294,8 +367,17 @@ async def delete_address(
 ):
     """Delete an address."""
     user_id = int(claims["sub"])
-    
-    # TODO: Implement with UserAddress model
+
+    ua = (
+        await db.execute(
+            select(UserAddress).where((UserAddress.id == address_id) & (UserAddress.user_id == user_id))
+        )
+    ).scalar_one_or_none()
+    if not ua:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    await db.delete(ua)
+    await db.commit()
     return {"message": "Address deleted successfully"}
 
 
@@ -307,8 +389,22 @@ async def set_default_address(
 ):
     """Set an address as the default."""
     user_id = int(claims["sub"])
-    
-    # TODO: Implement with UserAddress model
+
+    ua = (
+        await db.execute(
+            select(UserAddress).where((UserAddress.id == address_id) & (UserAddress.user_id == user_id))
+        )
+    ).scalar_one_or_none()
+    if not ua:
+        raise HTTPException(status_code=404, detail="Address not found")
+
+    await db.execute(
+        UserAddress.__table__.update()
+        .where(UserAddress.user_id == user_id)
+        .values(is_default=False)
+    )
+    ua.is_default = True
+    await db.commit()
     return {"message": "Default address updated"}
 
 

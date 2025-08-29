@@ -67,11 +67,30 @@ export default function AccountPage() {
       const firstName = nameParts[0] || 'User'
       const lastName = nameParts.slice(1).join(' ') || ''
 
-      // Calculate real user statistics from order data
-      const orders = JSON.parse(localStorage.getItem('mdv_orders') || '[]')
-      const totalSpent = orders.reduce((sum: number, order: any) => sum + (order.total || 0), 0)
-      const totalOrders = orders.length
-      
+      // Calculate user statistics from real orders API
+      let totalSpent = 0
+      let totalOrders = 0
+      try {
+        const ordersRes = await fetch('/api/orders', { headers: { 'Accept': 'application/json' }, credentials: 'include' })
+        if (ordersRes.ok) {
+          const data = await ordersRes.json()
+          const orders = Array.isArray(data.orders) ? data.orders : []
+          totalOrders = orders.length
+          totalSpent = orders.reduce((sum: number, o: any) => sum + (Number(o.total || 0)), 0)
+          // Cache for offline fallback
+          localStorage.setItem('mdv_orders', JSON.stringify(orders))
+        } else {
+          // Fallback to cached local data if API unavailable
+          const cached = JSON.parse(localStorage.getItem('mdv_orders') || '[]')
+          totalOrders = cached.length
+          totalSpent = cached.reduce((s: number, o: any) => s + (Number(o.total || 0)), 0)
+        }
+      } catch {
+        const cached = JSON.parse(localStorage.getItem('mdv_orders') || '[]')
+        totalOrders = cached.length
+        totalSpent = cached.reduce((s: number, o: any) => s + (Number(o.total || 0)), 0)
+      }
+
       // Calculate loyalty tier based on spending
       let loyaltyTier = 'bronze'
       if (totalSpent >= 1000000) loyaltyTier = 'platinum'
@@ -83,8 +102,8 @@ export default function AccountPage() {
         firstName,
         lastName,
         loyaltyTier,
-        joinedDate: userData.createdAt || new Date().toISOString(),
-        verified: userData.verified || true,
+        joinedDate: userData.createdAt || userData.created_at || new Date().toISOString(),
+        verified: userData.verified ?? true,
         totalOrders,
         totalSpent
       })
@@ -313,7 +332,7 @@ export default function AccountPage() {
             {activeTab === 'addresses' && (
               <Card className="p-6">
                 <h2 className="text-xl font-semibold mb-4">Saved Addresses</h2>
-                <AddressManager userId={user.id} />
+                <AddressManager />
               </Card>
             )}
             
@@ -338,7 +357,7 @@ export default function AccountPage() {
 }
 
 // Address Manager Component
-function AddressManager({ userId }: { userId: number }) {
+function AddressManager() {
   const [addresses, setAddresses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const toast = useToast()
