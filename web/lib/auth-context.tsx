@@ -257,14 +257,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   const checkAuth = async () => {
     try {
-      // Quick check: if document.cookie doesn't contain mdv_token, skip the request
-      // This reduces unnecessary 401 requests for users who are definitely not logged in
-      if (typeof document !== 'undefined' && !document.cookie.includes('mdv_token=')) {
-        setUser(null)
-        setLoading(false)
-        return
-      }
-
+      // Note: We can't check for mdv_token in document.cookie because it's httpOnly
+      // So we always make the auth check request and let the server handle it
       const response = await fetch('/api/auth/check', {
         credentials: 'include'
       })
