@@ -231,9 +231,9 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
       {/* Filters */}
       <Card>
         <div className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Search */}
-            <div className="flex-1">
+            <div className="sm:col-span-2 lg:col-span-2">
               <Input
                 placeholder="Search orders by number or product..."
                 value={searchQuery}
@@ -247,19 +247,23 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
             </div>
 
             {/* Status Filter */}
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500"
-            >
-              <option value="all">All Orders</option>
-              <option value="pending">Pending</option>
-              <option value="processing">Processing</option>
-              <option value="shipped">Shipped</option>
-              <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="refunded">Refunded</option>
-            </select>
+            <div>
+              <label className="sr-only" htmlFor="order-status">Status</label>
+              <select
+                id="order-status"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500"
+              >
+                <option value="all">All Orders</option>
+                <option value="pending">Pending</option>
+                <option value="processing">Processing</option>
+                <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="refunded">Refunded</option>
+              </select>
+            </div>
 
             {/* Date Range */}
             <div className="flex gap-2">
@@ -315,16 +319,16 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
                 {/* Order Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                   <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-lg">{order.orderNumber}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-base sm:text-lg truncate max-w-[220px] sm:max-w-none">{order.orderNumber}</h3>
                       <Badge variant={getStatusColor(order.status)} size="sm">
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 capitalize">
                           {getStatusIcon(order.status)}
                           {order.status}
                         </span>
                       </Badge>
                     </div>
-                    <p className="text-sm text-neutral-600">
+                    <p className="text-xs sm:text-sm text-neutral-600">
                       Ordered on {new Date(order.date).toLocaleDateString('en-US', {
                         month: 'long',
                         day: 'numeric',
@@ -341,7 +345,7 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
                 <div className="space-y-3 mb-4">
                   {order.items.slice(0, 2).map((item) => (
                     <div key={item.id} className="flex gap-3">
-                      <div className="w-16 h-16 bg-neutral-100 rounded overflow-hidden flex-shrink-0">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 bg-neutral-100 rounded overflow-hidden flex-shrink-0">
                         {item.image && (
                           <Image
                             src={item.image}
@@ -353,7 +357,7 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{item.title}</p>
+                        <p className="font-medium text-sm truncate max-w-[180px] sm:max-w-none">{item.title}</p>
                         <p className="text-xs text-neutral-600">{item.variant}</p>
                         <p className="text-xs text-neutral-600">Qty: {item.quantity}</p>
                       </div>
@@ -392,7 +396,7 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
                 )}
 
                 {/* Actions */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-2">
                   <Button
                     size="sm"
                     variant="secondary"
@@ -450,6 +454,7 @@ export default function OrderHistory({ userId }: OrderHistoryProps) {
         onClose={() => setSelectedOrder(null)}
         title="Order Details"
         size="lg"
+        bodyClassName="max-h-[70vh] overflow-y-auto"
       >
         {selectedOrder && (
           <div className="p-6 space-y-6">

@@ -272,22 +272,54 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
     setShowToast(true)
   }
 
-  const removeDevice = (deviceId: string) => {
-    setSecurity({
-      ...security,
-      trustedDevices: security.trustedDevices.filter(d => d.id !== deviceId)
-    })
-    setToastMessage('Device removed')
-    setShowToast(true)
+  const removeDevice = async (deviceId: string) => {
+    try {
+      const res = await fetch(`/api/security/devices/${encodeURIComponent(deviceId)}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include'
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setToastMessage(data.error || 'Failed to remove device')
+        setShowToast(true)
+        return
+      }
+      setSecurity({
+        ...security,
+        trustedDevices: security.trustedDevices.filter(d => d.id !== deviceId)
+      })
+      setToastMessage('Device removed')
+      setShowToast(true)
+    } catch (e) {
+      setToastMessage('Failed to remove device')
+      setShowToast(true)
+    }
   }
 
-  const endSession = (sessionId: string) => {
-    setSecurity({
-      ...security,
-      sessions: security.sessions.filter(s => s.id !== sessionId)
-    })
-    setToastMessage('Session ended')
-    setShowToast(true)
+  const endSession = async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/security/sessions/${encodeURIComponent(sessionId)}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include'
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setToastMessage(data.error || 'Failed to end session')
+        setShowToast(true)
+        return
+      }
+      setSecurity({
+        ...security,
+        sessions: security.sessions.filter(s => s.id !== sessionId)
+      })
+      setToastMessage('Session ended')
+      setShowToast(true)
+    } catch (e) {
+      setToastMessage('Failed to end session')
+      setShowToast(true)
+    }
   }
 
   const handleDeleteAccount = () => {
@@ -318,15 +350,31 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      {/* Mobile: convert tabs to select */}
+      <div className="md:hidden">
+        <label className="sr-only" htmlFor="settings-mobile-tab">Settings Section</label>
+        <select
+          id="settings-mobile-tab"
+          value={activeTab}
+          onChange={(e) => setActiveTab(e.target.value as any)}
+          className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500 mb-3"
+        >
+          {tabs.map(tab => (
+            <option key={tab.id} value={tab.id}>{tab.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Desktop tabs */}
+      <div className="hidden md:flex gap-2 overflow-x-auto pb-2">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
             className={`
               flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-colors
-              ${activeTab === tab.id 
-                ? 'bg-maroon-700 text-white' 
+              ${activeTab === tab.id
+                ? 'bg-maroon-700 text-white'
                 : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
               }
             `}
@@ -654,6 +702,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Password & Authentication</h3>
+              <p className="text-xs text-neutral-500 mb-2 md:hidden">Manage your password and 2FA</p>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -701,6 +750,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Trusted Devices</h3>
               <div className="space-y-3">
+                <p className="text-xs text-neutral-500 mb-1 md:hidden">Devices you've marked as trusted</p>
                 {security.trustedDevices.length === 0 ? (
                   <div className="text-center py-8">
                     <svg className="w-12 h-12 mx-auto mb-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -745,6 +795,7 @@ export default function AccountSettings({ user, onUpdate }: AccountSettingsProps
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Active Sessions</h3>
               <div className="space-y-3">
+                <p className="text-xs text-neutral-500 mb-1 md:hidden">Recent logins to your account</p>
                 {security.sessions.length === 0 ? (
                   <div className="text-center py-8">
                     <svg className="w-12 h-12 mx-auto mb-4 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">

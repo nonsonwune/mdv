@@ -170,9 +170,27 @@ export default function AccountPage() {
           <span className="text-neutral-900">My Account</span>
         </nav>
 
+        {/* Mobile navigation */}
+        <div className="md:hidden mb-4">
+          <label className="sr-only" htmlFor="account-mobile-nav">Section</label>
+          <select
+            id="account-mobile-nav"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500"
+          >
+            <option value="dashboard">Dashboard</option>
+            <option value="orders">Orders</option>
+            <option value="profile">Profile</option>
+            <option value="addresses">Addresses</option>
+            <option value="wishlist">Wishlist</option>
+            <option value="settings">Settings</option>
+          </select>
+        </div>
+
         <div className="grid md:grid-cols-4 gap-6">
           {/* Sidebar */}
-          <div className="md:col-span-1">
+          <div className="hidden md:block md:col-span-1">
             <Card className="p-6">
               {/* User Info */}
               <div className="text-center mb-6">
