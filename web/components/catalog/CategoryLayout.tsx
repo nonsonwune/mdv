@@ -16,7 +16,7 @@ interface CategoryLayoutProps {
   category?: string
 }
 
-function ProductGrid({ products, loading }: { products: Product[], loading: boolean }) {
+function ProductGrid({ products, loading, searchParams }: { products: Product[], loading: boolean, searchParams: URLSearchParams }) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -343,8 +343,8 @@ export default function CategoryLayout({ title, description, products: initialPr
 
         {/* Product Grid */}
         <div className="flex-1">
-          <Suspense fallback={<ProductGrid products={[]} loading={true} />}>
-            <ProductGrid products={products} loading={loading} />
+          <Suspense fallback={<ProductGrid products={[]} loading={true} searchParams={new URLSearchParams()} />}>
+            <ProductGrid products={products} loading={loading} searchParams={searchParams} />
           </Suspense>
 
           {/* Pagination */}
