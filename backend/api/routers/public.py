@@ -466,6 +466,95 @@ async def get_products_by_category(
     return Paginated(items=items, total=total, page=page, page_size=page_size)
 
 
+@router.get("/api/products/sale", response_model=Paginated)
+async def get_sale_products(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort: str = Query("relevance"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get products that are on sale (compare_at_price > variant.price)."""
+    # Build query for sale products
+    # We need to join with variants to compare prices
+    stmt = (
+        select(Product)
+        .join(Variant, Product.id == Variant.product_id)
+        .where(
+            and_(
+                Product.compare_at_price.isnot(None),
+                Product.compare_at_price > Variant.price
+            )
+        )
+        .distinct()  # Avoid duplicates when product has multiple variants
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+    )
+
+    count_stmt = (
+        select(func.count(func.distinct(Product.id)))
+        .select_from(Product)
+        .join(Variant, Product.id == Variant.product_id)
+        .where(
+            and_(
+                Product.compare_at_price.isnot(None),
+                Product.compare_at_price > Variant.price
+            )
+        )
+    )
+
+    # Apply sorting
+    if sort == "newest":
+        stmt = stmt.order_by(Product.id.desc())
+    elif sort == "price_asc":
+        stmt = stmt.order_by(Variant.price.asc())
+    elif sort == "price_desc":
+        stmt = stmt.order_by(Variant.price.desc())
+    else:  # relevance (default)
+        stmt = stmt.order_by(Product.id.desc())
+
+    # Execute queries
+    res = await db.execute(stmt)
+    products = res.scalars().all()
+    total = (await db.execute(count_stmt)).scalar_one()
+
+    # Build response items (reuse existing logic)
+    items: list = []
+    for p in products:
+        # Load variants
+        vres = await db.execute(select(Variant).where(Variant.product_id == p.id))
+        variants = [VariantOut(id=v.id, sku=v.sku, size=v.size, color=v.color, price=float(v.price)) for v in vres.scalars().all()]
+
+        # Load images
+        imgs = []
+        ires = await db.execute(
+            select(ProductImage)
+            .where(ProductImage.product_id == p.id)
+            .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+        )
+        for img in ires.scalars().all():
+            imgs.append({
+                "id": img.id,
+                "url": img.url,
+                "alt_text": img.alt_text,
+                "width": img.width,
+                "height": img.height,
+                "is_primary": img.is_primary
+            })
+
+        item = {
+            "id": p.id,
+            "title": p.title,
+            "slug": p.slug,
+            "description": p.description,
+            "compare_at_price": float(p.compare_at_price) if p.compare_at_price else None,
+            "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
+            "images": imgs,
+        }
+        items.append(item)
+
+    return Paginated(items=items, total=total, page=page, page_size=page_size)
+
+
 @router.get("/api/products/{id_or_slug}", response_model=ProductOut)
 async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
     product = None
@@ -785,95 +874,6 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
 
     await db.commit()
     return CheckoutInitResponse(order_id=order.id, authorization_url=authorization_url, reference=reference, totals=order.totals)
-
-
-@router.get("/api/products/sale", response_model=Paginated)
-async def get_sale_products(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    sort: str = Query("relevance"),
-    db: AsyncSession = Depends(get_db),
-):
-    """Get products that are on sale (compare_at_price > variant.price)."""
-    # Build query for sale products
-    # We need to join with variants to compare prices
-    stmt = (
-        select(Product)
-        .join(Variant, Product.id == Variant.product_id)
-        .where(
-            and_(
-                Product.compare_at_price.isnot(None),
-                Product.compare_at_price > Variant.price
-            )
-        )
-        .distinct()  # Avoid duplicates when product has multiple variants
-        .limit(page_size)
-        .offset((page - 1) * page_size)
-    )
-
-    count_stmt = (
-        select(func.count(func.distinct(Product.id)))
-        .select_from(Product)
-        .join(Variant, Product.id == Variant.product_id)
-        .where(
-            and_(
-                Product.compare_at_price.isnot(None),
-                Product.compare_at_price > Variant.price
-            )
-        )
-    )
-
-    # Apply sorting
-    if sort == "newest":
-        stmt = stmt.order_by(Product.id.desc())
-    elif sort == "price_asc":
-        stmt = stmt.order_by(Variant.price.asc())
-    elif sort == "price_desc":
-        stmt = stmt.order_by(Variant.price.desc())
-    else:  # relevance (default)
-        stmt = stmt.order_by(Product.id.desc())
-
-    # Execute queries
-    res = await db.execute(stmt)
-    products = res.scalars().all()
-    total = (await db.execute(count_stmt)).scalar_one()
-
-    # Build response items (reuse existing logic)
-    items: list = []
-    for p in products:
-        # Load variants
-        vres = await db.execute(select(Variant).where(Variant.product_id == p.id))
-        variants = [VariantOut(id=v.id, sku=v.sku, size=v.size, color=v.color, price=float(v.price)) for v in vres.scalars().all()]
-
-        # Load images
-        imgs = []
-        ires = await db.execute(
-            select(ProductImage)
-            .where(ProductImage.product_id == p.id)
-            .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
-        )
-        for img in ires.scalars().all():
-            imgs.append({
-                "id": img.id,
-                "url": img.url,
-                "alt_text": img.alt_text,
-                "width": img.width,
-                "height": img.height,
-                "is_primary": img.is_primary
-            })
-
-        item = {
-            "id": p.id,
-            "title": p.title,
-            "slug": p.slug,
-            "description": p.description,
-            "compare_at_price": float(p.compare_at_price) if p.compare_at_price else None,
-            "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
-            "images": imgs,
-        }
-        items.append(item)
-
-    return Paginated(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/api/navigation/categories")
