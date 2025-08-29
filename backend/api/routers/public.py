@@ -476,8 +476,9 @@ async def get_sale_products(
     """Get products that are on sale (compare_at_price > variant.price)."""
     # Build query for sale products
     # We need to join with variants to compare prices
-    stmt = (
-        select(Product)
+    # Use subquery to avoid PostgreSQL JSON comparison issues with DISTINCT
+    subquery = (
+        select(Product.id)
         .join(Variant, Product.id == Variant.product_id)
         .where(
             and_(
@@ -485,30 +486,25 @@ async def get_sale_products(
                 Product.compare_at_price > Variant.price
             )
         )
-        .distinct()  # Avoid duplicates when product has multiple variants
+        .distinct()
+    )
+
+    stmt = (
+        select(Product)
+        .where(Product.id.in_(subquery))
         .limit(page_size)
         .offset((page - 1) * page_size)
     )
 
-    count_stmt = (
-        select(func.count(func.distinct(Product.id)))
-        .select_from(Product)
-        .join(Variant, Product.id == Variant.product_id)
-        .where(
-            and_(
-                Product.compare_at_price.isnot(None),
-                Product.compare_at_price > Variant.price
-            )
-        )
-    )
+    count_stmt = select(func.count()).select_from(subquery.subquery())
 
     # Apply sorting
     if sort == "newest":
         stmt = stmt.order_by(Product.id.desc())
     elif sort == "price_asc":
-        stmt = stmt.order_by(Variant.price.asc())
+        stmt = stmt.order_by(Product.compare_at_price.asc())
     elif sort == "price_desc":
-        stmt = stmt.order_by(Variant.price.desc())
+        stmt = stmt.order_by(Product.compare_at_price.desc())
     else:  # relevance (default)
         stmt = stmt.order_by(Product.id.desc())
 
