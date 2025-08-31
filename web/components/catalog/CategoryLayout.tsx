@@ -139,7 +139,8 @@ export default function CategoryLayout({ title, description, products: initialPr
   const [loading, setLoading] = useState(false)
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "")
+
   // Sorting
   const sortBy = searchParams.get("sort") || "relevance"
   const [sortOpen, setSortOpen] = useState(false)
@@ -156,7 +157,17 @@ export default function CategoryLayout({ title, description, products: initialPr
   // Apply filters and sorting
   useEffect(() => {
     let filtered = [...initialProducts]
-    
+
+    // Search filter
+    const query = searchParams.get("q")
+    if (query) {
+      const searchTerm = query.toLowerCase()
+      filtered = filtered.filter(p =>
+        p.title?.toLowerCase().includes(searchTerm) ||
+        p.description?.toLowerCase().includes(searchTerm)
+      )
+    }
+
     // Price filter
     const minPrice = Number(searchParams.get("minPrice")) || 0
     const maxPrice = Number(searchParams.get("maxPrice")) || Infinity
@@ -224,6 +235,7 @@ export default function CategoryLayout({ title, description, products: initialPr
 
   // Count active filters
   const activeFilterCount = [
+    searchParams.get("q"),
     searchParams.get("minPrice"),
     searchParams.get("maxPrice"),
     searchParams.get("sizes"),
@@ -246,8 +258,35 @@ export default function CategoryLayout({ title, description, products: initialPr
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">{title}</h1>
         {description && (
-          <p className="text-neutral-600">{description}</p>
+          <p className="text-neutral-600 mb-4">{description}</p>
         )}
+
+        {/* Search Bar */}
+        <div className="mt-4 max-w-xl">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search products..."
+              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-maroon-500 border-neutral-200"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const params = new URLSearchParams(searchParams.toString())
+                  if (searchQuery.trim()) {
+                    params.set("q", searchQuery.trim())
+                  } else {
+                    params.delete("q")
+                  }
+                  router.push(`?${params.toString()}`)
+                }
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Toolbar */}

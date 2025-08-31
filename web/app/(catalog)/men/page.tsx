@@ -1,7 +1,7 @@
 import { api } from "../../../lib/api-client"
 import type { ProductListResponse } from "../../../lib/api-types"
 import type { Product } from "../../../lib/types"
-import EnhancedCategoryPage from "../../../components/catalog/EnhancedCategoryPage"
+import CategoryLayout from "../../../components/catalog/CategoryLayout"
 
 async function getProducts(): Promise<Product[]> {
   try {
@@ -14,9 +14,9 @@ async function getProducts(): Promise<Product[]> {
 
 export default async function MenCategoryPage() {
   const products = await getProducts()
-  
+
   return (
-    <EnhancedCategoryPage
+    <CategoryLayout
       title="Men's Collection"
       description="Discover our curated selection of men's fashion essentials."
       products={products}
