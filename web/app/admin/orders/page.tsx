@@ -56,13 +56,24 @@ const statusIcons: Record<string, any> = {
 }
 
 interface Stats {
-  total_orders: number
-  total_revenue: number
-  total_customers: number
-  average_order_value: number
-  recent_orders: number
-  recent_revenue: number
-  period_days: number
+  totalOrders: number
+  totalRevenue: number
+  totalUsers: number
+  totalProducts: number
+  orderChange: number
+  revenueChange: number
+  userChange: number
+  productChange: number
+  recentOrders: any[]
+  lowStockProducts: any[]
+  // Legacy fields for backward compatibility
+  total_orders?: number
+  total_revenue?: number
+  total_customers?: number
+  average_order_value?: number
+  recent_orders?: number
+  recent_revenue?: number
+  period_days?: number
 }
 
 // Access Denied Component
@@ -124,9 +135,52 @@ function OrderManagementContent() {
     try {
       setStatsLoading(true)
       const statsData = await api<Stats>('/api/admin/stats')
-      setStats(statsData)
+
+      // Ensure all numeric fields have default values
+      const safeStats: Stats = {
+        totalOrders: statsData.totalOrders || statsData.total_orders || 0,
+        totalRevenue: statsData.totalRevenue || statsData.total_revenue || 0,
+        totalUsers: statsData.totalUsers || statsData.total_customers || 0,
+        totalProducts: statsData.totalProducts || 0,
+        orderChange: statsData.orderChange || 0,
+        revenueChange: statsData.revenueChange || 0,
+        userChange: statsData.userChange || 0,
+        productChange: statsData.productChange || 0,
+        recentOrders: statsData.recentOrders || [],
+        lowStockProducts: statsData.lowStockProducts || [],
+        // Legacy fields for backward compatibility
+        total_orders: statsData.total_orders || statsData.totalOrders || 0,
+        total_revenue: statsData.total_revenue || statsData.totalRevenue || 0,
+        total_customers: statsData.total_customers || statsData.totalUsers || 0,
+        average_order_value: statsData.average_order_value || 0,
+        recent_orders: statsData.recent_orders || 0,
+        recent_revenue: statsData.recent_revenue || 0,
+        period_days: statsData.period_days || 30
+      }
+
+      setStats(safeStats)
     } catch (error) {
       console.error('Failed to fetch stats:', error)
+      // Set safe fallback values on error
+      setStats({
+        totalOrders: 0,
+        totalRevenue: 0,
+        totalUsers: 0,
+        totalProducts: 0,
+        orderChange: 0,
+        revenueChange: 0,
+        userChange: 0,
+        productChange: 0,
+        recentOrders: [],
+        lowStockProducts: [],
+        total_orders: 0,
+        total_revenue: 0,
+        total_customers: 0,
+        average_order_value: 0,
+        recent_orders: 0,
+        recent_revenue: 0,
+        period_days: 30
+      })
     } finally {
       setStatsLoading(false)
     }
@@ -219,32 +273,84 @@ function OrderManagementContent() {
       </div>
 
       {/* Stats Cards */}
-      {!statsLoading && stats && (
+      {statsLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-6">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-8 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : stats ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
             <p className="text-sm font-medium text-gray-600">Total Orders</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{stats.total_orders.toLocaleString()}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {(stats.totalOrders || stats.total_orders || 0).toLocaleString()}
+            </p>
             <p className="mt-1 text-sm text-gray-500">
-              {stats.recent_orders.toLocaleString()} in last {stats.period_days} days
+              {stats.orderChange !== undefined ? (
+                <span className={stats.orderChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {stats.orderChange >= 0 ? '+' : ''}{stats.orderChange.toFixed(1)}% from last period
+                </span>
+              ) : (
+                `${(stats.recent_orders || 0).toLocaleString()} in last ${stats.period_days || 30} days`
+              )}
             </p>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
             <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">₦{stats.total_revenue.toLocaleString()}</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              ₦{(stats.totalRevenue || stats.total_revenue || 0).toLocaleString()}
+            </p>
             <p className="mt-1 text-sm text-gray-500">
-              ₦{stats.recent_revenue.toLocaleString()} in last {stats.period_days} days
+              {stats.revenueChange !== undefined ? (
+                <span className={stats.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {stats.revenueChange >= 0 ? '+' : ''}{stats.revenueChange.toFixed(1)}% from last period
+                </span>
+              ) : (
+                `₦${(stats.recent_revenue || 0).toLocaleString()} in last ${stats.period_days || 30} days`
+              )}
             </p>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm font-medium text-gray-600">Total Customers</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">{stats.total_customers.toLocaleString()}</p>
-            <p className="mt-1 text-sm text-gray-500">Unique customers</p>
+            <p className="text-sm font-medium text-gray-600">Total Users</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {(stats.totalUsers || stats.total_customers || 0).toLocaleString()}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {stats.userChange !== undefined ? (
+                <span className={stats.userChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {stats.userChange >= 0 ? '+' : ''}{stats.userChange.toFixed(1)}% from last period
+                </span>
+              ) : (
+                'Registered users'
+              )}
+            </p>
           </div>
           <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-sm font-medium text-gray-600">Average Order Value</p>
-            <p className="mt-2 text-3xl font-bold text-gray-900">₦{stats.average_order_value.toLocaleString()}</p>
-            <p className="mt-1 text-sm text-gray-500">Per order</p>
+            <p className="text-sm font-medium text-gray-600">Total Products</p>
+            <p className="mt-2 text-3xl font-bold text-gray-900">
+              {(stats.totalProducts || 0).toLocaleString()}
+            </p>
+            <p className="mt-1 text-sm text-gray-500">
+              {stats.productChange !== undefined ? (
+                <span className={stats.productChange >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {stats.productChange >= 0 ? '+' : ''}{stats.productChange.toFixed(1)}% from last period
+                </span>
+              ) : (
+                'Active products'
+              )}
+            </p>
           </div>
+        </div>
+      ) : (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
+          <p className="text-yellow-800 text-sm">Unable to load statistics. Please refresh the page.</p>
         </div>
       )}
 
