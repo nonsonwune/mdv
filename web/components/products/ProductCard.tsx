@@ -29,16 +29,19 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const isOnSale = comparePrice && comparePrice > price
   const discountPercent = isOnSale ? Math.round((1 - price / comparePrice) * 100) : 0
   
-  // Mock stock status (in real app, this would come from backend)
-  const stockStatus = Math.random() > 0.2 ? "in-stock" : Math.random() > 0.5 ? "low-stock" : "out-of-stock"
-  const stockCount = stockStatus === "low-stock" ? Math.floor(Math.random() * 5) + 1 : null
+  // Get real stock status from product data
+  const stockStatus = product.stock_status || "in-stock"
+  const totalStock = product.total_stock || 0
+
+  // Calculate stock count for low stock display
+  const stockCount = stockStatus === "low-stock" && totalStock > 0 ? totalStock : null
   
   // Handle quick add to cart
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     
-    if (!defaultVariant || stockStatus === "out-of-stock") return
+    if (!defaultVariant || stockStatus === "out_of_stock") return
     
     setIsAdding(true)
     try {
@@ -95,7 +98,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
           )}
           
           {/* Stock Badge */}
-          {stockStatus === "out-of-stock" && (
+          {stockStatus === "out_of_stock" && (
             <Badge
               variant="neutral"
               className="absolute top-2 right-2 z-10"
@@ -103,7 +106,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               Out of Stock
             </Badge>
           )}
-          {stockStatus === "low-stock" && stockCount && (
+          {stockStatus === "low_stock" && stockCount && stockCount > 0 && (
             <Badge
               variant="warning"
               className="absolute top-2 right-2 z-10"
@@ -165,7 +168,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
               </button>
               <button
                 onClick={handleQuickAdd}
-                disabled={isAdding || stockStatus === "out-of-stock"}
+                disabled={isAdding || stockStatus === "out_of_stock"}
                 className="p-2 bg-white rounded-lg hover:bg-neutral-100 transition-colors disabled:opacity-50"
                 aria-label="Add to cart"
               >

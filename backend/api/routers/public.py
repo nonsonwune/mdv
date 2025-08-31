@@ -345,11 +345,53 @@ async def list_products(
     products = res.scalars().all()
     total = (await db.execute(count_stmt)).scalar_one()
 
-    # Load variants
+    # Load variants with inventory data
     items: list[ProductOut] = []
     for p in products:
         vres = await db.execute(select(Variant).where(Variant.product_id == p.id))
-        variants = [VariantOut(id=v.id, sku=v.sku, size=v.size, color=v.color, price=float(v.price)) for v in vres.scalars().all()]
+        variants_with_inventory = []
+        total_stock = 0
+        low_stock_count = 0
+        out_of_stock_count = 0
+
+        for v in vres.scalars().all():
+            # Get inventory for this variant
+            inv_res = await db.execute(select(Inventory).where(Inventory.variant_id == v.id))
+            inventory = inv_res.scalar_one_or_none()
+
+            stock_quantity = inventory.quantity if inventory else 0
+            safety_stock = inventory.safety_stock if inventory else 0
+            total_stock += stock_quantity
+
+            # Determine stock status
+            if stock_quantity == 0:
+                stock_status = "out_of_stock"
+                out_of_stock_count += 1
+            elif stock_quantity <= safety_stock:
+                stock_status = "low_stock"
+                low_stock_count += 1
+            else:
+                stock_status = "in_stock"
+
+            variant_data = {
+                "id": v.id,
+                "sku": v.sku,
+                "size": v.size,
+                "color": v.color,
+                "price": float(v.price),
+                "stock_quantity": stock_quantity,
+                "stock_status": stock_status
+            }
+            variants_with_inventory.append(variant_data)
+
+        # Calculate overall product stock status
+        if out_of_stock_count == len(variants_with_inventory):
+            product_stock_status = "out_of_stock"
+        elif low_stock_count > 0 or out_of_stock_count > 0:
+            product_stock_status = "low_stock"
+        else:
+            product_stock_status = "in_stock"
+
         # Map images if any (explicit query to avoid async lazy-load issues)
         imgs = []
         ires = await db.execute(
@@ -367,15 +409,18 @@ async def list_products(
                 "sort_order": img.sort_order,
                 "is_primary": img.is_primary,
             })
-        # Return as plain dict to include images, variants fields
+
+        # Return as plain dict to include images, variants fields, and inventory data
         item = {
             "id": p.id,
             "title": p.title,
             "slug": p.slug,
             "description": p.description,
             "compare_at_price": float(p.compare_at_price) if p.compare_at_price else None,
-            "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
+            "variants": variants_with_inventory,
             "images": imgs,
+            "total_stock": total_stock,
+            "stock_status": product_stock_status
         }
         items.append(item)
     return Paginated(items=items, total=total, page=page, page_size=page_size)
@@ -513,12 +558,53 @@ async def get_sale_products(
     products = res.scalars().all()
     total = (await db.execute(count_stmt)).scalar_one()
 
-    # Build response items (reuse existing logic)
+    # Build response items with inventory data
     items: list = []
     for p in products:
-        # Load variants
+        # Load variants with inventory data
         vres = await db.execute(select(Variant).where(Variant.product_id == p.id))
-        variants = [VariantOut(id=v.id, sku=v.sku, size=v.size, color=v.color, price=float(v.price)) for v in vres.scalars().all()]
+        variants_with_inventory = []
+        total_stock = 0
+        low_stock_count = 0
+        out_of_stock_count = 0
+
+        for v in vres.scalars().all():
+            # Get inventory for this variant
+            inv_res = await db.execute(select(Inventory).where(Inventory.variant_id == v.id))
+            inventory = inv_res.scalar_one_or_none()
+
+            stock_quantity = inventory.quantity if inventory else 0
+            safety_stock = inventory.safety_stock if inventory else 0
+            total_stock += stock_quantity
+
+            # Determine stock status
+            if stock_quantity == 0:
+                stock_status = "out_of_stock"
+                out_of_stock_count += 1
+            elif stock_quantity <= safety_stock:
+                stock_status = "low_stock"
+                low_stock_count += 1
+            else:
+                stock_status = "in_stock"
+
+            variant_data = {
+                "id": v.id,
+                "sku": v.sku,
+                "size": v.size,
+                "color": v.color,
+                "price": float(v.price),
+                "stock_quantity": stock_quantity,
+                "stock_status": stock_status
+            }
+            variants_with_inventory.append(variant_data)
+
+        # Calculate overall product stock status
+        if out_of_stock_count == len(variants_with_inventory):
+            product_stock_status = "out_of_stock"
+        elif low_stock_count > 0 or out_of_stock_count > 0:
+            product_stock_status = "low_stock"
+        else:
+            product_stock_status = "in_stock"
 
         # Load images
         imgs = []
@@ -543,8 +629,10 @@ async def get_sale_products(
             "slug": p.slug,
             "description": p.description,
             "compare_at_price": float(p.compare_at_price) if p.compare_at_price else None,
-            "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
+            "variants": variants_with_inventory,
             "images": imgs,
+            "total_stock": total_stock,
+            "stock_status": product_stock_status
         }
         items.append(item)
 

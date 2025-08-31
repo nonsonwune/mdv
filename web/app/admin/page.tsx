@@ -34,6 +34,7 @@ export default function AdminHome() {
   const { user, hasPermission, isRole } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDashboardStats()
@@ -41,11 +42,38 @@ export default function AdminHome() {
 
   const fetchDashboardStats = async () => {
     try {
+      setError(null)
       // Fetch actual stats from API
+      const response = await fetch('/api/admin/stats', {
+        method: 'GET',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication required. Please log in again.')
+        } else if (response.status === 403) {
+          throw new Error('Access denied. Insufficient permissions.')
+        } else {
+          throw new Error(`Failed to fetch stats: ${response.status}`)
+        }
+      }
+
+      const data = await response.json()
+      setStats(data)
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load dashboard data'
+      setError(errorMessage)
+
+      // Fallback to safe defaults on error
       setStats({
         totalProducts: 0,
         totalOrders: 0,
-        totalUsers: 1,
+        totalUsers: 0,
         totalRevenue: 0,
         productChange: 0,
         orderChange: 0,
@@ -54,8 +82,6 @@ export default function AdminHome() {
         recentOrders: [],
         lowStockProducts: []
       })
-    } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error)
     } finally {
       setLoading(false)
     }
@@ -65,6 +91,29 @@ export default function AdminHome() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-maroon-700"></div>
+      </div>
+    )
+  }
+
+  // Show error state with retry option
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center">
+            <ExclamationTriangleIcon className="h-6 w-6 text-red-600 mr-3" />
+            <div className="flex-1">
+              <h3 className="text-lg font-medium text-red-800">Dashboard Error</h3>
+              <p className="text-red-700 mt-1">{error}</p>
+            </div>
+            <button
+              onClick={fetchDashboardStats}
+              className="ml-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     )
   }

@@ -776,7 +776,7 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
     # Get total orders count
     total_orders_result = await db.execute(select(func.count(Order.id)))
     total_orders = total_orders_result.scalar_one()
-    
+
     # Get total revenue (sum of all order totals)
     # First get all orders with totals
     orders_with_totals = await db.execute(select(Order.totals).where(Order.totals.isnot(None)))
@@ -789,25 +789,42 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
                 total_revenue += amount
             except (ValueError, TypeError):
                 pass
-    
-    # Get unique customer count
+
+    # Get total products count
+    total_products_result = await db.execute(select(func.count(Product.id)))
+    total_products = total_products_result.scalar_one()
+
+    # Get total users count
+    total_users_result = await db.execute(select(func.count(User.id)))
+    total_users = total_users_result.scalar_one()
+
+    # Get unique customer count (users who have placed orders)
     customer_count_result = await db.execute(
         select(func.count(distinct(Order.user_id))).where(Order.user_id.isnot(None))
     )
     total_customers = customer_count_result.scalar_one() or 0
-    
+
     # Calculate average order value
     average_order_value = float(total_revenue / total_orders) if total_orders > 0 else 0.0
-    
-    # Get stats for the last 30 days
+
+    # Get stats for the last 30 days for change calculations
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    
-    # Orders in last 30 days
+    sixty_days_ago = datetime.now(timezone.utc) - timedelta(days=60)
+
+    # Current period (last 30 days)
     recent_orders_result = await db.execute(
         select(func.count(Order.id)).where(Order.created_at >= thirty_days_ago)
     )
     recent_orders = recent_orders_result.scalar_one()
-    
+
+    # Previous period (30-60 days ago) for change calculation
+    prev_orders_result = await db.execute(
+        select(func.count(Order.id)).where(
+            and_(Order.created_at >= sixty_days_ago, Order.created_at < thirty_days_ago)
+        )
+    )
+    prev_orders = prev_orders_result.scalar_one()
+
     # Revenue in last 30 days
     recent_orders_with_totals = await db.execute(
         select(Order.totals).where(
@@ -825,15 +842,110 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
                 recent_revenue += amount
             except (ValueError, TypeError):
                 pass
-    
+
+    # Previous period revenue for change calculation
+    prev_orders_with_totals = await db.execute(
+        select(Order.totals).where(
+            and_(
+                Order.totals.isnot(None),
+                Order.created_at >= sixty_days_ago,
+                Order.created_at < thirty_days_ago
+            )
+        )
+    )
+    prev_revenue = Decimal("0")
+    for (totals,) in prev_orders_with_totals:
+        if totals and isinstance(totals, dict) and "total" in totals:
+            try:
+                amount = Decimal(str(totals["total"]))
+                prev_revenue += amount
+            except (ValueError, TypeError):
+                pass
+
+    # Users in last 30 days
+    recent_users_result = await db.execute(
+        select(func.count(User.id)).where(User.created_at >= thirty_days_ago)
+    )
+    recent_users = recent_users_result.scalar_one()
+
+    # Previous period users for change calculation
+    prev_users_result = await db.execute(
+        select(func.count(User.id)).where(
+            and_(User.created_at >= sixty_days_ago, User.created_at < thirty_days_ago)
+        )
+    )
+    prev_users = prev_users_result.scalar_one()
+
+    # Products in last 30 days
+    recent_products_result = await db.execute(
+        select(func.count(Product.id)).where(Product.created_at >= thirty_days_ago)
+    )
+    recent_products = recent_products_result.scalar_one()
+
+    # Previous period products for change calculation
+    prev_products_result = await db.execute(
+        select(func.count(Product.id)).where(
+            and_(Product.created_at >= sixty_days_ago, Product.created_at < thirty_days_ago)
+        )
+    )
+    prev_products = prev_products_result.scalar_one()
+
+    # Calculate percentage changes
+    def calculate_change(current: int, previous: int) -> float:
+        if previous == 0:
+            return 100.0 if current > 0 else 0.0
+        return round(((current - previous) / previous) * 100, 1)
+
+    order_change = calculate_change(recent_orders, prev_orders)
+    revenue_change = calculate_change(float(recent_revenue), float(prev_revenue))
+    user_change = calculate_change(recent_users, prev_users)
+    product_change = calculate_change(recent_products, prev_products)
+
+    # Get recent orders for dashboard display
+    recent_orders_query = await db.execute(
+        select(Order)
+        .order_by(Order.created_at.desc())
+        .limit(5)
+    )
+    recent_orders_list = []
+    for order in recent_orders_query.scalars().all():
+        recent_orders_list.append({
+            "id": order.id,
+            "status": order.status.value if order.status else "unknown",
+            "total": float(order.totals.get("total", 0)) if order.totals else 0,
+            "created_at": order.created_at.isoformat() if order.created_at else None
+        })
+
+    # Get low stock products
+    low_stock_query = await db.execute(
+        select(Product, Variant, Inventory)
+        .join(Variant, Product.id == Variant.product_id)
+        .join(Inventory, Variant.id == Inventory.variant_id)
+        .where(Inventory.quantity <= Inventory.safety_stock)
+        .limit(5)
+    )
+    low_stock_products = []
+    for product, variant, inventory in low_stock_query:
+        low_stock_products.append({
+            "id": product.id,
+            "title": product.title,
+            "variant_sku": variant.sku,
+            "current_stock": inventory.quantity,
+            "safety_stock": inventory.safety_stock
+        })
+
+    # Return format expected by frontend
     return {
-        "total_orders": total_orders,
-        "total_revenue": float(total_revenue),
-        "total_customers": total_customers,
-        "average_order_value": round(average_order_value, 2),
-        "recent_orders": recent_orders,
-        "recent_revenue": float(recent_revenue),
-        "period_days": 30
+        "totalProducts": total_products,
+        "totalOrders": total_orders,
+        "totalUsers": total_users,
+        "totalRevenue": float(total_revenue),
+        "productChange": product_change,
+        "orderChange": order_change,
+        "userChange": user_change,
+        "revenueChange": revenue_change,
+        "recentOrders": recent_orders_list,
+        "lowStockProducts": low_stock_products
     }
 
 

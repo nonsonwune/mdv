@@ -14,6 +14,8 @@ export type Variant = {
   size?: string | null
   color?: string | null
   price: number
+  stock_quantity?: number
+  stock_status?: "in_stock" | "low_stock" | "out_of_stock"
 }
 
 export type Product = {
@@ -24,6 +26,8 @@ export type Product = {
   compare_at_price?: number | null
   variants: Variant[]
   images: ProductImage[]
+  total_stock?: number
+  stock_status?: "in_stock" | "low_stock" | "out_of_stock"
 }
 
 export type CartItem = {
