@@ -20,10 +20,15 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
   headers.delete('cookie')
   headers.delete('host')
 
+  // Create AbortController with longer timeout for admin operations
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 seconds
+
   const init: RequestInit = {
     method: request.method,
     headers,
     redirect: 'manual',
+    signal: controller.signal,
   }
 
   if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -43,22 +48,40 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
     }
   }
 
-  const resp = await fetch(target, init)
+  try {
+    const resp = await fetch(target, init)
+    clearTimeout(timeoutId)
 
-  // Stream or JSON passthrough
-  const resHeaders = new Headers(resp.headers)
-  // Ensure CORS is fine for same-origin proxy
-  resHeaders.delete('access-control-allow-origin')
-  resHeaders.delete('access-control-allow-credentials')
+    // Stream or JSON passthrough
+    const resHeaders = new Headers(resp.headers)
+    // Ensure CORS is fine for same-origin proxy
+    resHeaders.delete('access-control-allow-origin')
+    resHeaders.delete('access-control-allow-credentials')
 
-  const contentType = resp.headers.get('content-type') || ''
-  if (contentType.includes('application/json')) {
-    const data = await resp.text()
-    return new NextResponse(data, { status: resp.status, headers: resHeaders })
+    const contentType = resp.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const data = await resp.text()
+      return new NextResponse(data, { status: resp.status, headers: resHeaders })
+    }
+
+    const blob = await resp.arrayBuffer()
+    return new NextResponse(blob, { status: resp.status, headers: resHeaders })
+  } catch (error) {
+    clearTimeout(timeoutId)
+
+    // Handle timeout or other errors
+    if (error instanceof Error && error.name === 'AbortError') {
+      return NextResponse.json(
+        { detail: 'Request timeout - operation took too long' },
+        { status: 408 }
+      )
+    }
+
+    // Re-throw other errors
+    throw error
   }
 
-  const blob = await resp.arrayBuffer()
-  return new NextResponse(blob, { status: resp.status, headers: resHeaders })
+
 }
 
 export const GET = proxy

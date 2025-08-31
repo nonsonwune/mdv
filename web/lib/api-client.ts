@@ -33,7 +33,10 @@
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
   const ctrl = new AbortController()
-  const id = setTimeout(() => ctrl.abort(), 12000)
+  // Longer timeout for admin operations (product creation, etc.)
+  const isAdminPath = path.startsWith('/api/admin')
+  const timeout = isAdminPath ? 35000 : 12000 // 35s for admin, 12s for others
+  const id = setTimeout(() => ctrl.abort(), timeout)
   
   // Build headers (avoid setting Content-Type for FormData bodies)
   const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData
@@ -45,7 +48,6 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
   
   // Route admin requests through Next.js proxy (uses HttpOnly cookie on server)
-  const isAdminPath = path.startsWith('/api/admin')
   const url = isAdminPath ? path : `${base}${path}`
   
   try {

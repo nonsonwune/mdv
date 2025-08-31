@@ -9,6 +9,13 @@ const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
+  // Increase API route timeout for admin operations
+  api: {
+    responseLimit: false,
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if
