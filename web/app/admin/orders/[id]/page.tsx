@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
+import { useAuth } from '@/lib/auth-context'
 import {
   ArrowLeftIcon,
   TruckIcon,
@@ -179,6 +180,7 @@ interface Order {
 export default function OrderDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
@@ -301,6 +303,36 @@ export default function OrderDetailPage() {
     })
   }
 
+  // Show loading state while authentication is initializing
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-maroon-700 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Authenticating...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Check if user is authenticated after auth loading is complete
+  if (!authLoading && !user) {
+    return (
+      <div className="text-center py-12">
+        <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Authentication Required</h3>
+        <p className="text-gray-500 mb-4">You must be logged in to access this page.</p>
+        <button
+          onClick={() => router.push('/staff-login')}
+          className="text-maroon-600 hover:text-maroon-500"
+        >
+          Go to Login
+        </button>
+      </div>
+    )
+  }
+
+  // Show loading state while order data is being fetched
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -605,8 +637,8 @@ export default function OrderDetailPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
-                {/* Check if user can modify payment status */}
-                {user?.role === 'admin' && !order.payment_ref ? (
+                {/* Check if user can modify payment status - ensure user exists and has admin role */}
+                {user && user.role === 'admin' && !order.payment_ref ? (
                   <select
                     value={newPaymentStatus}
                     onChange={(e) => setNewPaymentStatus(e.target.value)}
