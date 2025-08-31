@@ -369,11 +369,14 @@ async def admin_update_order(
 
     Supported updates:
     - payment_status: maps to Order.status (pending|failed -> PendingPayment, paid -> Paid, refunded -> Refunded)
+      * Only Admin users can modify payment status for non-Paystack orders
+      * Paystack orders are read-only for all users (including Admin)
     - status: high-level UI status; "cancelled" maps to Order.status Cancelled; other values primarily affect fulfillment/shipment timeline
     - tracking_number/carrier: creates or updates Shipment (and Fulfillment if missing)
     - notes: stored on Fulfillment.notes
     """
     actor_id = parse_actor_id(claims)
+    user_role = claims.get("role")
 
     # Load order with related fulfillment/shipment
     stmt = (
@@ -395,18 +398,40 @@ async def admin_update_order(
 
     changed = False
 
-    # Map payment_status -> OrderStatus
+    # Map payment_status -> OrderStatus with role-based restrictions
     if body.payment_status is not None:
-        mapping = {
-            "pending": OrderStatus.pending_payment,
-            "failed": OrderStatus.pending_payment,  # we treat failed as pending (unpaid)
-            "paid": OrderStatus.paid,
-            "refunded": OrderStatus.refunded,
-        }
-        new_os = mapping.get(body.payment_status)
-        if new_os and order.status != new_os:
-            order.status = new_os
-            changed = True
+        # Check if user has permission to modify payment status
+        can_modify_payment = False
+
+        # Only Admin users can modify payment status
+        if user_role == "admin":
+            # Check if this is a Paystack order (read-only for all users)
+            is_paystack_order = bool(order.payment_ref)  # Paystack orders have payment_ref
+
+            if not is_paystack_order:
+                can_modify_payment = True
+            else:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Cannot modify payment status for Paystack orders. Payment status is managed automatically."
+                )
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Admin users can modify payment status."
+            )
+
+        if can_modify_payment:
+            mapping = {
+                "pending": OrderStatus.pending_payment,
+                "failed": OrderStatus.pending_payment,  # we treat failed as pending (unpaid)
+                "paid": OrderStatus.paid,
+                "refunded": OrderStatus.refunded,
+            }
+            new_os = mapping.get(body.payment_status)
+            if new_os and order.status != new_os:
+                order.status = new_os
+                changed = True
 
     # Handle UI status updates
     if body.status is not None:
@@ -768,6 +793,108 @@ async def get_admin_analytics(
         },
     }
 
+
+
+@router.get("/logistics/stats", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def get_logistics_stats(db: AsyncSession = Depends(get_db)):
+    """Get logistics dashboard statistics."""
+    # Get shipment counts by status
+    shipment_counts = await db.execute(
+        select(
+            Shipment.status,
+            func.count(Shipment.id).label('count')
+        )
+        .group_by(Shipment.status)
+    )
+
+    stats = {
+        'total_shipments': 0,
+        'dispatched': 0,
+        'in_transit': 0,
+        'delivered': 0,
+        'returned': 0,
+        'pending_dispatch': 0
+    }
+
+    for status, count in shipment_counts:
+        stats['total_shipments'] += count
+        if status == ShipmentStatus.dispatched:
+            stats['dispatched'] = count
+        elif status == ShipmentStatus.in_transit:
+            stats['in_transit'] = count
+        elif status == ShipmentStatus.delivered:
+            stats['delivered'] = count
+        elif status == ShipmentStatus.returned:
+            stats['returned'] = count
+
+    # Get orders ready to ship (fulfillment ready but no shipment)
+    pending_dispatch_result = await db.execute(
+        select(func.count(Fulfillment.id))
+        .where(
+            and_(
+                Fulfillment.status == FulfillmentStatus.ready_to_ship,
+                ~Fulfillment.id.in_(select(Shipment.fulfillment_id))
+            )
+        )
+    )
+    stats['pending_dispatch'] = pending_dispatch_result.scalar_one()
+
+    return stats
+
+
+@router.get("/logistics/ready-to-ship", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def get_ready_to_ship_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get orders that are ready to ship."""
+    # Get fulfillments that are ready to ship but don't have shipments
+    stmt = (
+        select(Order, Address)
+        .join(Fulfillment, Order.id == Fulfillment.order_id)
+        .join(Address, Order.id == Address.order_id)
+        .where(
+            and_(
+                Fulfillment.status == FulfillmentStatus.ready_to_ship,
+                ~Fulfillment.id.in_(select(Shipment.fulfillment_id))
+            )
+        )
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(Order.created_at.asc())
+    )
+
+    result = await db.execute(stmt)
+    orders_data = []
+
+    for order, address in result:
+        # Get order items count
+        items_count_result = await db.execute(
+            select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+        )
+        items_count = items_count_result.scalar_one()
+
+        # Get total amount from order.totals
+        total_amount = 0
+        if order.totals and isinstance(order.totals, dict):
+            total_amount = float(order.totals.get('total', 0))
+
+        orders_data.append({
+            'id': order.id,
+            'order_number': f"MDV-{order.id:06d}",
+            'customer_name': address.name,
+            'items_count': items_count,
+            'total_amount': total_amount,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'shipping_address': {
+                'city': address.city,
+                'state': address.state,
+                'street': address.street
+            }
+        })
+
+    return {'orders': orders_data}
 
 
 @router.get("/stats", dependencies=[Depends(require_roles(*ALL_STAFF))])

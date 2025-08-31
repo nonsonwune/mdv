@@ -100,13 +100,21 @@ export default function AdminLayout({
           permission: Permission.ORDER_VIEW,
           description: 'Order processing and fulfillment'
         },
-        { 
-          name: 'Inventory', 
-          href: '/admin/inventory', 
+        {
+          name: 'Inventory',
+          href: '/admin/inventory',
           icon: ArchiveBoxIcon,
           permission: Permission.INVENTORY_VIEW,
           roles: ['admin', 'supervisor', 'operations'],
           description: 'Stock management and adjustments'
+        },
+        {
+          name: 'Logistics',
+          href: '/admin/logistics',
+          icon: TruckIcon,
+          permission: Permission.ORDER_VIEW,
+          roles: ['admin', 'supervisor', 'logistics'],
+          description: 'Shipping and delivery management'
         }
       ]
     },

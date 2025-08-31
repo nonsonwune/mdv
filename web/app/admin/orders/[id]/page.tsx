@@ -605,16 +605,31 @@ export default function OrderDetailPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
-                <select
-                  value={newPaymentStatus}
-                  onChange={(e) => setNewPaymentStatus(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="failed">Failed</option>
-                  <option value="refunded">Refunded</option>
-                </select>
+                {/* Check if user can modify payment status */}
+                {user?.role === 'admin' && !order.payment_ref ? (
+                  <select
+                    value={newPaymentStatus}
+                    onChange={(e) => setNewPaymentStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="failed">Failed</option>
+                    <option value="refunded">Refunded</option>
+                  </select>
+                ) : (
+                  <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
+                    <span className="text-gray-600">
+                      {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+                    </span>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {order.payment_ref
+                        ? "Paystack orders are read-only"
+                        : "Only Admin users can modify payment status"
+                      }
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
