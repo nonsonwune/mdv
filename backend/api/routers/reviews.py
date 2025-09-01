@@ -276,7 +276,14 @@ async def create_review(
     
     # Check if user has purchased the product
     verified_purchase = await has_purchased_product(user_id, request.product_id, db)
-    
+
+    # BUSINESS RULE: Only allow reviews from verified purchasers
+    if not verified_purchase:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only review products you have purchased and received"
+        )
+
     # Create review
     review = Review(
         product_id=request.product_id,

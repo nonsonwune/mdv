@@ -22,6 +22,7 @@ interface Order {
   status: string
   total: number
   item_count: number
+  items_summary?: string
   created_at: string
   user?: {
     name: string
@@ -449,8 +450,12 @@ function OrderManagementContent() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(order.created_at)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.item_count || 0} items
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        <div className="max-w-xs">
+                          <div className="truncate" title={order.items_summary || `${order.item_count || 0} items`}>
+                            {order.items_summary || `${order.item_count || 0} items`}
+                          </div>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         ₦{(order.total || 0).toLocaleString()}

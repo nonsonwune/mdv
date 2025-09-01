@@ -121,7 +121,7 @@ interface OrderItem {
 interface Order {
   id: number
   order_number: string
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  status: 'pending' | 'processing' | 'pending_dispatch' | 'in_transit' | 'shipped' | 'delivered' | 'cancelled'
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded'
   payment_method?: string
   total_amount: number
@@ -255,6 +255,10 @@ export default function OrderDetailPage() {
         return 'bg-yellow-100 text-yellow-800'
       case 'processing':
         return 'bg-blue-100 text-blue-800'
+      case 'pending_dispatch':
+        return 'bg-orange-100 text-orange-800'
+      case 'in_transit':
+        return 'bg-indigo-100 text-indigo-800'
       case 'shipped':
       case 'dispatched':
         return 'bg-purple-100 text-purple-800'
@@ -629,6 +633,8 @@ export default function OrderDetailPage() {
                 >
                   <option value="pending">Pending</option>
                   <option value="processing">Processing</option>
+                  <option value="pending_dispatch">Pending Dispatch</option>
+                  <option value="in_transit">In Transit</option>
                   <option value="shipped">Shipped</option>
                   <option value="delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>

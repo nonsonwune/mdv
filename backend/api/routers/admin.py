@@ -53,7 +53,7 @@ async def admin_list_orders(
         .offset((page - 1) * page_size)
         .order_by(Order.id.desc())
         .options(
-            selectinload(Order.items),
+            selectinload(Order.items).selectinload(OrderItem.variant).selectinload(Variant.product),
             selectinload(Order.address),
             selectinload(Order.user),
         )
@@ -100,6 +100,25 @@ async def admin_list_orders(
         except Exception:
             total_value = None
         item_count = sum(i.qty for i in (o.items or []))
+
+        # Create item summary for display
+        items_list = o.items or []
+        item_names = []
+        for item in items_list[:3]:  # Get first 3 items
+            # Get product title from the variant relationship
+            if hasattr(item, 'variant') and item.variant and hasattr(item.variant, 'product') and item.variant.product:
+                item_names.append(item.variant.product.title)
+            else:
+                # Fallback: use a generic name
+                item_names.append(f"Product {item.variant_id if hasattr(item, 'variant_id') else item.id}")
+
+        # Create summary string
+        if len(items_list) <= 3:
+            items_summary = ", ".join(item_names) if item_names else f"{item_count} items"
+        else:
+            remaining = len(items_list) - 3
+            items_summary = f"{', '.join(item_names)} and {remaining} more item{'s' if remaining > 1 else ''}" if item_names else f"{item_count} items"
+
         user_obj = {"name": o.user.name, "email": o.user.email} if getattr(o, "user", None) else None
         addr = getattr(o, "address", None)
         shipping_address = (
@@ -111,6 +130,7 @@ async def admin_list_orders(
                 "status": _status_value(o.status),
                 "total": total_value,
                 "item_count": item_count,
+                "items_summary": items_summary,
                 "created_at": o.created_at,
                 "user": user_obj,
                 "shipping_address": shipping_address,
