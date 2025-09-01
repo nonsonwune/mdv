@@ -135,6 +135,7 @@ class Variant(Base):
     color: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     price: Mapped[Numeric] = mapped_column(Numeric(12, 2))
     # Relationships
+    product: Mapped["Product"] = relationship("Product", back_populates="variants")
     inventory: Mapped[Optional["Inventory"]] = relationship(
         "Inventory",
         back_populates="variant",
@@ -246,6 +247,7 @@ class OrderItem(Base):
     
     # Relationships
     order: Mapped["Order"] = relationship("Order", back_populates="items")
+    variant: Mapped["Variant"] = relationship("Variant")
 
 
 class Address(Base):

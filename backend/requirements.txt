@@ -20,6 +20,8 @@ opentelemetry-instrumentation-fastapi==0.46b0
 opentelemetry-exporter-otlp==1.25.0
 # Async Postgres driver used by SQLAlchemy AsyncEngine
 asyncpg==0.30.0
+# Sync Postgres driver for Alembic migrations
+psycopg2-binary==2.9.9
 # Image upload and management
 cloudinary==1.41.0
 # Rate limiting
