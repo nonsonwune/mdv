@@ -48,6 +48,14 @@ class MoveToCartRequest(BaseModel):
     item_id: int
     cart_id: Optional[int] = None  # If not provided, create new cart
 
+class ToggleWishlistRequest(BaseModel):
+    product_id: int
+    variant_id: Optional[int] = None
+
+class ToggleWishlistResponse(BaseModel):
+    action: str  # "added" or "removed"
+    message: str
+
 
 # Get wishlist
 @router.get("", response_model=WishlistResponse)
@@ -122,6 +130,85 @@ async def get_wishlist(
         updated_at=wishlist.updated_at
     )
 
+
+# Toggle wishlist item (add if not exists, remove if exists)
+@router.post("/toggle", response_model=ToggleWishlistResponse)
+async def toggle_wishlist_item(
+    request: ToggleWishlistRequest,
+    claims: dict = Depends(get_current_claims),
+    db: AsyncSession = Depends(get_db)
+):
+    """Toggle an item in the wishlist - add if not present, remove if present."""
+    user_id = int(claims["sub"])
+
+    # Get or create wishlist
+    wishlist_result = await db.execute(
+        select(Wishlist).where(Wishlist.user_id == user_id)
+    )
+    wishlist = wishlist_result.scalar_one_or_none()
+
+    if not wishlist:
+        # Create new wishlist
+        wishlist = Wishlist(user_id=user_id)
+        db.add(wishlist)
+        await db.flush()  # Get the ID
+
+    # Check if item already exists
+    existing_item_result = await db.execute(
+        select(WishlistItem).where(
+            and_(
+                WishlistItem.wishlist_id == wishlist.id,
+                WishlistItem.product_id == request.product_id,
+                WishlistItem.variant_id == request.variant_id
+            )
+        )
+    )
+    existing_item = existing_item_result.scalar_one_or_none()
+
+    if existing_item:
+        # Remove item
+        await db.delete(existing_item)
+        await db.commit()
+        return ToggleWishlistResponse(
+            action="removed",
+            message="Item removed from wishlist"
+        )
+    else:
+        # Verify product exists
+        product_result = await db.execute(
+            select(Product).where(Product.id == request.product_id)
+        )
+        product = product_result.scalar_one_or_none()
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # Verify variant if provided
+        if request.variant_id:
+            variant_result = await db.execute(
+                select(Variant).where(
+                    and_(
+                        Variant.id == request.variant_id,
+                        Variant.product_id == request.product_id
+                    )
+                )
+            )
+            variant = variant_result.scalar_one_or_none()
+            if not variant:
+                raise HTTPException(status_code=404, detail="Variant not found")
+
+        # Add item
+        wishlist_item = WishlistItem(
+            wishlist_id=wishlist.id,
+            product_id=request.product_id,
+            variant_id=request.variant_id
+        )
+        db.add(wishlist_item)
+        await db.commit()
+
+        return ToggleWishlistResponse(
+            action="added",
+            message="Item added to wishlist"
+        )
 
 # Add to wishlist
 @router.post("/items", response_model=dict)
