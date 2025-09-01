@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     console.log('Auth check: token length', token.length)
     
     try {
-      const response = await fetch(`${backendUrl}/api/users/profile`, {
+      const response = await fetch(`${backendUrl}/api/auth/check`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -33,17 +33,17 @@ export async function GET(request: NextRequest) {
       }
 
       const userData = await response.json()
-      
+
       return NextResponse.json({
         authenticated: true,
         user: {
-          id: userData.id.toString(),
-          name: userData.name,
-          email: userData.email,
-          role: userData.role || role, // Fallback to cookie role
-          active: userData.active,
-          created_at: userData.created_at,
-          phone: userData.phone
+          id: userData.user.id.toString(),
+          name: userData.user.name,
+          email: userData.user.email,
+          role: userData.user.role || role, // Fallback to cookie role
+          active: userData.user.active,
+          created_at: userData.user.created_at,
+          phone: userData.user.phone || null
         }
       })
     } catch (fetchError) {
