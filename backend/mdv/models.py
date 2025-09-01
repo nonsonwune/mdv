@@ -95,8 +95,15 @@ class Category(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
     slug: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("categories.id"), nullable=True, index=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
     # Relationships
     products: Mapped[list["Product"]] = relationship("Product", back_populates="category")
+    parent: Mapped[Optional["Category"]] = relationship("Category", remote_side=[id], back_populates="children")
+    children: Mapped[list["Category"]] = relationship("Category", back_populates="parent")
 
 
 class Product(Base):

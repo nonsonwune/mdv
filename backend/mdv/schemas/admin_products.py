@@ -227,8 +227,13 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
     slug: str
+    parent_id: Optional[int] = None
+    description: Optional[str] = None
+    sort_order: int = 0
+    is_active: bool = True
     product_count: int = 0
-    
+    children: List["CategoryResponse"] = []
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -236,7 +241,11 @@ class CategoryCreateRequest(BaseModel):
     """Schema for creating a category."""
     name: str = Field(..., min_length=1, max_length=120)
     slug: Optional[str] = Field(None, max_length=160)
-    
+    parent_id: Optional[int] = Field(None, description="Parent category ID for subcategories")
+    description: Optional[str] = Field(None, description="Category description")
+    sort_order: int = Field(0, description="Sort order within parent category")
+    is_active: bool = Field(True, description="Whether category is active")
+
     @validator('slug')
     def generate_slug(cls, v, values):
         """Generate slug from name if not provided."""
@@ -252,6 +261,10 @@ class CategoryUpdateRequest(BaseModel):
     """Schema for updating a category."""
     name: Optional[str] = Field(None, min_length=1, max_length=120)
     slug: Optional[str] = Field(None, max_length=160)
+    parent_id: Optional[int] = Field(None, description="Parent category ID for subcategories")
+    description: Optional[str] = Field(None, description="Category description")
+    sort_order: Optional[int] = Field(None, description="Sort order within parent category")
+    is_active: Optional[bool] = Field(None, description="Whether category is active")
 
 
 class BulkDeleteRequest(BaseModel):

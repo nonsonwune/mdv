@@ -1,58 +1,61 @@
-# Build Next.js web
+# ---------- deps: install node modules ----------
 FROM node:20-alpine AS deps
 WORKDIR /app
-# Install dependencies for sharp (required for Next.js image optimization)
-RUN apk add --no-cache libc6-compat python3 make g++ 
+ENV NEXT_TELEMETRY_DISABLED=1
+# Needed for building native deps like sharp
+RUN apk add --no-cache libc6-compat python3 make g++
 COPY web/package.json web/package-lock.json ./
-# Install ALL dependencies (including devDependencies) for build
 RUN npm ci
-# Install sharp explicitly with platform-specific binary
-RUN npm install sharp
 
+# ---------- build: compile Next.js (standalone) ----------
 FROM node:20-alpine AS build
 WORKDIR /app
-
-# IMPORTANT: Accept build args for Next.js public environment variables
+ENV NEXT_TELEMETRY_DISABLED=1
+# Public build args (baked into the bundle)
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-
-# Set them as ENV for the build process
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}
+# Node modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+# App source
 COPY web ./
-# Copy docs directory for API contract generation
-COPY docs ../docs
-
-# Debug: Print environment variables during build
-RUN echo "Building with NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL"
-
-# Run build (which includes prebuild for type generation)
+# Copy the docs directory so the prebuild script can find api-contracts.yaml
+COPY docs /docs
+# Optional: quick visibility during build
+RUN echo "Building with NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}"
+# Build (runs your prebuild -> openapi-typescript -> next build)
 RUN npm run build
 
+# ---------- runner: minimal production image ----------
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-# Add runtime dependencies for sharp
-RUN apk add --no-cache libc6-compat
-
-# Runtime environment variables (these don't affect the built code)
+ENV NEXT_TELEMETRY_DISABLED=1
+# Runtime-only vars (e.g., server-side fetches from the web container to backend)
+ARG API_URL
+ENV API_URL=${API_URL}
+# Expose public vars at runtime too (handy for diagnostics or edge cases)
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
-ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-
-# Copy standalone output if available (Next 14 standalone)
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}
+# Runtime deps for sharp
+RUN apk add --no-cache libc6-compat
+# Copy Next standalone output
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
-# The standalone output includes a server.js with Next server
+# Keep package.json around (some setups expect it at runtime)
+COPY web/package.json ./package.json
 ENV PORT=3000
 EXPOSE 3000
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+USER nextjs
 CMD ["node", "server.js"]

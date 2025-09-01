@@ -54,6 +54,78 @@ async def order_tracking(order_id: int, db: AsyncSession = Depends(get_db)):
     return {"order_id": order.id, "status": order.status.value if hasattr(order.status, 'value') else order.status, "timeline": timeline}
 
 
+@router.get("/api/orders/{order_id}/receipt")
+async def order_receipt(order_id: int, reference: str = Query(...), db: AsyncSession = Depends(get_db)):
+    """Get order receipt details for checkout confirmation. Requires transaction reference for security."""
+    from sqlalchemy.orm import selectinload
+    from mdv.models import OrderItem, Variant, Product, Address
+
+    # Get order with related data
+    result = await db.execute(
+        select(Order)
+        .where(Order.id == order_id)
+        .options(
+            selectinload(Order.items),
+            selectinload(Order.address)
+        )
+    )
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Verify the reference matches (basic security check)
+    # In a real implementation, you might want to store and verify the actual transaction reference
+    expected_ref = f"MDV-{order_id}-"
+    if not reference.startswith(expected_ref):
+        raise HTTPException(status_code=403, detail="Invalid reference")
+
+    # Get detailed item information
+    items_response = []
+    for item in order.items:
+        # Get variant and product info
+        variant = await db.get(Variant, item.variant_id)
+        if variant:
+            product_result = await db.execute(
+                select(Product).where(Product.id == variant.product_id)
+            )
+            product = product_result.scalar_one_or_none()
+
+            items_response.append({
+                "id": item.id,
+                "variant_id": item.variant_id,
+                "product_name": product.title if product else f"Product {variant.product_id}",
+                "variant_sku": variant.sku,
+                "size": variant.size,
+                "color": variant.color,
+                "qty": item.qty,
+                "unit_price": float(item.unit_price),
+                "subtotal": float(item.unit_price * item.qty),
+                "on_sale": item.on_sale
+            })
+
+    # Format address
+    address_response = None
+    if order.address:
+        address_response = {
+            "name": order.address.name,
+            "phone": order.address.phone,
+            "state": order.address.state,
+            "city": order.address.city,
+            "street": order.address.street
+        }
+
+    return {
+        "id": order.id,
+        "status": order.status.value if hasattr(order.status, 'value') else order.status,
+        "totals": order.totals,
+        "created_at": order.created_at.isoformat(),
+        "items": items_response,
+        "shipping_address": address_response,
+        "tracking_available": order.status in ["Paid", "Refunded"]
+    }
+
+
 @router.get("/api/search/suggestions")
 async def get_search_suggestions(
     q: str = Query(..., min_length=1),

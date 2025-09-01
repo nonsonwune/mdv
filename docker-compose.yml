@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   postgres:
     image: postgres:16
@@ -8,25 +7,90 @@ services:
       POSTGRES_USER: mdv
       POSTGRES_PASSWORD: mdv
     ports:
-      - "5432:5432"
+      - "5432:5432"         # change to "5433:5432" if you have local Postgres on 5432
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mdv"]
+      test: ["CMD-SHELL", "pg_isready -U mdv -d mdv"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7
     container_name: mdv_redis
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: mdv_backend
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: 8000
+      # Internal service hostnames are the service names: postgres, redis
+      DATABASE_URL: postgresql://mdv:mdv@postgres:5432/mdv
+      REDIS_URL: redis://redis:6379/0
+      # These will be loaded from the .env file but we set defaults
+      ENV: ${ENV:-production}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        # The public URL your browser calls. Since the browser hits your host,
+        # expose the host-mapped port here:
+        NEXT_PUBLIC_API_URL: "http://localhost:8000"
+        NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+        NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: "${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}"
+    container_name: mdv_web
+    environment:
+      # If your Next server-side code needs internal API calls, you can add
+      # a non-public API_URL too (read with process.env.API_URL in server code):
+      API_URL: "http://backend:8000"
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 5
 
 volumes:
   pgdata:
   redisdata:
-

@@ -10,6 +10,7 @@ from decimal import Decimal
 
 from mdv.auth import require_roles
 from mdv.rbac import ALL_STAFF, FULFILLMENT_STAFF, LOGISTICS_STAFF, SUPERVISORS
+from mdv.size_system import get_category_size_options, SizeSystem
 from mdv.models import (
     Order,
     OrderStatus,
@@ -936,6 +937,36 @@ async def get_ready_to_ship_orders(
         })
 
     return {'orders': orders_data}
+
+
+@router.get("/categories/{category_id}/size-options", dependencies=[Depends(require_roles(*ALL_STAFF))])
+async def get_category_size_options(
+    category_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get size options for a specific category."""
+    # Get category
+    category = await db.get(Category, category_id)
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    # Get size options based on category
+    size_info = get_category_size_options(category.slug)
+
+    return {
+        "category_id": category_id,
+        "category_name": category.name,
+        "category_slug": category.slug,
+        **size_info
+    }
+
+
+@router.get("/size-systems", dependencies=[Depends(require_roles(*ALL_STAFF))])
+async def get_all_size_systems():
+    """Get all available size systems."""
+    return {
+        "size_systems": SizeSystem.get_all_size_types()
+    }
 
 
 @router.get("/stats", dependencies=[Depends(require_roles(*ALL_STAFF))])

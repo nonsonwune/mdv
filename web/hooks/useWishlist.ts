@@ -1,97 +1,201 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
+import { api } from '../lib/api-client'
+import { useAuth } from '../lib/auth-context'
 import type { Product } from '../lib/types'
 
-const STORAGE_KEY = 'mdv_wishlist'
+interface WishlistItem {
+  id: number
+  product_id: number
+  variant_id?: number
+  product_name: string
+  product_slug: string
+  price: number
+  image_url?: string
+  added_at: string
+  in_stock: boolean
+}
+
+interface WishlistResponse {
+  user_id: number
+  items: WishlistItem[]
+  total_items: number
+  created_at: string
+  updated_at: string
+}
 
 export function useWishlist() {
-  const [items, setItems] = useState<Product[]>([])
+  const { user, isAuthenticated } = useAuth()
+  const [items, setItems] = useState<WishlistItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Load from localStorage on mount
-  useEffect(() => {
+  // Load wishlist from API when user is authenticated
+  const loadWishlist = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      setItems([])
+      setIsLoading(false)
+      return
+    }
+
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored) as Product[]
-        setItems(parsed)
-      }
+      setError(null)
+      const response = await api<WishlistResponse>('/api/wishlist')
+      setItems(response.items)
     } catch (error) {
       console.error('Failed to load wishlist:', error)
+      setError('Failed to load wishlist')
+      setItems([])
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isAuthenticated, user])
 
-  // Save to localStorage whenever items change
+  // Load wishlist on mount and when auth state changes
+  useEffect(() => {
+    loadWishlist()
+  }, [loadWishlist])
+
+  // Dispatch wishlist update events
   useEffect(() => {
     if (!isLoading) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-        
-        // Dispatch custom event for other components to listen to
-        window.dispatchEvent(new CustomEvent('wishlist-updated', { 
-          detail: { count: items.length } 
-        }))
-      } catch (error) {
-        console.error('Failed to save wishlist:', error)
-      }
+      window.dispatchEvent(new CustomEvent('wishlist-updated', {
+        detail: { count: items.length }
+      }))
     }
   }, [items, isLoading])
 
-  const addItem = useCallback((product: Product) => {
-    setItems(prev => {
-      // Check if already in wishlist
-      if (prev.some(p => p.id === product.id)) {
-        return prev
-      }
-      return [...prev, product]
-    })
-    return true
-  }, [])
+  const addItem = useCallback(async (productId: number, variantId?: number) => {
+    if (!isAuthenticated || !user) {
+      throw new Error('Must be logged in to add items to wishlist')
+    }
 
-  const removeItem = useCallback((productId: number) => {
-    setItems(prev => prev.filter(p => p.id !== productId))
-  }, [])
+    try {
+      await api('/api/wishlist/items', {
+        method: 'POST',
+        body: JSON.stringify({
+          product_id: productId,
+          variant_id: variantId
+        })
+      })
 
-  const toggleItem = useCallback((product: Product) => {
-    setItems(prev => {
-      const exists = prev.some(p => p.id === product.id)
-      if (exists) {
-        return prev.filter(p => p.id !== product.id)
-      } else {
-        return [...prev, product]
-      }
-    })
-  }, [])
+      // Reload wishlist to get updated data
+      await loadWishlist()
+      return true
+    } catch (error) {
+      console.error('Failed to add item to wishlist:', error)
+      throw error
+    }
+  }, [isAuthenticated, user, loadWishlist])
 
-  const clearWishlist = useCallback(() => {
-    setItems([])
-    localStorage.removeItem(STORAGE_KEY)
-  }, [])
+  const removeItem = useCallback(async (productId: number, variantId?: number) => {
+    if (!isAuthenticated || !user) {
+      throw new Error('Must be logged in to remove items from wishlist')
+    }
 
-  const isInWishlist = useCallback((productId: number) => {
-    return items.some(p => p.id === productId)
+    try {
+      await api('/api/wishlist/items', {
+        method: 'DELETE',
+        body: JSON.stringify({
+          product_id: productId,
+          variant_id: variantId
+        })
+      })
+
+      // Reload wishlist to get updated data
+      await loadWishlist()
+      return true
+    } catch (error) {
+      console.error('Failed to remove item from wishlist:', error)
+      throw error
+    }
+  }, [isAuthenticated, user, loadWishlist])
+
+  const toggleItem = useCallback(async (productId: number, variantId?: number) => {
+    if (!isAuthenticated || !user) {
+      throw new Error('Must be logged in to modify wishlist')
+    }
+
+    try {
+      const response = await api('/api/wishlist/toggle', {
+        method: 'POST',
+        body: JSON.stringify({
+          product_id: productId,
+          variant_id: variantId
+        })
+      })
+
+      // Reload wishlist to get updated data
+      await loadWishlist()
+      return response.action === 'added'
+    } catch (error) {
+      console.error('Failed to toggle wishlist item:', error)
+      throw error
+    }
+  }, [isAuthenticated, user, loadWishlist])
+
+  const clearWishlist = useCallback(async () => {
+    if (!isAuthenticated || !user) {
+      throw new Error('Must be logged in to clear wishlist')
+    }
+
+    try {
+      await api('/api/wishlist/clear', {
+        method: 'DELETE'
+      })
+
+      // Reload wishlist to get updated data
+      await loadWishlist()
+      return true
+    } catch (error) {
+      console.error('Failed to clear wishlist:', error)
+      throw error
+    }
+  }, [isAuthenticated, user, loadWishlist])
+
+  const isInWishlist = useCallback((productId: number, variantId?: number) => {
+    return items.some(item =>
+      item.product_id === productId &&
+      (variantId ? item.variant_id === variantId : !item.variant_id)
+    )
   }, [items])
 
-  const moveToCart = useCallback(async (productId: number) => {
-    const product = items.find(p => p.id === productId)
-    if (!product || !product.variants?.[0]) return false
-    
+  const checkWishlistStatus = useCallback(async (productId: number, variantId?: number) => {
+    if (!isAuthenticated || !user) {
+      return false
+    }
+
     try {
-      // Import cart functions dynamically to avoid circular dependencies
-      const { addItemWithRecovery } = await import('../lib/cart')
-      await addItemWithRecovery(product.variants[0].id, 1)
-      
-      // Remove from wishlist after adding to cart
-      removeItem(productId)
+      const response = await api<{in_wishlist: boolean}>(`/api/wishlist/check/${productId}${variantId ? `?variant_id=${variantId}` : ''}`)
+      return response.in_wishlist
+    } catch (error) {
+      console.error('Failed to check wishlist status:', error)
+      return false
+    }
+  }, [isAuthenticated, user])
+
+  const moveToCart = useCallback(async (itemId: number) => {
+    if (!isAuthenticated || !user) {
+      throw new Error('Must be logged in to move items to cart')
+    }
+
+    try {
+      await api('/api/wishlist/move-to-cart', {
+        method: 'POST',
+        body: JSON.stringify({
+          item_id: itemId
+        })
+      })
+
+      // Reload wishlist to get updated data
+      await loadWishlist()
       return true
     } catch (error) {
       console.error('Failed to move to cart:', error)
-      return false
+      throw error
     }
-  }, [items, removeItem])
+  }, [isAuthenticated, user, loadWishlist])
 
   const getItemCount = useCallback(() => items.length, [items])
 
@@ -99,12 +203,16 @@ export function useWishlist() {
     items,
     count: items.length,
     isLoading,
+    error,
     addItem,
     removeItem,
     toggleItem,
     clearWishlist,
     isInWishlist,
+    checkWishlistStatus,
     moveToCart,
     getItemCount,
+    loadWishlist,
+    isAuthenticated
   }
 }

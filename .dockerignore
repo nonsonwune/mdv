@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Node
+web/node_modules/
+web/.next/
+npm-debug.log
+yarn.lock # if you don't use it
+pnpm-lock.yaml # if you don't use it
+
+# Misc
+.git
+.gitignore
+.env*
+Dockerfile*
+docker-compose.yml
+docs/*.md # keep if you need
