@@ -55,12 +55,13 @@ export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
     
     // Check if staff is viewing customer pages
     const isStaffViewingCustomer = isStaff && (
-      pathname.startsWith('/account') || 
-      pathname === '/' || 
-      pathname.startsWith('/men') || 
-      pathname.startsWith('/women') || 
-      pathname.startsWith('/essentials') || 
-      pathname.startsWith('/sale')
+      pathname.startsWith('/account') ||
+      pathname === '/' ||
+      pathname.startsWith('/men') ||
+      pathname.startsWith('/women') ||
+      pathname.startsWith('/essentials') ||
+      pathname.startsWith('/sale') ||
+      pathname.startsWith('/about')
     )
     
     // Staff viewing customer pages - show both contexts

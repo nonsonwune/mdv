@@ -9,7 +9,7 @@ export default function NavigationAuth() {
   const pathname = usePathname()
   
   // Check if staff is viewing customer pages
-  const isStaffViewingCustomer = isStaff && (pathname.startsWith('/account') || pathname === '/' || pathname.startsWith('/men') || pathname.startsWith('/women') || pathname.startsWith('/essentials') || pathname.startsWith('/sale'))
+  const isStaffViewingCustomer = isStaff && (pathname.startsWith('/account') || pathname === '/' || pathname.startsWith('/men') || pathname.startsWith('/women') || pathname.startsWith('/essentials') || pathname.startsWith('/sale') || pathname.startsWith('/about'))
 
   if (loading) {
     return (
