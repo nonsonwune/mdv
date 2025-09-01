@@ -106,7 +106,7 @@ async def inventory_report(
     low_stock_count = (
         await db.execute(
             select(func.count(Inventory.variant_id)).where(
-                Inventory.quantity < Inventory.safety_stock
+                Inventory.quantity <= Inventory.safety_stock
             )
         )
     ).scalar_one()
@@ -123,7 +123,7 @@ async def inventory_report(
         )
         .join(Inventory, Inventory.variant_id == Variant.id)
         .join(Product, Product.id == Variant.product_id)
-        .where(Inventory.quantity < Inventory.safety_stock)
+        .where(Inventory.quantity <= Inventory.safety_stock)
         .order_by((Inventory.safety_stock - Inventory.quantity).desc().nulls_last())
         .limit(10)
     )

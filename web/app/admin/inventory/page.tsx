@@ -32,8 +32,8 @@ interface LowStockItem {
 }
 
 interface InventoryItem {
-  id: number
   variant_id: number
+  product_id: number
   product_title: string
   sku: string
   size?: string
@@ -41,7 +41,7 @@ interface InventoryItem {
   price: number
   quantity: number
   safety_stock: number
-  status: 'in_stock' | 'low_stock' | 'out_of_stock'
+  is_low_stock: boolean
 }
 
 interface StockAdjustment {
@@ -80,6 +80,9 @@ function InventoryManagementContent() {
       fetchLowStockItems()
     }
   }, [activeTab, searchTerm, statusFilter])
+
+  // Calculate low stock count from inventory data for dashboard
+  const lowStockCount = inventory.filter(item => item.is_low_stock === true).length
 
   const fetchInventory = async () => {
     try {
@@ -192,29 +195,23 @@ function InventoryManagementContent() {
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'in_stock':
-        return 'bg-green-100 text-green-800'
-      case 'low_stock':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'out_of_stock':
-        return 'bg-red-100 text-red-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  const getStatusColor = (item: InventoryItem) => {
+    if (item.quantity === 0) {
+      return 'bg-red-100 text-red-800'
+    } else if (item.is_low_stock) {
+      return 'bg-yellow-100 text-yellow-800'
+    } else {
+      return 'bg-green-100 text-green-800'
     }
   }
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'in_stock':
-        return 'In Stock'
-      case 'low_stock':
-        return 'Low Stock'
-      case 'out_of_stock':
-        return 'Out of Stock'
-      default:
-        return 'Unknown'
+  const getStatusText = (item: InventoryItem) => {
+    if (item.quantity === 0) {
+      return 'Out of Stock'
+    } else if (item.is_low_stock) {
+      return 'Low Stock'
+    } else {
+      return 'In Stock'
     }
   }
 
@@ -270,7 +267,7 @@ function InventoryManagementContent() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Low Stock</p>
-              <p className="text-2xl font-bold text-yellow-600">{lowStockItems.length}</p>
+              <p className="text-2xl font-bold text-yellow-600">{lowStockCount}</p>
             </div>
             <ExclamationTriangleIcon className="h-8 w-8 text-yellow-600" />
           </div>
@@ -281,7 +278,7 @@ function InventoryManagementContent() {
             <div>
               <p className="text-sm text-gray-500">Out of Stock</p>
               <p className="text-2xl font-bold text-red-600">
-                {inventory.filter(item => item.status === 'out_of_stock').length}
+                {inventory.filter(item => item.quantity === 0).length}
               </p>
             </div>
             <ExclamationTriangleIcon className="h-8 w-8 text-red-600" />
@@ -439,8 +436,8 @@ function InventoryManagementContent() {
                           {item.safety_stock}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                            {getStatusText(item.status)}
+                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(item)}`}>
+                            {getStatusText(item)}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

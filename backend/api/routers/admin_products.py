@@ -385,7 +385,7 @@ async def list_products(
         for variant in product.variants:
             if variant.inventory:
                 total_inventory += variant.inventory.quantity
-                if variant.inventory.quantity < variant.inventory.safety_stock:
+                if variant.inventory.quantity <= variant.inventory.safety_stock:
                     low_stock_count += 1
             
             price = float(variant.price)
@@ -841,7 +841,7 @@ async def get_low_stock_items(
         select(Variant, Inventory, Product)
         .join(Inventory, Variant.id == Inventory.variant_id)
         .join(Product, Variant.product_id == Product.id)
-        .where(Inventory.quantity < Inventory.safety_stock * threshold_multiplier)
+        .where(Inventory.quantity <= Inventory.safety_stock * threshold_multiplier)
     )
     
     result = await db.execute(query)
