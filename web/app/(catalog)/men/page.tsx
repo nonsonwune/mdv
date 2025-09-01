@@ -1,45 +1,45 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { api } from "../../../lib/api-client"
 import type { ProductListResponse } from "../../../lib/api-types"
 import type { Product } from "../../../lib/types"
 import CategoryLayout from "../../../components/catalog/CategoryLayout"
 
-export default function MenCategoryPage() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+async function getProducts(): Promise<Product[]> {
+  try {
+    // Use direct fetch instead of api client for server-side rendering
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://mdv-web-production.up.railway.app'
+    const url = `${baseUrl}/api/products/category/men?page_size=100`
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        console.log('Men page (client): Fetching products from /api/products/category/men')
-        setLoading(true)
-        const data = await api<ProductListResponse>("/api/products/category/men?page_size=100")
-        console.log('Men page (client): API response:', JSON.stringify(data, null, 2))
-        console.log('Men page (client): Items count:', data?.items?.length || 0)
-        setProducts((data.items as Product[]) || [])
-      } catch (error) {
-        console.error('Men page (client): Error fetching products:', error)
-        setProducts([])
-      } finally {
-        setLoading(false)
-      }
+    console.log('Men page (server): Fetching from URL:', url)
+
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      // Add cache control to prevent stale data
+      cache: 'no-store'
+    })
+
+    console.log('Men page (server): Response status:', response.status)
+
+    if (!response.ok) {
+      console.error('Men page (server): Response not OK:', response.status, response.statusText)
+      return []
     }
 
-    fetchProducts()
-  }, [])
+    const data = await response.json() as ProductListResponse
+    console.log('Men page (server): Items count:', data?.items?.length || 0)
+    console.log('Men page (server): First item:', data?.items?.[0]?.title || 'none')
 
-  if (loading) {
-    return (
-      <CategoryLayout
-        title="Men's Collection"
-        description="Discover our curated selection of men's fashion essentials."
-        products={[]}
-        category="men"
-      />
-    )
+    return (data.items as Product[]) || []
+  } catch (error) {
+    console.error('Men page (server): Error fetching products:', error)
+    return []
   }
+}
+
+export default async function MenCategoryPage() {
+  const products = await getProducts()
+
+  console.log('Men page (server): Final products count:', products.length)
 
   return (
     <CategoryLayout
