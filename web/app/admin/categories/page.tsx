@@ -46,6 +46,9 @@ interface Category {
   product_count: number
   description?: string
   is_active?: boolean
+  parent_id?: number
+  sort_order?: number
+  children?: Category[]
 }
 
 interface CategoryStats {
@@ -63,9 +66,9 @@ interface CategoryFormData {
   slug?: string
   description?: string
   is_active: boolean
-  // Optional fields for future extension; not required by backend
   parent_id?: number
   sort_order?: number
+  // Optional fields for future extension
   is_featured?: boolean
   image_url?: string
   meta_title?: string
@@ -80,6 +83,131 @@ function generateSlug(name: string): string {
     .replace(/[^\w\s-]/g, '') // Remove special characters
     .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with dashes
     .replace(/^-+|-+$/g, '') // Remove leading/trailing dashes
+}
+
+// Build hierarchical category structure
+function buildCategoryHierarchy(categories: Category[]): Category[] {
+  const categoryMap = new Map<number, Category>()
+  const rootCategories: Category[] = []
+
+  // First pass: create map and initialize children arrays
+  categories.forEach(category => {
+    categoryMap.set(category.id, { ...category, children: [] })
+  })
+
+  // Second pass: build hierarchy
+  categories.forEach(category => {
+    const categoryWithChildren = categoryMap.get(category.id)!
+
+    if (category.parent_id) {
+      const parent = categoryMap.get(category.parent_id)
+      if (parent) {
+        parent.children = parent.children || []
+        parent.children.push(categoryWithChildren)
+      }
+    } else {
+      rootCategories.push(categoryWithChildren)
+    }
+  })
+
+  // Sort categories by sort_order, then by name
+  const sortCategories = (cats: Category[]) => {
+    cats.sort((a, b) => {
+      if (a.sort_order !== b.sort_order) {
+        return (a.sort_order || 0) - (b.sort_order || 0)
+      }
+      return a.name.localeCompare(b.name)
+    })
+    cats.forEach(cat => {
+      if (cat.children && cat.children.length > 0) {
+        sortCategories(cat.children)
+      }
+    })
+  }
+
+  sortCategories(rootCategories)
+  return rootCategories
+}
+
+// Render category row with hierarchy indentation
+function renderCategoryRow(
+  category: Category,
+  level: number,
+  expandedCategories: Set<number>,
+  toggleExpanded: (id: number) => void,
+  handleEdit: (category: Category) => void,
+  handleDelete: (category: Category) => void,
+  canManageCategories: boolean
+): JSX.Element[] {
+  const rows: JSX.Element[] = []
+  const hasChildren = category.children && category.children.length > 0
+  const isExpanded = expandedCategories.has(category.id)
+
+  // Main category row
+  rows.push(
+    <tr key={category.id} className="hover:bg-gray-50">
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+        <div className="flex items-center" style={{ paddingLeft: `${level * 20}px` }}>
+          {hasChildren && (
+            <button
+              onClick={() => toggleExpanded(category.id)}
+              className="mr-2 p-1 hover:bg-gray-200 rounded"
+            >
+              {isExpanded ? '▼' : '▶'}
+            </button>
+          )}
+          {!hasChildren && level > 0 && (
+            <span className="mr-2 w-6 text-center text-gray-400">└</span>
+          )}
+          <span className={level > 0 ? 'text-gray-600' : 'text-gray-900'}>
+            {category.name}
+            {level > 0 && <span className="text-xs text-gray-400 ml-1">(subcategory)</span>}
+          </span>
+        </div>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {category.slug}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {category.product_count} {category.product_count === 1 ? 'product' : 'products'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        {canManageCategories && (
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => handleEdit(category)}
+              className="text-maroon-600 hover:text-maroon-900"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => handleDelete(category)}
+              className="text-red-600 hover:text-red-900"
+            >
+              Delete
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  )
+
+  // Render children if expanded
+  if (hasChildren && isExpanded) {
+    category.children!.forEach(child => {
+      rows.push(...renderCategoryRow(
+        child,
+        level + 1,
+        expandedCategories,
+        toggleExpanded,
+        handleEdit,
+        handleDelete,
+        canManageCategories
+      ))
+    })
+  }
+
+  return rows
 }
 
 // Main category management content component
@@ -103,7 +231,9 @@ function CategoryManagementContent() {
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     description: '',
-    is_active: true
+    is_active: true,
+    parent_id: undefined,
+    sort_order: 0
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -128,6 +258,10 @@ function CategoryManagementContent() {
       // Backend does not support filtering query params; fetch all and filter client-side
       const response = await api<Category[]>('/api/admin/categories')
       setCategories(response)
+
+      // Build hierarchical structure
+      const hierarchical = buildCategoryHierarchy(response)
+      setHierarchicalCategories(hierarchical)
     } catch (error: any) {
       if (error?.message?.includes('Not authenticated') || error?.message?.includes('401')) {
         window.location.href = '/staff-login?error=authentication_required'
@@ -172,7 +306,14 @@ function CategoryManagementContent() {
     setSaving(true)
     try {
       const slug = generateSlug(formData.name)
-      const payload = { name: formData.name, slug }
+      const payload = {
+        name: formData.name,
+        slug,
+        description: formData.description || null,
+        is_active: formData.is_active,
+        parent_id: formData.parent_id || null,
+        sort_order: formData.sort_order || 0
+      }
 
       if (editingCategory) {
         // Update existing category
@@ -240,7 +381,9 @@ function CategoryManagementContent() {
     setFormData({
       name: category.name,
       description: category.description || '',
-      is_active: category.is_active ?? true
+      is_active: category.is_active ?? true,
+      parent_id: category.parent_id || undefined,
+      sort_order: category.sort_order || 0
     })
     setIsModalOpen(true)
   }
@@ -251,12 +394,25 @@ function CategoryManagementContent() {
     setFormData({
       name: '',
       description: '',
-      is_active: true
+      is_active: true,
+      parent_id: undefined,
+      sort_order: 0
     })
     setFormErrors({})
   }
 
-  // Filter categories
+  // Toggle expanded state for categories
+  const toggleExpanded = (categoryId: number) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId)
+    } else {
+      newExpanded.add(categoryId)
+    }
+    setExpandedCategories(newExpanded)
+  }
+
+  // Filter categories (for flat list view)
   const filteredCategories = categories.filter(category => {
     const nameMatch = category.name.toLowerCase().includes(searchTerm.toLowerCase())
     const descMatch = (category.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -268,6 +424,38 @@ function CategoryManagementContent() {
       (statusFilter === 'inactive' && !isActive)
     return matchesSearch && matchesStatus
   })
+
+  // Filter hierarchical categories (for tree view)
+  const filterHierarchicalCategories = (cats: Category[]): Category[] => {
+    return cats.filter(category => {
+      const nameMatch = category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const descMatch = (category.description ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+      const isActive = category.is_active ?? true
+      const matchesSearch = nameMatch || descMatch
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && isActive) ||
+        (statusFilter === 'inactive' && !isActive)
+
+      // Include category if it matches or if any of its children match
+      const selfMatches = matchesSearch && matchesStatus
+      const hasMatchingChildren = category.children &&
+        filterHierarchicalCategories(category.children).length > 0
+
+      if (selfMatches || hasMatchingChildren) {
+        return {
+          ...category,
+          children: category.children ? filterHierarchicalCategories(category.children) : []
+        }
+      }
+      return false
+    }).map(category => ({
+      ...category,
+      children: category.children ? filterHierarchicalCategories(category.children) : []
+    }))
+  }
+
+  const filteredHierarchicalCategories = filterHierarchicalCategories(hierarchicalCategories)
 
   if (loading) {
     return (
@@ -472,7 +660,7 @@ function CategoryManagementContent() {
           </div>
         </div>
 
-        {filteredCategories.length === 0 ? (
+        {(viewMode === 'tree' ? filteredHierarchicalCategories.length === 0 : filteredCategories.length === 0) ? (
           <div className="text-center py-12">
             <TagIcon className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No categories</h3>
@@ -511,35 +699,54 @@ function CategoryManagementContent() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredCategories.map((category) => (
-                <tr key={category.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {category.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {category.slug}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {category.product_count} {category.product_count === 1 ? 'product' : 'products'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <PermissionGuard permission={Permission.MANAGE_CATEGORIES}>
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="text-maroon-600 hover:text-maroon-900 mr-4"
-                      >
-                        <PencilIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(category)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                    </PermissionGuard>
-                  </td>
-                </tr>
-              ))}
+              {viewMode === 'tree' ? (
+                // Hierarchical tree view
+                filteredHierarchicalCategories.flatMap(category =>
+                  renderCategoryRow(
+                    category,
+                    0,
+                    expandedCategories,
+                    toggleExpanded,
+                    handleEdit,
+                    handleDelete,
+                    canManageCategories
+                  )
+                )
+              ) : (
+                // Flat list view
+                filteredCategories.map((category) => (
+                  <tr key={category.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {category.name}
+                      {category.parent_id && (
+                        <span className="text-xs text-gray-400 ml-2">(subcategory)</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {category.slug}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {category.product_count} {category.product_count === 1 ? 'product' : 'products'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <PermissionGuard permission={Permission.MANAGE_CATEGORIES}>
+                        <button
+                          onClick={() => handleEdit(category)}
+                          className="text-maroon-600 hover:text-maroon-900 mr-4"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <TrashIcon className="h-5 w-5" />
+                        </button>
+                      </PermissionGuard>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         )}
@@ -577,6 +784,51 @@ function CategoryManagementContent() {
                     placeholder="Optional description"
                   />
                 </div>
+
+                {/* Parent Category Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Parent Category
+                  </label>
+                  <select
+                    value={formData.parent_id || ''}
+                    onChange={(e) => setFormData({ ...formData, parent_id: e.target.value ? parseInt(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-maroon-500 focus:border-maroon-500"
+                  >
+                    <option value="">None (Root Category)</option>
+                    {categories
+                      .filter(cat => cat.id !== editingCategory?.id) // Prevent self-parenting
+                      .filter(cat => !cat.parent_id) // Only show root categories as parent options
+                      .map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))
+                    }
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select a parent category to create a subcategory
+                  </p>
+                </div>
+
+                {/* Sort Order */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Sort Order
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.sort_order || 0}
+                    onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-maroon-500 focus:border-maroon-500"
+                    placeholder="0"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Lower numbers appear first
+                  </p>
+                </div>
+
                 <div className="flex items-center mb-2">
                   <input
                     id="is_active"
