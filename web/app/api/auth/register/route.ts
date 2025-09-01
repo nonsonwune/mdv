@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { API_BASE } from "../../../../lib/api"
+import { API_BASE_INTERNAL } from "../../../../lib/api"
 import type { AuthLoginResponse } from "../../../../lib/types"
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Call backend registration endpoint
-    const resp = await fetch(`${API_BASE}/api/auth/register`, {
+    const resp = await fetch(`${API_BASE_INTERNAL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

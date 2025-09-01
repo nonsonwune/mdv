@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
-import { API_BASE } from "../../../../lib/api"
+import { API_BASE_INTERNAL } from "../../../../lib/api"
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Forward the request to the backend with the auth token
-    const response = await fetch(`${API_BASE}/api/users/profile`, {
+    const response = await fetch(`${API_BASE_INTERNAL}/api/users/profile`, {
       headers: {
         'Authorization': `Bearer ${token.value}`,
         'Accept': 'application/json'

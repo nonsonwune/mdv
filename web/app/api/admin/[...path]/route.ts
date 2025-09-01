@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { API_BASE } from '../../../../lib/api'
+import { API_BASE_INTERNAL } from '../../../../lib/api'
 
 async function proxy(request: NextRequest, context: { params: { path?: string[] } }) {
   const token = cookies().get('mdv_token')?.value
@@ -13,7 +13,7 @@ async function proxy(request: NextRequest, context: { params: { path?: string[] 
   // Support both standard /api/admin/* routes and special admin routers without /api prefix
   const first = pathSegments[0] || ''
   const basePath = (first === 'inventory') ? 'admin' : 'api/admin'
-  const target = `${API_BASE}/${basePath}/${pathSegments.join('/')}${search}`
+  const target = `${API_BASE_INTERNAL}/${basePath}/${pathSegments.join('/')}${search}`
 
   const headers = new Headers(request.headers)
   headers.set('Authorization', `Bearer ${token}`)

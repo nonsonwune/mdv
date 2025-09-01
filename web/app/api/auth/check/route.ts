@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Call the backend to get user profile
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const backendUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     
     console.log('Auth check: calling backend at', backendUrl)
     console.log('Auth check: token length', token.length)
