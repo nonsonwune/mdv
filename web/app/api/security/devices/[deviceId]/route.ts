@@ -5,7 +5,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { deviceId:
   const { deviceId } = params
   try {
     const token = cookies().get('mdv_token')?.value
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const backendUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
     if (!deviceId) {
       return NextResponse.json({ error: 'Missing deviceId' }, { status: 400 })

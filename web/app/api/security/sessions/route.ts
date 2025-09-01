@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 export async function GET(_req: NextRequest) {
   try {
     const token = cookies().get('mdv_token')?.value
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+    const backendUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
     // If we have a token, try proxying to the backend security sessions endpoint
     if (token) {
