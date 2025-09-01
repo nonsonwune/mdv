@@ -30,7 +30,8 @@ class InventoryItem(BaseModel):
     quantity: int
     safety_stock: int
     status: str
-    
+    is_low_stock: bool = Field(default=False, description="Whether item is at or below safety stock")
+
     class Config:
         from_attributes = True
 
@@ -137,6 +138,9 @@ async def list_inventory(
         else:
             status_str = "in_stock"
         
+        # Calculate is_low_stock for frontend compatibility
+        is_low_stock = inventory.quantity <= inventory.safety_stock
+
         items.append(InventoryItem(
             id=variant.id,
             variant_id=variant.id,
@@ -147,7 +151,8 @@ async def list_inventory(
             price=float(variant.price),
             quantity=inventory.quantity,
             safety_stock=inventory.safety_stock,
-            status=status_str
+            status=status_str,
+            is_low_stock=is_low_stock
         ))
     
     total_pages = (total + page_size - 1) // page_size
