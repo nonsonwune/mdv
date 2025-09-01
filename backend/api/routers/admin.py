@@ -444,8 +444,29 @@ async def admin_update_order(
             order.status = OrderStatus.cancelled
             changed = True
 
+    # Handle fulfillment workflow based on order status updates
+    if body.status is not None and body.status in {"processing", "shipped", "delivered"}:
+        # Ensure fulfillment exists for workflow statuses
+        if not order.fulfillment:
+            order.fulfillment = Fulfillment(
+                order_id=order.id,
+                status=FulfillmentStatus.processing,
+                packed_by=actor_id,
+                packed_at=datetime.now(timezone.utc),
+                notes=body.notes or None,
+            )
+            changed = True
+
+        # Update fulfillment status based on UI status
+        if body.status == "processing" and order.fulfillment.status != FulfillmentStatus.ready_to_ship:
+            # Mark as ready to ship when order status is set to processing
+            order.fulfillment.status = FulfillmentStatus.ready_to_ship
+            order.fulfillment.packed_by = actor_id
+            order.fulfillment.packed_at = datetime.now(timezone.utc)
+            changed = True
+
     # Ensure fulfillment exists if we need to store notes or handle shipment fields
-    need_fulfillment = bool(body.notes) or bool(body.tracking_number) or bool(body.carrier) or (body.status in {"processing", "shipped", "delivered"} if body.status else False)
+    need_fulfillment = bool(body.notes) or bool(body.tracking_number) or bool(body.carrier)
     if need_fulfillment and not order.fulfillment:
         order.fulfillment = Fulfillment(
             order_id=order.id,

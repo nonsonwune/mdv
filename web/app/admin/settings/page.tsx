@@ -388,6 +388,7 @@ export default function SettingsPage() {
                   onChange={(e) => setAppSettings({...appSettings, currency: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
                 >
+                  <option value="NGN">NGN - Nigerian Naira</option>
                   <option value="USD">USD - US Dollar</option>
                   <option value="EUR">EUR - Euro</option>
                   <option value="GBP">GBP - British Pound</option>

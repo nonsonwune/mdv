@@ -77,6 +77,15 @@ export default function LogisticsDashboard() {
     fetchLogisticsData()
   }, [])
 
+  // Auto-refresh every 30 seconds to catch order status updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchLogisticsData()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [])
+
   const handleCreateShipment = async (orderId: number) => {
     try {
       // This would open a modal or navigate to shipment creation
@@ -120,9 +129,21 @@ export default function LogisticsDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Logistics Dashboard</h1>
-        <p className="text-gray-600">Manage shipments and deliveries</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Logistics Dashboard</h1>
+          <p className="text-gray-600">Manage shipments and deliveries</p>
+        </div>
+        <button
+          onClick={fetchLogisticsData}
+          disabled={loading}
+          className="px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          <svg className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh
+        </button>
       </div>
 
       {/* Shipment Statistics */}
