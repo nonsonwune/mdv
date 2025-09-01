@@ -12,8 +12,8 @@ async function getProducts(): Promise<Product[]> {
       headers: {
         'Content-Type': 'application/json',
       },
-      // Add cache control to prevent stale data
-      cache: 'no-store'
+      // Use default caching for static generation
+      next: { revalidate: 60 }
     })
 
     if (!response.ok) {
