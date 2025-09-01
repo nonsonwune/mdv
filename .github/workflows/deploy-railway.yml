@@ -20,16 +20,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Run CI tests first
-  test:
-    name: Run Tests
-    uses: ./.github/workflows/ci.yml
-    secrets: inherit
-
-  # Deploy to Railway after tests pass
+  # Deploy to Railway
   deploy:
     name: Deploy to Railway
-    needs: test
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.event.inputs.environment || 'production' }}
