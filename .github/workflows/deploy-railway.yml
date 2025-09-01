@@ -39,11 +39,22 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
+          # Validate required secrets
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "❌ RAILWAY_TOKEN secret is not configured"
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            echo "❌ RAILWAY_PROJECT_ID secret is not configured"
+            exit 1
+          fi
+
           railway link ${{ secrets.RAILWAY_PROJECT_ID }}
           railway up --service mdv-api --detach
           echo "Waiting for API deployment to complete..."
           railway logs --service mdv-api --tail 20
-          
+
           # Get the deployment URL
           API_URL=$(railway status --service mdv-api --json | jq -r '.url')
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
@@ -52,6 +63,7 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
+          # Railway CLI should already be authenticated from previous step
           railway up --service mdv-worker --detach
           echo "Worker service deployed"
       
@@ -149,11 +161,18 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
+          # Validate secrets for rollback
+          if [ -z "$RAILWAY_TOKEN" ] || [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            echo "❌ Cannot rollback - Railway secrets not configured"
+            echo "⚠️ Manual rollback required via Railway dashboard" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
           railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          
+
           echo "Rolling back services to previous version..."
           railway rollback --service mdv-api --yes
           railway rollback --service mdv-web --yes
           railway rollback --service mdv-worker --yes
-          
+
           echo "⚠️ Deployment failed and was rolled back" >> $GITHUB_STEP_SUMMARY

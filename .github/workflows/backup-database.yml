@@ -41,8 +41,19 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
+          # Validate required secrets
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "❌ RAILWAY_TOKEN secret is not configured"
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            echo "❌ RAILWAY_PROJECT_ID secret is not configured"
+            exit 1
+          fi
+
           railway link ${{ secrets.RAILWAY_PROJECT_ID }}
-          
+
           # Get database URL from Railway
           DB_URL=$(railway variables --service mdv-postgres --kv | grep DATABASE_URL | cut -d'=' -f2-)
           
