@@ -26,6 +26,9 @@ class ProductOut(BaseModel):
     compare_at_price: Optional[float] = None
     variants: List[VariantOut] = []
     images: Optional[list[dict]] = None
+    # Review data
+    average_rating: Optional[float] = None
+    review_count: Optional[int] = None
 
 
 class Paginated(BaseModel):

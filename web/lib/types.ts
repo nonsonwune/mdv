@@ -28,6 +28,9 @@ export type Product = {
   images: ProductImage[]
   total_stock?: number
   stock_status?: "in_stock" | "low_stock" | "out_of_stock"
+  // Review data
+  average_rating?: number
+  review_count?: number
 }
 
 export type CartItem = {

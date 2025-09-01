@@ -19,7 +19,7 @@ from mdv.schemas import (
     CartItemQtyUpdate,
     ShippingEstimate,
 )
-from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category
+from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category, Review
 from mdv.config import settings
 from ..deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -482,6 +482,15 @@ async def list_products(
                 "is_primary": img.is_primary,
             })
 
+        # Get review statistics for this product
+        review_stats = await db.execute(
+            select(
+                func.avg(Review.rating).label('avg_rating'),
+                func.count(Review.id).label('review_count')
+            ).where(Review.product_id == p.id)
+        )
+        stats = review_stats.first()
+
         # Return as plain dict to include images, variants fields, and inventory data
         item = {
             "id": p.id,
@@ -492,7 +501,9 @@ async def list_products(
             "variants": variants_with_inventory,
             "images": imgs,
             "total_stock": total_stock,
-            "stock_status": product_stock_status
+            "stock_status": product_stock_status,
+            "average_rating": float(stats.avg_rating) if stats.avg_rating else None,
+            "review_count": int(stats.review_count) if stats.review_count else 0,
         }
         items.append(item)
     return Paginated(items=items, total=total, page=page, page_size=page_size)
@@ -569,6 +580,15 @@ async def get_products_by_category(
                 "is_primary": img.is_primary
             })
 
+        # Get review statistics for this product
+        review_stats = await db.execute(
+            select(
+                func.avg(Review.rating).label('avg_rating'),
+                func.count(Review.id).label('review_count')
+            ).where(Review.product_id == p.id)
+        )
+        stats = review_stats.first()
+
         item = {
             "id": p.id,
             "title": p.title,
@@ -577,6 +597,8 @@ async def get_products_by_category(
             "compare_at_price": float(p.compare_at_price) if p.compare_at_price else None,
             "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
             "images": imgs,
+            "average_rating": float(stats.avg_rating) if stats.avg_rating else None,
+            "review_count": int(stats.review_count) if stats.review_count else 0,
         }
         items.append(item)
 
@@ -741,6 +763,15 @@ async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
             "sort_order": img.sort_order,
             "is_primary": img.is_primary,
         })
+    # Get review statistics
+    review_stats = await db.execute(
+        select(
+            func.avg(Review.rating).label('avg_rating'),
+            func.count(Review.id).label('review_count')
+        ).where(Review.product_id == product.id)
+    )
+    stats = review_stats.first()
+
     out = {
         "id": product.id,
         "title": product.title,
@@ -749,6 +780,8 @@ async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
         "compare_at_price": float(product.compare_at_price) if product.compare_at_price else None,
         "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
         "images": imgs,
+        "average_rating": float(stats.avg_rating) if stats.avg_rating else None,
+        "review_count": int(stats.review_count) if stats.review_count else 0,
     }
     return out
 
