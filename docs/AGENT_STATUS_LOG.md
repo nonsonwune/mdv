@@ -28,7 +28,7 @@ Update 2025-08-24 (MVP progress)
 - Added docs/api-contracts.yaml for openapi-typescript; updated railway.json to include NEXT_PUBLIC_ALLOW_MOCKS.
 - Next: regenerate web types; smoke test cart/checkout flows; add Dockerfiles.
 
-How to use this log
+How to use this log:
 - Append each work session with: what was done, what’s next, blockers, decisions made.
 - Cross-reference BACKLOG.md for task IDs / priorities.
 
