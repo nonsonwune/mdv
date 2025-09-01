@@ -8,8 +8,6 @@ async function getProducts(): Promise<Product[]> {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://mdv-web-production.up.railway.app'
     const url = `${baseUrl}/api/products/category/men?page_size=100`
 
-    console.log('Men page (server): Fetching from URL:', url)
-
     const response = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -18,28 +16,22 @@ async function getProducts(): Promise<Product[]> {
       cache: 'no-store'
     })
 
-    console.log('Men page (server): Response status:', response.status)
-
     if (!response.ok) {
-      console.error('Men page (server): Response not OK:', response.status, response.statusText)
+      console.error('Men page: Failed to fetch products:', response.status, response.statusText)
       return []
     }
 
     const data = await response.json() as ProductListResponse
-    console.log('Men page (server): Items count:', data?.items?.length || 0)
-    console.log('Men page (server): First item:', data?.items?.[0]?.title || 'none')
 
     return (data.items as Product[]) || []
   } catch (error) {
-    console.error('Men page (server): Error fetching products:', error)
+    console.error('Men page: Error fetching products:', error)
     return []
   }
 }
 
 export default async function MenCategoryPage() {
   const products = await getProducts()
-
-  console.log('Men page (server): Final products count:', products.length)
 
   return (
     <CategoryLayout
