@@ -5,6 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import {
+  mapOrderStatus,
+  getStatusColor,
+  getPaymentStatusColor,
+  formatStatusDisplay,
+  type OrderStatusData
+} from '@/lib/status-mapper'
+import {
   ArrowLeftIcon,
   TruckIcon,
   CheckCircleIcon,
@@ -30,49 +37,24 @@ const labelize = (s?: string) => {
 
 // Normalize backend admin order response into this page's Order shape
 const normalizeOrderData = (raw: any): Order => {
-  // Derive order status for this UI from backend status/timeline
-  const backendStatus = String(raw?.status || '')
-  const timeline: Array<{ code: string; at: string; message?: string; tracking_id?: string }> = raw?.tracking_timeline || []
-  const fulfillment = raw?.fulfillment || {}
-  const shipment = raw?.shipment || fulfillment?.shipment || {}
+  // Use centralized status mapping utility
+  const statusResult = mapOrderStatus(raw as OrderStatusData, 'admin', true)
 
-  // Determine shipment milestones from timeline
-  const hasDelivered = timeline.some(e => (e.code || '').toLowerCase() === 'delivered')
-  const hasShipped = hasDelivered || timeline.some(e => (e.code || '').toLowerCase() === 'shipped' || (e.code || '').toLowerCase() === 'dispatched')
-
-  // Map backend OrderStatus -> UI status (prioritize actual status over timeline for admin)
-  let uiStatus: Order['status'] = 'pending'
-  const b = backendStatus.toLowerCase()
-
-  // First check actual shipment status for delivered/shipped states
-  if (shipment?.status === 'Delivered' || hasDelivered) {
-    uiStatus = 'delivered'
-  } else if (shipment?.status === 'Dispatched' || shipment?.status === 'InTransit') {
-    uiStatus = 'shipped'
-  } else if (b === 'cancelled') {
-    uiStatus = 'cancelled'
-  } else if (b === 'refunded') {
-    uiStatus = 'cancelled' // show as terminal
-  } else if (b === 'paid') {
-    // For paid orders, check fulfillment status to determine if processing or ready for dispatch
-    if (fulfillment?.status === 'ReadyToShip') {
-      uiStatus = 'pending_dispatch'
-    } else {
-      uiStatus = 'processing'
-    }
-  } else {
-    uiStatus = 'pending'
+  // Log additional context for admin debugging
+  if (statusResult.confidence === 'low') {
+    console.warn('⚠️ Low confidence order status mapping detected:', {
+      orderId: raw?.id,
+      recommendedAction: 'Review order data quality and status consistency'
+    })
   }
 
-  // Derive payment status from backend OrderStatus
-  let paymentStatus: Order['payment_status'] = 'pending'
-  if (b === 'paid') paymentStatus = 'paid'
-  else if (b === 'refunded') paymentStatus = 'refunded'
-  else if (b === 'cancelled') paymentStatus = 'pending'
+  // Use payment status from centralized mapper
+  const paymentStatus = statusResult.paymentStatus
 
-  // Derive shipped/delivered timestamps
-  const shippedEvent = timeline.find(e => ['shipped', 'dispatched'].includes((e.code || '').toLowerCase()))
-  const deliveredEvent = timeline.find(e => (e.code || '').toLowerCase() === 'delivered')
+  // Derive shipped/delivered timestamps from timeline
+  const timeline = raw?.tracking_timeline || []
+  const shippedEvent = timeline.find((e: any) => ['shipped', 'dispatched'].includes((e.code || '').toLowerCase()))
+  const deliveredEvent = timeline.find((e: any) => (e.code || '').toLowerCase() === 'delivered')
 
   // Best-effort tracking details
   const trackingNumber = shippedEvent?.tracking_id || ''
@@ -84,8 +66,8 @@ const normalizeOrderData = (raw: any): Order => {
   return {
     id: raw?.id,
     order_number: String(raw?.id ?? ''),
-    status: uiStatus,
-    payment_status: paymentStatus,
+    status: statusResult.uiStatus,
+    payment_status: statusResult.paymentStatus,
     payment_method: undefined,
     total_amount: Number(raw?.total ?? 0),
     subtotal: 0,
