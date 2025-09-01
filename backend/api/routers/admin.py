@@ -372,7 +372,7 @@ async def refund_order(oid: int, body: RefundRequest, db: AsyncSession = Depends
 
 
 class AdminOrderUpdateRequest(BaseModel):
-    status: Optional[Literal["pending", "processing", "shipped", "delivered", "cancelled"]] = None
+    status: Optional[Literal["pending", "processing", "pending_dispatch", "in_transit", "shipped", "delivered", "cancelled"]] = None
     payment_status: Optional[Literal["pending", "paid", "failed", "refunded"]] = None
     tracking_number: Optional[str] = None
     carrier: Optional[str] = None
@@ -466,7 +466,7 @@ async def admin_update_order(
             changed = True
 
     # Handle fulfillment workflow based on order status updates
-    if body.status is not None and body.status in {"processing", "shipped", "delivered"}:
+    if body.status is not None and body.status in {"processing", "pending_dispatch", "in_transit", "shipped", "delivered"}:
         # Ensure fulfillment exists for workflow statuses
         if not order.fulfillment:
             order.fulfillment = Fulfillment(
@@ -479,8 +479,8 @@ async def admin_update_order(
             changed = True
 
         # Update fulfillment status based on UI status
-        if body.status == "processing" and order.fulfillment.status != FulfillmentStatus.ready_to_ship:
-            # Mark as ready to ship when order status is set to processing
+        if body.status in ["processing", "pending_dispatch"] and order.fulfillment.status != FulfillmentStatus.ready_to_ship:
+            # Mark as ready to ship when order status is set to processing or pending dispatch
             order.fulfillment.status = FulfillmentStatus.ready_to_ship
             order.fulfillment.packed_by = actor_id
             order.fulfillment.packed_at = datetime.now(timezone.utc)
@@ -504,7 +504,7 @@ async def admin_update_order(
     # Shipment updates based on tracking/carrier or status hints
     if order.fulfillment:
         shp = order.fulfillment.shipment
-        wants_shipment = bool(body.tracking_number or body.carrier or (body.status in {"shipped", "delivered"} if body.status else False))
+        wants_shipment = bool(body.tracking_number or body.carrier or (body.status in {"pending_dispatch", "in_transit", "shipped", "delivered"} if body.status else False))
         if wants_shipment and not shp:
             shp = Shipment(
                 fulfillment_id=order.fulfillment.id if order.fulfillment.id else None,
@@ -538,7 +538,29 @@ async def admin_update_order(
                 shp.tracking_id = body.tracking_number
                 updated = True
             # Handle status transitions requested by UI
-            if body.status == "delivered" and shp.status != ShipmentStatus.delivered:
+            if body.status == "pending_dispatch" and shp.status != ShipmentStatus.dispatched:
+                shp.status = ShipmentStatus.dispatched
+                db.add(
+                    ShipmentEvent(
+                        shipment_id=shp.id,
+                        code="Dispatched",
+                        message="Shipment pending dispatch",
+                        occurred_at=datetime.now(timezone.utc),
+                    )
+                )
+                updated = True
+            elif body.status == "in_transit" and shp.status != ShipmentStatus.in_transit:
+                shp.status = ShipmentStatus.in_transit
+                db.add(
+                    ShipmentEvent(
+                        shipment_id=shp.id,
+                        code="InTransit",
+                        message="Shipment in transit",
+                        occurred_at=datetime.now(timezone.utc),
+                    )
+                )
+                updated = True
+            elif body.status == "delivered" and shp.status != ShipmentStatus.delivered:
                 shp.status = ShipmentStatus.delivered
                 db.add(
                     ShipmentEvent(
