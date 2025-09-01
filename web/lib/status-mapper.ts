@@ -182,9 +182,10 @@ export function mapOrderStatus(
         confidence = context === 'admin' ? 'medium' : 'high'
       } else {
         // No fulfillment, no timeline - default to processing for paid orders
+        // This is expected for older orders or during data migration
         uiStatus = 'processing'
         source = 'fallback'
-        confidence = 'low'
+        confidence = context === 'admin' ? 'medium' : 'high' // Improve confidence for expected fallback case
       }
     }
   }
@@ -234,7 +235,9 @@ export function mapOrderStatus(
     } else if (source === 'backend') {
       decisionRationale = 'Backend status used for terminal states'
     } else {
-      decisionRationale = 'Fallback logic applied - insufficient data quality'
+      decisionRationale = confidence === 'low'
+        ? 'Fallback logic applied - insufficient data quality'
+        : 'Fallback logic applied - using default processing status for paid order'
     }
 
     console[logLevel](`🔍 Hybrid Order Status Resolution [${context}]:`, {
@@ -308,9 +311,12 @@ export function formatStatusDisplay(status: string): string {
  * Validate if a status transition is allowed
  */
 export function isValidStatusTransition(
-  from: OrderUIStatus, 
+  from: OrderUIStatus,
   to: OrderUIStatus
 ): boolean {
+  // Same status is always allowed (no-op)
+  if (from === to) return true
+
   const validTransitions: Record<OrderUIStatus, OrderUIStatus[]> = {
     'pending': ['processing', 'cancelled'],
     'processing': ['pending_dispatch', 'cancelled'],
@@ -322,4 +328,21 @@ export function isValidStatusTransition(
   }
 
   return validTransitions[from]?.includes(to) || false
+}
+
+/**
+ * Get allowed next statuses for a given status
+ */
+export function getAllowedNextStatuses(currentStatus: OrderUIStatus): OrderUIStatus[] {
+  const validTransitions: Record<OrderUIStatus, OrderUIStatus[]> = {
+    'pending': ['processing', 'cancelled'],
+    'processing': ['pending_dispatch', 'cancelled'],
+    'pending_dispatch': ['shipped', 'in_transit', 'cancelled'],
+    'in_transit': ['delivered', 'shipped'],
+    'shipped': ['delivered', 'in_transit'],
+    'delivered': [], // Terminal state
+    'cancelled': [] // Terminal state
+  }
+
+  return validTransitions[currentStatus] || []
 }

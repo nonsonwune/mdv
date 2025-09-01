@@ -9,7 +9,9 @@ import {
   getStatusColor,
   getPaymentStatusColor,
   formatStatusDisplay,
-  type OrderStatusData
+  isValidStatusTransition,
+  type OrderStatusData,
+  type OrderUIStatus
 } from '@/lib/status-mapper'
 import {
   ArrowLeftIcon,
@@ -187,6 +189,8 @@ export default function OrderDetailPage() {
   const [trackingNumber, setTrackingNumber] = useState('')
   const [carrier, setCarrier] = useState('')
   const [notes, setNotes] = useState('')
+  const [updateSuccess, setUpdateSuccess] = useState(false)
+  const [updateError, setUpdateError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchOrder()
@@ -218,28 +222,75 @@ export default function OrderDetailPage() {
   const handleUpdateOrder = async () => {
     if (!order) return
 
-    setUpdating(true)
-    try {
-      const updateData: any = {}
-      
-      if (newStatus !== order.status) updateData.status = newStatus
-      if (newPaymentStatus !== order.payment_status) updateData.payment_status = newPaymentStatus
-      if (trackingNumber !== (order.tracking_number || '')) updateData.tracking_number = trackingNumber
-      if (carrier !== (order.carrier || '')) updateData.carrier = carrier
-      if (notes !== (order.notes || '')) updateData.notes = notes
+    // Clear previous feedback
+    setUpdateSuccess(false)
+    setUpdateError(null)
 
-      if (Object.keys(updateData).length > 0) {
-        await api(`/api/admin/orders/${order.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(updateData)
-        })
-        
-        await fetchOrder() // Refresh order data
-        alert('Order updated successfully!')
+    // Validate status transition if status is being changed
+    if (newStatus !== order.status) {
+      if (!isValidStatusTransition(order.status as OrderUIStatus, newStatus as OrderUIStatus)) {
+        setUpdateError(`Invalid status transition from "${formatStatusDisplay(order.status)}" to "${formatStatusDisplay(newStatus)}". Please check the allowed workflow.`)
+        return
       }
+    }
+
+    const updateData: any = {}
+    if (newStatus !== order.status) updateData.status = newStatus
+    if (newPaymentStatus !== order.payment_status) updateData.payment_status = newPaymentStatus
+    if (trackingNumber !== (order.tracking_number || '')) updateData.tracking_number = trackingNumber
+    if (carrier !== (order.carrier || '')) updateData.carrier = carrier
+    if (notes !== (order.notes || '')) updateData.notes = notes
+
+    if (Object.keys(updateData).length === 0) {
+      setUpdateError('No changes detected.')
+      return
+    }
+
+    setUpdating(true)
+
+    // Optimistic update - immediately update UI
+    const previousOrder = { ...order }
+    setOrder(prev => prev ? {
+      ...prev,
+      status: updateData.status || prev.status,
+      payment_status: updateData.payment_status || prev.payment_status,
+      tracking_number: updateData.tracking_number || prev.tracking_number,
+      carrier: updateData.carrier || prev.carrier,
+      notes: updateData.notes || prev.notes
+    } : null)
+
+    try {
+      await api(`/api/admin/orders/${order.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData)
+      })
+
+      // Refresh order data to get the latest state from server
+      await fetchOrder()
+      setUpdateSuccess(true)
+
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setUpdateSuccess(false), 3000)
+
     } catch (error) {
       console.error('Failed to update order:', error)
-      alert('Failed to update order')
+
+      // Rollback optimistic update
+      setOrder(previousOrder)
+
+      // Provide more specific error messages
+      let errorMessage = 'Failed to update order'
+      if (error instanceof Error) {
+        if (error.message.includes('409')) {
+          errorMessage = 'Update conflict: The order status cannot be changed due to business rules (e.g., shipment already exists).'
+        } else if (error.message.includes('400')) {
+          errorMessage = 'Invalid update request: Please check your input values.'
+        } else if (error.message.includes('403')) {
+          errorMessage = 'Permission denied: You do not have permission to perform this update.'
+        }
+      }
+
+      setUpdateError(errorMessage)
     } finally {
       setUpdating(false)
     }
@@ -389,6 +440,21 @@ export default function OrderDetailPage() {
           </span>
         </div>
 
+        {/* Feedback Messages */}
+        {updateSuccess && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg">
+            <CheckCircleIcon className="h-5 w-5" />
+            <span>Order updated successfully!</span>
+          </div>
+        )}
+
+        {updateError && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-800 rounded-lg">
+            <ExclamationTriangleIcon className="h-5 w-5" />
+            <span>{updateError}</span>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-3">
           <button
@@ -403,7 +469,11 @@ export default function OrderDetailPage() {
             disabled={updating}
             className="flex items-center gap-2 px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 disabled:opacity-50 transition-colors"
           >
-            <PencilIcon className="h-4 w-4" />
+            {updating ? (
+              <ClockIcon className="h-4 w-4 animate-spin" />
+            ) : (
+              <PencilIcon className="h-4 w-4" />
+            )}
             {updating ? 'Updating...' : 'Update Order'}
           </button>
         </div>

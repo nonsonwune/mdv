@@ -248,6 +248,26 @@ async def admin_get_order_details(
         # cancelled and pending_payment both show as pending for payment
         payment_status = "pending"
 
+    # Include fulfillment data for frontend status mapping
+    fulfillment_data = None
+    if order.fulfillment:
+        shipment_data = None
+        if order.fulfillment.shipment:
+            shipment_data = {
+                "status": order.fulfillment.shipment.status.value if hasattr(order.fulfillment.shipment.status, "value") else order.fulfillment.shipment.status,
+                "tracking_id": order.fulfillment.shipment.tracking_id,
+                "courier": order.fulfillment.shipment.courier,
+                "dispatched_at": order.fulfillment.shipment.dispatched_at.isoformat() if order.fulfillment.shipment.dispatched_at else None
+            }
+
+        fulfillment_data = {
+            "status": order.fulfillment.status.value if hasattr(order.fulfillment.status, "value") else order.fulfillment.status,
+            "packed_by": order.fulfillment.packed_by,
+            "packed_at": order.fulfillment.packed_at.isoformat() if order.fulfillment.packed_at else None,
+            "notes": order.fulfillment.notes,
+            "shipment": shipment_data
+        }
+
     return {
         "id": order.id,
         "status": order.status.value if hasattr(order.status, "value") else order.status,
@@ -258,7 +278,8 @@ async def admin_get_order_details(
         "user": user_obj,
         "shipping_address": shipping_address,
         "items": items_response,
-        "tracking_timeline": sorted(timeline, key=lambda x: x["at"]) if timeline else []
+        "tracking_timeline": sorted(timeline, key=lambda x: x["at"]) if timeline else [],
+        "fulfillment": fulfillment_data
     }
 
 

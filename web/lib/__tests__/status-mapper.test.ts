@@ -5,7 +5,13 @@
  * edge cases from the cross-functional team review.
  */
 
-import { mapOrderStatus, type OrderStatusData } from '../status-mapper'
+import {
+  mapOrderStatus,
+  isValidStatusTransition,
+  getAllowedNextStatuses,
+  type OrderStatusData,
+  type OrderUIStatus
+} from '../status-mapper'
 
 describe('Order Status Mapper - Edge Cases', () => {
   
@@ -326,3 +332,104 @@ export function runManualEdgeCaseTests() {
   
   console.log('🧪 Manual tests completed!')
 }
+
+describe('Status Transition Validation', () => {
+  describe('isValidStatusTransition', () => {
+    test('allows valid transitions', () => {
+      expect(isValidStatusTransition('pending', 'processing')).toBe(true)
+      expect(isValidStatusTransition('processing', 'pending_dispatch')).toBe(true)
+      expect(isValidStatusTransition('pending_dispatch', 'shipped')).toBe(true)
+      expect(isValidStatusTransition('shipped', 'delivered')).toBe(true)
+    })
+
+    test('rejects invalid transitions', () => {
+      expect(isValidStatusTransition('pending', 'delivered')).toBe(false)
+      expect(isValidStatusTransition('delivered', 'processing')).toBe(false)
+      expect(isValidStatusTransition('cancelled', 'processing')).toBe(false)
+    })
+
+    test('allows same status transitions', () => {
+      expect(isValidStatusTransition('processing', 'processing')).toBe(true)
+      expect(isValidStatusTransition('pending_dispatch', 'pending_dispatch')).toBe(true)
+    })
+  })
+
+  describe('getAllowedNextStatuses', () => {
+    test('returns correct next statuses for processing', () => {
+      const allowed = getAllowedNextStatuses('processing')
+      expect(allowed).toEqual(['pending_dispatch', 'cancelled'])
+    })
+
+    test('returns empty array for terminal states', () => {
+      expect(getAllowedNextStatuses('delivered')).toEqual([])
+      expect(getAllowedNextStatuses('cancelled')).toEqual([])
+    })
+  })
+})
+
+describe('Pending Dispatch Status Mapping - Bug Fix Tests', () => {
+  test('correctly maps ReadyToShip fulfillment to pending_dispatch with high confidence', () => {
+    const orderData: OrderStatusData = {
+      id: 14,
+      status: 'Paid',
+      fulfillment: {
+        status: 'ReadyToShip',
+        packed_by: 1,
+        packed_at: '2024-01-01T10:00:00Z',
+        notes: 'Ready for dispatch'
+      },
+      tracking_timeline: []
+    }
+
+    const result = mapOrderStatus(orderData, 'admin', false)
+
+    expect(result.uiStatus).toBe('pending_dispatch')
+    expect(result.confidence).toBe('high')
+    expect(result.source).toBe('fulfillment')
+  })
+
+  test('handles case-insensitive backend status', () => {
+    const orderData: OrderStatusData = {
+      id: 14,
+      status: 'paid', // lowercase
+      fulfillment: {
+        status: 'ReadyToShip'
+      }
+    }
+
+    const result = mapOrderStatus(orderData, 'admin', false)
+
+    expect(result.uiStatus).toBe('pending_dispatch')
+    expect(result.confidence).toBe('high')
+  })
+
+  test('improved fallback confidence for paid orders without fulfillment', () => {
+    const orderData: OrderStatusData = {
+      id: 14,
+      status: 'paid',
+      fulfillment: null,
+      tracking_timeline: []
+    }
+
+    const result = mapOrderStatus(orderData, 'admin', false)
+
+    expect(result.uiStatus).toBe('processing')
+    expect(result.confidence).toBe('medium') // Improved from 'low'
+    expect(result.source).toBe('fallback')
+  })
+
+  test('maintains high confidence for customer context fallback', () => {
+    const orderData: OrderStatusData = {
+      id: 14,
+      status: 'paid',
+      fulfillment: null,
+      tracking_timeline: []
+    }
+
+    const result = mapOrderStatus(orderData, 'customer', false)
+
+    expect(result.uiStatus).toBe('processing')
+    expect(result.confidence).toBe('high')
+    expect(result.source).toBe('fallback')
+  })
+})
