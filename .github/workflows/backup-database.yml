@@ -20,6 +20,13 @@ jobs:
   backup:
     name: Backup Railway PostgreSQL
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+      BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
     
     steps:
       - uses: actions/checkout@v4
@@ -38,8 +45,6 @@ jobs:
       
       - name: Get Database Credentials
         id: db-creds
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           # Validate required secrets
           if [ -z "$RAILWAY_TOKEN" ]; then
@@ -47,12 +52,12 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+          if [ -z "$RAILWAY_PROJECT_ID" ]; then
             echo "❌ RAILWAY_PROJECT_ID secret is not configured"
             exit 1
           fi
 
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway link "$RAILWAY_PROJECT_ID"
 
           # Get database URL from Railway
           DB_URL=$(railway variables --service mdv-postgres --kv | grep DATABASE_URL | cut -d'=' -f2-)
@@ -113,6 +118,7 @@ jobs:
           echo "backup_file=$BACKUP_FILE" >> $GITHUB_OUTPUT
           echo "file_size=$FILE_SIZE" >> $GITHUB_OUTPUT
           echo "timestamp=$TIMESTAMP" >> $GITHUB_OUTPUT
+          echo "backup_type=$BACKUP_TYPE" >> $GITHUB_OUTPUT
       
       - name: Upload to GitHub Artifacts
         uses: actions/upload-artifact@v3
@@ -122,23 +128,19 @@ jobs:
           retention-days: 30
       
       - name: Upload to S3 (Optional)
-        if: env.AWS_ACCESS_KEY_ID != ''
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
         run: |
-          S3_BUCKET="${{ secrets.BACKUP_S3_BUCKET }}"
+          S3_BUCKET="$BACKUP_S3_BUCKET"
           S3_PATH="database-backups/railway/${{ steps.backup.outputs.backup_file }}"
           
           if [ -n "$S3_BUCKET" ]; then
             echo "Uploading backup to S3..."
-            aws s3 cp ${{ steps.backup.outputs.backup_file }} s3://$S3_BUCKET/$S3_PATH
+            aws s3 cp "${{ steps.backup.outputs.backup_file }}" "s3://$S3_BUCKET/$S3_PATH"
             
             # Set lifecycle for old backups (keep last 30 days)
             aws s3api put-object-tagging \
-              --bucket $S3_BUCKET \
-              --key $S3_PATH \
+              --bucket "$S3_BUCKET" \
+              --key "$S3_PATH" \
               --tagging 'TagSet=[{Key=AutoDelete,Value=30days}]'
           fi
       
@@ -149,7 +151,7 @@ jobs:
           echo "Verifying backup integrity..."
           
           # For custom format backups, list contents
-          if [ "${{ github.event.inputs.backup_type }}" != "schema-only" ]; then
+          if [ "${{ steps.backup.outputs.backup_type }}" != "schema-only" ]; then
             gunzip -c ${{ steps.backup.outputs.backup_file }} | pg_restore -l > /dev/null 2>&1
             if [ $? -eq 0 ]; then
               echo "✅ Backup integrity verified"
@@ -171,7 +173,7 @@ jobs:
           echo "## 💾 Database Backup Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Backup Details:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Type**: ${{ github.event.inputs.backup_type || 'full' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Type**: ${{ steps.backup.outputs.backup_type }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Timestamp**: ${{ steps.backup.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
           echo "- **File**: ${{ steps.backup.outputs.backup_file }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Size**: ${{ steps.backup.outputs.file_size }}" >> $GITHUB_STEP_SUMMARY
@@ -179,8 +181,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Storage Locations:" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ GitHub Artifacts (30 days retention)" >> $GITHUB_STEP_SUMMARY
-          if [ -n "${{ secrets.BACKUP_S3_BUCKET }}" ]; then
-            echo "- ✅ AWS S3: ${{ secrets.BACKUP_S3_BUCKET }}" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$BACKUP_S3_BUCKET" ]; then
+            echo "- ✅ AWS S3: $BACKUP_S3_BUCKET" >> $GITHUB_STEP_SUMMARY
           fi
 
   # Notification job
@@ -189,12 +191,12 @@ jobs:
     needs: backup
     if: always()
     runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     
     steps:
       - name: Send Notification
-        if: env.SLACK_WEBHOOK_URL != ''
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         run: |
           STATUS_EMOJI=$([[ "${{ needs.backup.result }}" == "success" ]] && echo "✅" || echo "❌")
           
@@ -207,7 +209,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*Database Backup Completed*\n*Status:* '"${{ needs.backup.result }}"'\n*Type:* '"${{ github.event.inputs.backup_type || 'full' }}"'"
+                    "text": "*Database Backup Completed*\n*Status:* '"${{ needs.backup.result }}"'\n*Type:* '"${{ steps.backup.outputs.backup_type }}"'"
                   }
                 }
               ]

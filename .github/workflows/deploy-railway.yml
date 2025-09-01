@@ -27,6 +27,9 @@ jobs:
     environment:
       name: ${{ github.event.inputs.environment || 'production' }}
       url: ${{ steps.deploy-web.outputs.url }}
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
     
     steps:
       - uses: actions/checkout@v4
@@ -36,8 +39,6 @@ jobs:
       
       - name: Deploy Backend API to Railway
         id: deploy-api
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           # Validate required secrets
           if [ -z "$RAILWAY_TOKEN" ]; then
@@ -45,12 +46,12 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+          if [ -z "$RAILWAY_PROJECT_ID" ]; then
             echo "❌ RAILWAY_PROJECT_ID secret is not configured"
             exit 1
           fi
 
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway link "$RAILWAY_PROJECT_ID"
           railway up --service mdv-api --detach
           echo "Waiting for API deployment to complete..."
           railway logs --service mdv-api --tail 20
@@ -60,8 +61,6 @@ jobs:
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
       
       - name: Deploy Worker to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           # Railway CLI should already be authenticated from previous step
           railway up --service mdv-worker --detach
@@ -69,8 +68,6 @@ jobs:
       
       - name: Deploy Web Frontend to Railway
         id: deploy-web
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up --service mdv-web --detach
           echo "Waiting for Web deployment to complete..."
@@ -81,8 +78,6 @@ jobs:
           echo "url=$WEB_URL" >> $GITHUB_OUTPUT
       
       - name: Run Database Migrations
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           echo "Running database migrations..."
           railway run --service mdv-api python -m alembic upgrade head
@@ -152,23 +147,24 @@ jobs:
     needs: deploy
     if: failure()
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
     
     steps:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       
       - name: Rollback Deployments
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           # Validate secrets for rollback
-          if [ -z "$RAILWAY_TOKEN" ] || [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+          if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_PROJECT_ID" ]; then
             echo "❌ Cannot rollback - Railway secrets not configured"
             echo "⚠️ Manual rollback required via Railway dashboard" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
-          railway link ${{ secrets.RAILWAY_PROJECT_ID }}
+          railway link "$RAILWAY_PROJECT_ID"
 
           echo "Rolling back services to previous version..."
           railway rollback --service mdv-api --yes
