@@ -40,7 +40,7 @@ export default function FilterSidebar({ onClose, isMobile = false }: FilterSideb
   // Parse filters from URL
   const [priceRange, setPriceRange] = useState({
     min: Number(searchParams.get("minPrice")) || 0,
-    max: Number(searchParams.get("maxPrice")) || 100000
+    max: Number(searchParams.get("maxPrice")) || 500000
   })
   const [selectedSizes, setSelectedSizes] = useState<string[]>(
     searchParams.get("sizes")?.split(",").filter(Boolean) || []
@@ -59,9 +59,9 @@ export default function FilterSidebar({ onClose, isMobile = false }: FilterSideb
   )
 
   // Track if filters are active
-  const hasActiveFilters = 
+  const hasActiveFilters =
     priceRange.min > 0 ||
-    priceRange.max < 100000 ||
+    priceRange.max < 500000 ||
     selectedSizes.length > 0 ||
     selectedColors.length > 0 ||
     selectedCategories.length > 0 ||
@@ -76,7 +76,7 @@ export default function FilterSidebar({ onClose, isMobile = false }: FilterSideb
     if (priceRange.min > 0) params.set("minPrice", priceRange.min.toString())
     else params.delete("minPrice")
     
-    if (priceRange.max < 100000) params.set("maxPrice", priceRange.max.toString())
+    if (priceRange.max < 500000) params.set("maxPrice", priceRange.max.toString())
     else params.delete("maxPrice")
     
     // Sizes
@@ -112,7 +112,7 @@ export default function FilterSidebar({ onClose, isMobile = false }: FilterSideb
 
   // Clear all filters
   const clearFilters = () => {
-    setPriceRange({ min: 0, max: 100000 })
+    setPriceRange({ min: 0, max: 500000 })
     setSelectedSizes([])
     setSelectedColors([])
     setSelectedCategories([])
@@ -192,8 +192,8 @@ export default function FilterSidebar({ onClose, isMobile = false }: FilterSideb
             <input
               type="number"
               placeholder="Max"
-              value={priceRange.max === 100000 ? "" : priceRange.max}
-              onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) || 100000 }))}
+              value={priceRange.max === 500000 ? "" : priceRange.max}
+              onChange={(e) => setPriceRange(prev => ({ ...prev, max: Number(e.target.value) || 500000 }))}
               className="input text-sm"
               min="0"
             />
@@ -331,7 +331,7 @@ export default function FilterSidebar({ onClose, isMobile = false }: FilterSideb
                 Min: ₦{priceRange.min.toLocaleString()}
               </span>
             )}
-            {priceRange.max < 100000 && (
+            {priceRange.max < 500000 && (
               <span className="bg-neutral-100 px-2 py-1 rounded">
                 Max: ₦{priceRange.max.toLocaleString()}
               </span>

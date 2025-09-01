@@ -28,7 +28,7 @@ export const sortOptions: SortOption[] = [
 
 export function useProductFilters(products: Product[]) {
   const [filters, setFilters] = useState<FilterOptions>({
-    priceRange: [0, 100000], // Updated to ₦1000 (100000 kobo) to accommodate actual product prices
+    priceRange: [0, 500000], // Updated to ₦500,000 to accommodate higher-priced products
     categories: [],
     sizes: [],
     colors: [],
