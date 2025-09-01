@@ -47,8 +47,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     (headers as Record<string, string>)["Content-Type"] = "application/json"
   }
   
-  // Route admin requests through Next.js proxy (uses HttpOnly cookie on server)
-  const url = isAdminPath ? path : `${base}${path}`
+  // Route all API requests through Next.js proxy (uses HttpOnly cookie on server)
+  // This ensures authentication cookies are available for all API calls
+  const isApiPath = path.startsWith('/api/')
+  const url = isApiPath ? path : `${base}${path}`
   
   try {
     const res = await fetch(url, {
