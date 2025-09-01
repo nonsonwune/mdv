@@ -8,6 +8,7 @@ import type { Product, Variant } from "../../lib/types"
 import { addItemWithRecovery } from "../../lib/cart"
 import { Button, Badge } from "../ui"
 import { useToast } from "../../app/_components/ToastProvider"
+import { useWishlist } from "../../hooks/useWishlist"
 import ProductQuickView from "./ProductQuickView"
 
 interface ProductCardProps {
@@ -19,9 +20,11 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const [isHovered, setIsHovered] = useState(false)
   const [imageIndex, setImageIndex] = useState(0)
   const [isAdding, setIsAdding] = useState(false)
+  const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
   const [showQuickView, setShowQuickView] = useState(false)
   const router = useRouter()
   const toast = useToast()
+  const { toggleItem, isAuthenticated } = useWishlist()
   
   const defaultVariant: Variant | undefined = product.variants?.[0]
   const price = defaultVariant?.price || 0
@@ -184,27 +187,45 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                 )}
               </button>
               <button
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.preventDefault()
                   e.stopPropagation()
-                  // Add to wishlist
-                  const wishlist = JSON.parse(localStorage.getItem("mdv_wishlist") || "[]")
-                  const exists = wishlist.find((p: Product) => p.id === product.id)
-                  if (!exists) {
-                    wishlist.push(product)
-                    localStorage.setItem("mdv_wishlist", JSON.stringify(wishlist))
-                    toast.success("Added to wishlist")
-                  } else {
-                    toast.info("Already in wishlist")
+
+                  if (!isAuthenticated) {
+                    toast.error("Please log in", "You need to be logged in to add items to your wishlist")
+                    return
+                  }
+
+                  setIsAddingToWishlist(true)
+                  try {
+                    const wasAdded = await toggleItem(product.id)
+                    if (wasAdded) {
+                      toast.success("Added to wishlist", `${product.title} has been added to your wishlist`)
+                    } else {
+                      toast.info("Removed from wishlist", `${product.title} has been removed from your wishlist`)
+                    }
+                  } catch (error) {
+                    toast.error("Failed to update wishlist", "Please try again")
+                    console.error("Wishlist error:", error)
+                  } finally {
+                    setIsAddingToWishlist(false)
                   }
                 }}
-                className="p-2 bg-white rounded-lg hover:bg-neutral-100 transition-colors"
+                disabled={isAddingToWishlist}
+                className="p-2 bg-white rounded-lg hover:bg-neutral-100 transition-colors disabled:opacity-50"
                 aria-label="Add to wishlist"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
+                {isAddingToWishlist ? (
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                )}
               </button>
             </div>
           </div>
