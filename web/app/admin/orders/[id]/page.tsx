@@ -33,20 +33,36 @@ const normalizeOrderData = (raw: any): Order => {
   // Derive order status for this UI from backend status/timeline
   const backendStatus = String(raw?.status || '')
   const timeline: Array<{ code: string; at: string; message?: string; tracking_id?: string }> = raw?.tracking_timeline || []
+  const fulfillment = raw?.fulfillment || {}
+  const shipment = raw?.shipment || fulfillment?.shipment || {}
 
-  // Determine shipment milestones
+  // Determine shipment milestones from timeline
   const hasDelivered = timeline.some(e => (e.code || '').toLowerCase() === 'delivered')
   const hasShipped = hasDelivered || timeline.some(e => (e.code || '').toLowerCase() === 'shipped' || (e.code || '').toLowerCase() === 'dispatched')
 
-  // Map backend OrderStatus -> UI status
+  // Map backend OrderStatus -> UI status (prioritize actual status over timeline for admin)
   let uiStatus: Order['status'] = 'pending'
   const b = backendStatus.toLowerCase()
-  if (hasDelivered) uiStatus = 'delivered'
-  else if (hasShipped) uiStatus = 'shipped'
-  else if (b === 'cancelled') uiStatus = 'cancelled'
-  else if (b === 'paid') uiStatus = 'processing'
-  else if (b === 'refunded') uiStatus = 'cancelled' // show as terminal
-  else uiStatus = 'pending'
+
+  // First check actual shipment status for delivered/shipped states
+  if (shipment?.status === 'Delivered' || hasDelivered) {
+    uiStatus = 'delivered'
+  } else if (shipment?.status === 'Dispatched' || shipment?.status === 'InTransit') {
+    uiStatus = 'shipped'
+  } else if (b === 'cancelled') {
+    uiStatus = 'cancelled'
+  } else if (b === 'refunded') {
+    uiStatus = 'cancelled' // show as terminal
+  } else if (b === 'paid') {
+    // For paid orders, check fulfillment status to determine if processing or ready for dispatch
+    if (fulfillment?.status === 'ReadyToShip') {
+      uiStatus = 'pending_dispatch'
+    } else {
+      uiStatus = 'processing'
+    }
+  } else {
+    uiStatus = 'pending'
+  }
 
   // Derive payment status from backend OrderStatus
   let paymentStatus: Order['payment_status'] = 'pending'

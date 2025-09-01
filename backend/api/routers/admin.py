@@ -479,8 +479,14 @@ async def admin_update_order(
             changed = True
 
         # Update fulfillment status based on UI status
-        if body.status in ["processing", "pending_dispatch"] and order.fulfillment.status != FulfillmentStatus.ready_to_ship:
-            # Mark as ready to ship when order status is set to processing or pending dispatch
+        if body.status == "processing" and order.fulfillment.status != FulfillmentStatus.processing:
+            # Set to processing when order status is set to processing
+            order.fulfillment.status = FulfillmentStatus.processing
+            order.fulfillment.packed_by = actor_id
+            order.fulfillment.packed_at = datetime.now(timezone.utc)
+            changed = True
+        elif body.status == "pending_dispatch" and order.fulfillment.status != FulfillmentStatus.ready_to_ship:
+            # Mark as ready to ship when order status is set to pending dispatch
             order.fulfillment.status = FulfillmentStatus.ready_to_ship
             order.fulfillment.packed_by = actor_id
             order.fulfillment.packed_at = datetime.now(timezone.utc)
