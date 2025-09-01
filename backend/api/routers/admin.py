@@ -510,7 +510,8 @@ async def admin_update_order(
     # Shipment updates based on tracking/carrier or status hints
     if order.fulfillment:
         shp = order.fulfillment.shipment
-        wants_shipment = bool(body.tracking_number or body.carrier or (body.status in {"pending_dispatch", "in_transit", "shipped", "delivered"} if body.status else False))
+        # Only create shipment for actual shipping statuses, not pending_dispatch
+        wants_shipment = bool(body.tracking_number or body.carrier or (body.status in {"in_transit", "shipped", "delivered"} if body.status else False))
         if wants_shipment and not shp:
             shp = Shipment(
                 fulfillment_id=order.fulfillment.id if order.fulfillment.id else None,
@@ -544,13 +545,14 @@ async def admin_update_order(
                 shp.tracking_id = body.tracking_number
                 updated = True
             # Handle status transitions requested by UI
-            if body.status == "pending_dispatch" and shp.status != ShipmentStatus.dispatched:
+            # Note: "pending_dispatch" should NOT create shipment events - it's a fulfillment state
+            if body.status == "shipped" and shp.status != ShipmentStatus.dispatched:
                 shp.status = ShipmentStatus.dispatched
                 db.add(
                     ShipmentEvent(
                         shipment_id=shp.id,
                         code="Dispatched",
-                        message="Shipment pending dispatch",
+                        message="Shipment dispatched",
                         occurred_at=datetime.now(timezone.utc),
                     )
                 )

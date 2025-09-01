@@ -98,20 +98,10 @@ export function mapOrderStatus(
   let confidence: 'high' | 'medium' | 'low' = 'high'
   let source: StatusMappingResult['source'] = 'backend'
 
-  // Status mapping logic with priority order
-  if ((shipment?.status === 'Delivered') || hasDelivered) {
-    uiStatus = 'delivered'
-    source = shipment?.status === 'Delivered' ? 'shipment' : 'timeline'
-    confidence = 'high'
-  } else if (shipment?.status === 'InTransit') {
-    uiStatus = 'in_transit'
-    source = 'shipment'
-    confidence = 'high'
-  } else if (shipment?.status === 'Dispatched' || hasShipped) {
-    uiStatus = 'shipped'
-    source = shipment?.status === 'Dispatched' ? 'shipment' : 'timeline'
-    confidence = shipment?.status === 'Dispatched' ? 'high' : 'medium'
-  } else if (backendStatus === 'cancelled') {
+  // HYBRID STATUS RESOLUTION: Intelligently combine timeline events + admin intent
+
+  // 1. TERMINAL STATES (always trust backend)
+  if (backendStatus === 'cancelled') {
     uiStatus = 'cancelled'
     source = 'backend'
     confidence = 'high'
@@ -119,28 +109,95 @@ export function mapOrderStatus(
     uiStatus = 'cancelled' // Show refunded as cancelled (terminal state)
     source = 'backend'
     confidence = 'high'
-  } else if (backendStatus === 'paid') {
-    // For paid orders, use fulfillment status to determine processing stage
+  }
+
+  // 2. CONFIRMED LOGISTICS STATES (trust shipment data when available)
+  else if (shipment?.status === 'Delivered') {
+    uiStatus = 'delivered'
+    source = 'shipment'
+    confidence = 'high'
+  } else if (shipment?.status === 'InTransit') {
+    uiStatus = 'in_transit'
+    source = 'shipment'
+    confidence = 'high'
+  } else if (shipment?.status === 'Dispatched') {
+    uiStatus = 'shipped'
+    source = 'shipment'
+    confidence = 'high'
+  }
+
+  // 3. HYBRID RESOLUTION FOR PAID ORDERS (combine fulfillment + timeline intelligently)
+  else if (backendStatus === 'paid') {
+    // Strategy: Use fulfillment status as primary, timeline as validation/fallback
+
     if (fulfillment?.status === 'ReadyToShip') {
-      uiStatus = 'pending_dispatch'
-      source = 'fulfillment'
-      confidence = 'high'
-    } else if (fulfillment?.status === 'Processing') {
-      uiStatus = 'processing'
-      source = 'fulfillment'
-      confidence = 'high'
-    } else {
-      // Fallback for paid orders without clear fulfillment status
-      uiStatus = 'processing'
-      source = 'fallback'
-      confidence = 'low'
+      // Admin set to pending_dispatch - check if timeline conflicts
+      if (hasDelivered) {
+        // Timeline shows delivered but fulfillment says ready to ship
+        // This suggests timeline is more current (package was delivered)
+        uiStatus = 'delivered'
+        source = 'timeline'
+        confidence = 'medium' // Medium because of data conflict
+      } else if (hasShipped) {
+        // Timeline shows shipped but fulfillment says ready to ship
+        // This suggests package was actually dispatched
+        uiStatus = 'shipped'
+        source = 'timeline'
+        confidence = 'medium' // Medium because of data conflict
+      } else {
+        // No timeline conflicts - trust fulfillment status
+        uiStatus = 'pending_dispatch'
+        source = 'fulfillment'
+        confidence = 'high'
+      }
     }
-  } else if (backendStatus === 'pendingpayment') {
+
+    else if (fulfillment?.status === 'Processing') {
+      // Admin set to processing - check if timeline suggests progression
+      if (hasDelivered) {
+        uiStatus = 'delivered'
+        source = 'timeline'
+        confidence = 'medium'
+      } else if (hasShipped) {
+        uiStatus = 'shipped'
+        source = 'timeline'
+        confidence = 'medium'
+      } else {
+        // No timeline conflicts - trust fulfillment status
+        uiStatus = 'processing'
+        source = 'fulfillment'
+        confidence = 'high'
+      }
+    }
+
+    else {
+      // No fulfillment data - rely on timeline with confidence scoring
+      if (hasDelivered) {
+        uiStatus = 'delivered'
+        source = 'timeline'
+        confidence = context === 'admin' ? 'medium' : 'high' // Lower confidence for admin (they need accurate data)
+      } else if (hasShipped) {
+        uiStatus = 'shipped'
+        source = 'timeline'
+        confidence = context === 'admin' ? 'medium' : 'high'
+      } else {
+        // No fulfillment, no timeline - default to processing for paid orders
+        uiStatus = 'processing'
+        source = 'fallback'
+        confidence = 'low'
+      }
+    }
+  }
+
+  // 4. UNPAID ORDERS
+  else if (backendStatus === 'pendingpayment') {
     uiStatus = 'pending'
     source = 'backend'
     confidence = 'high'
-  } else {
-    // Ultimate fallback
+  }
+
+  // 5. ULTIMATE FALLBACK
+  else {
     uiStatus = 'pending'
     source = 'fallback'
     confidence = 'low'
@@ -160,22 +217,48 @@ export function mapOrderStatus(
     debugInfo
   }
 
-  // Comprehensive logging
+  // Comprehensive logging with hybrid decision explanation
   if (enableLogging) {
     const logLevel = confidence === 'low' ? 'warn' : 'log'
-    console[logLevel](`🔍 Order Status Mapping [${context}]:`, {
+
+    // Determine decision rationale
+    let decisionRationale = ''
+    if (source === 'shipment') {
+      decisionRationale = 'Shipment data available - using confirmed logistics status'
+    } else if (source === 'fulfillment') {
+      decisionRationale = 'Fulfillment status matches admin intent - no timeline conflicts'
+    } else if (source === 'timeline') {
+      decisionRationale = confidence === 'medium'
+        ? 'Timeline events override fulfillment status (data conflict detected)'
+        : 'Timeline events used as primary source (no fulfillment data)'
+    } else if (source === 'backend') {
+      decisionRationale = 'Backend status used for terminal states'
+    } else {
+      decisionRationale = 'Fallback logic applied - insufficient data quality'
+    }
+
+    console[logLevel](`🔍 Hybrid Order Status Resolution [${context}]:`, {
       orderId: orderData?.id,
-      result: {
+      decision: {
         uiStatus,
         paymentStatus,
         confidence,
-        source
+        source,
+        rationale: decisionRationale
+      },
+      dataQuality: {
+        hasFulfillment: !!fulfillment?.status,
+        hasShipment: !!shipment?.status,
+        timelineEvents: debugInfo.timelineEvents,
+        hasConflicts: (fulfillment?.status && (hasDelivered || hasShipped))
       },
       debugInfo
     })
 
     if (confidence === 'low') {
-      console.warn('⚠️ Low confidence status mapping - review data quality')
+      console.warn('⚠️ Low confidence hybrid mapping - review data quality and consider manual verification')
+    } else if (confidence === 'medium') {
+      console.info('ℹ️ Medium confidence mapping - data conflicts detected, timeline took precedence')
     }
   }
 
