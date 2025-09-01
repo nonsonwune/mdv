@@ -133,6 +133,9 @@ function ProductGrid({ products, loading, searchParams }: { products: Product[],
 }
 
 export default function CategoryLayout({ title, description, products: initialProducts, category }: CategoryLayoutProps) {
+  console.log('CategoryLayout: Received products:', initialProducts?.length || 0, 'items')
+  console.log('CategoryLayout: Products data:', JSON.stringify(initialProducts, null, 2))
+
   const searchParams = useSearchParams()
   const router = useRouter()
   const [products, setProducts] = useState(initialProducts)
