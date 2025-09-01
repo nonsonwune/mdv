@@ -1,32 +1,47 @@
-# Build API service
+# ---------- base: install system dependencies ----------
 FROM python:3.12-slim AS base
-
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONPATH=/app
-
 WORKDIR /app
-
-# Install build deps as needed (psycopg, etc.)
+# Add libpq-dev for psycopg2 builds; keep image slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    && rm -rf /var/lib/apt/lists/*
+    libpq-dev \
+    curl \
+ && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install
-COPY backend/requirements.txt backend/requirements.txt
-RUN pip install -r backend/requirements.txt
+# ---------- deps: install Python dependencies ----------
+FROM base AS deps
+COPY backend/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source
-COPY backend backend
+# ---------- build: copy application code ----------
+FROM base AS build
+WORKDIR /app
+# Copy the entire backend directory to /app/backend
+COPY backend/ ./backend/
 
-# Expose port (Railway sets $PORT)
+# ---------- runner: minimal production image ----------
+FROM base AS runner
+# Change working directory to where the app code is
+WORKDIR /app/backend
+ENV PYTHONPATH=/app
 ENV PORT=8000
 EXPOSE 8000
-
-# Set working directory to backend before running
-WORKDIR /app
-
-# Use Python startup script for better error handling
-CMD ["python", "backend/start.py"]
-
+# Copy application code from build stage (only the backend contents)
+# Use trailing slashes to copy the directory contents, avoiding nested /backend/backend
+COPY --from=build /app/backend/ ./
+# Copy installed dependencies from deps stage
+COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=deps /usr/local/bin /usr/local/bin
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
+USER app
+# Health check endpoint should exist in your app
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+# Use shell form to avoid bracket parsing issues observed in runtime
+CMD python3 start.py
