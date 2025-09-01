@@ -20,6 +20,11 @@ jobs:
   backup:
     name: Backup Railway PostgreSQL
     runs-on: ubuntu-latest
+    outputs:
+      backup_type: ${{ steps.backup.outputs.backup_type }}
+      backup_status: ${{ job.status }}
+      backup_file: ${{ steps.backup.outputs.backup_file }}
+      timestamp: ${{ steps.backup.outputs.timestamp }}
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
@@ -30,7 +35,53 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: Validate Environment Variables
+        run: |
+          echo "🔍 Validating required and optional environment variables..."
+
+          # Check required secrets
+          MISSING_REQUIRED=false
+
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "❌ RAILWAY_TOKEN is required but not set"
+            MISSING_REQUIRED=true
+          else
+            echo "✅ RAILWAY_TOKEN is configured"
+          fi
+
+          if [ -z "$RAILWAY_PROJECT_ID" ]; then
+            echo "❌ RAILWAY_PROJECT_ID is required but not set"
+            MISSING_REQUIRED=true
+          else
+            echo "✅ RAILWAY_PROJECT_ID is configured"
+          fi
+
+          # Check optional secrets
+          if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ] && [ -n "$BACKUP_S3_BUCKET" ]; then
+            echo "✅ AWS S3 backup is configured and will be used"
+          else
+            echo "ℹ️ AWS S3 backup is not fully configured (optional)"
+            echo "   Missing one or more of: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, BACKUP_S3_BUCKET"
+          fi
+
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            echo "✅ Slack notifications are configured"
+          else
+            echo "ℹ️ Slack notifications are not configured (optional)"
+          fi
+
+          # Exit if required secrets are missing
+          if [ "$MISSING_REQUIRED" = "true" ]; then
+            echo ""
+            echo "❌ Cannot proceed: Required secrets are missing"
+            echo "Please configure the missing secrets in repository settings"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ All required environment variables are configured"
+
       - name: Install Dependencies
         run: |
           # Install PostgreSQL client tools
@@ -128,20 +179,27 @@ jobs:
           retention-days: 30
       
       - name: Upload to S3 (Optional)
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: ${{ env.AWS_ACCESS_KEY_ID != '' && env.AWS_SECRET_ACCESS_KEY != '' && env.BACKUP_S3_BUCKET != '' }}
         run: |
+          echo "🔄 Uploading backup to S3..."
           S3_BUCKET="$BACKUP_S3_BUCKET"
           S3_PATH="database-backups/railway/${{ steps.backup.outputs.backup_file }}"
-          
-          if [ -n "$S3_BUCKET" ]; then
-            echo "Uploading backup to S3..."
-            aws s3 cp "${{ steps.backup.outputs.backup_file }}" "s3://$S3_BUCKET/$S3_PATH"
-            
+
+          echo "S3 Bucket: $S3_BUCKET"
+          echo "S3 Path: $S3_PATH"
+
+          # Upload to S3
+          if aws s3 cp "${{ steps.backup.outputs.backup_file }}" "s3://$S3_BUCKET/$S3_PATH"; then
+            echo "✅ Backup successfully uploaded to S3"
+
             # Set lifecycle for old backups (keep last 30 days)
             aws s3api put-object-tagging \
               --bucket "$S3_BUCKET" \
               --key "$S3_PATH" \
-              --tagging 'TagSet=[{Key=AutoDelete,Value=30days}]'
+              --tagging 'TagSet=[{Key=AutoDelete,Value=30days}]' || echo "⚠️ Failed to set S3 object tags (non-critical)"
+          else
+            echo "❌ Failed to upload backup to S3"
+            exit 1
           fi
       
       - name: Verify Backup Integrity
@@ -196,21 +254,41 @@ jobs:
     
     steps:
       - name: Send Notification
-        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
         run: |
+          echo "📢 Sending backup notification to Slack..."
           STATUS_EMOJI=$([[ "${{ needs.backup.result }}" == "success" ]] && echo "✅" || echo "❌")
-          
-          curl -X POST $SLACK_WEBHOOK_URL \
-            -H 'Content-Type: application/json' \
-            -d '{
-              "text": "'"$STATUS_EMOJI"' Database Backup: '"${{ needs.backup.result }}"'",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Database Backup Completed*\n*Status:* '"${{ needs.backup.result }}"'\n*Type:* '"${{ steps.backup.outputs.backup_type }}"'"
-                  }
+
+          # Prepare notification payload
+          NOTIFICATION_PAYLOAD='{
+            "text": "'"$STATUS_EMOJI"' Database Backup: '"${{ needs.backup.result }}"'",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Database Backup Completed*\n*Status:* '"${{ needs.backup.result }}"'\n*Type:* '"${{ needs.backup.outputs.backup_type }}"'\n*File:* '"${{ needs.backup.outputs.backup_file }}"'\n*Timestamp:* '"${{ needs.backup.outputs.timestamp }}"'"
                 }
-              ]
-            }'
+              }
+            ]
+          }'
+
+          # Send notification with error handling
+          if curl -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-Type: application/json' \
+            -d "$NOTIFICATION_PAYLOAD" \
+            --fail --silent --show-error; then
+            echo "✅ Notification sent successfully to Slack"
+          else
+            echo "❌ Failed to send notification to Slack"
+            echo "Webhook URL configured but request failed"
+            exit 1
+          fi
+
+      - name: Notification Fallback
+        if: ${{ env.SLACK_WEBHOOK_URL == '' }}
+        run: |
+          echo "ℹ️ Slack webhook not configured - skipping notification"
+          echo "Backup completed with status: ${{ needs.backup.result }}"
+          echo "Backup type: ${{ needs.backup.outputs.backup_type }}"
+          echo "Backup file: ${{ needs.backup.outputs.backup_file }}"
