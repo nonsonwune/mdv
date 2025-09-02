@@ -32,10 +32,18 @@ export default function CustomerLoginPage() {
       }
       
       const data = await res.json()
-      
+
+      // Handle force password change scenario
+      if (data.force_password_change) {
+        // Redirect to password change page with user info
+        const changePasswordUrl = `/change-password?user_id=${data.user_id}&message=${encodeURIComponent(data.message || 'Password change required')}`
+        router.replace(changePasswordUrl as any)
+        return
+      }
+
       // Refresh auth state to update navigation
       await checkAuth()
-      
+
       // For customers, redirect to account page by default
       const next = searchParams.get("next") || "/account"
       router.replace(next as any)
