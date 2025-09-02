@@ -142,6 +142,27 @@ function UserManagementContent() {
   const canManageUsers = hasPermission(Permission.MANAGE_USERS)
   const canViewUsers = hasPermission(Permission.VIEW_USERS) || hasPermission(Permission.MANAGE_USERS)
   const canDeleteUsers = hasPermission(Permission.DELETE_USERS) || hasPermission(Permission.MANAGE_USERS)
+  const canManageSupervisors = currentUser?.role === 'admin' // Only admins can manage supervisors
+  const isCurrentUserSupervisor = currentUser?.role === 'supervisor'
+
+  // Helper functions for role-based restrictions
+  const canEditUser = (user: User) => {
+    if (!canManageUsers) return false
+    if (isCurrentUserSupervisor && ['admin', 'supervisor'].includes(user.role)) return false
+    return true
+  }
+
+  const canDeleteUser = (user: User) => {
+    if (!canDeleteUsers) return false
+    if (isCurrentUserSupervisor && ['admin', 'supervisor'].includes(user.role)) return false
+    return true
+  }
+
+  const canResetPassword = (user: User) => {
+    if (!canManageUsers) return false
+    if (isCurrentUserSupervisor && ['admin', 'supervisor'].includes(user.role)) return false
+    return true
+  }
   const [users, setUsers] = useState<User[]>([])
   const [stats, setStats] = useState<UserStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -249,17 +270,71 @@ function UserManagementContent() {
     }
   }
 
-  const handleDeleteUser = async (userId: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) return
+  const handleDeleteUser = async (user: User) => {
+    const confirmMessage = `Delete user: ${user.name}?\n\nThis will:\n• Deactivate their account\n• Prevent them from logging in\n• Preserve their order history\n\nThis action can be reversed by reactivating the user.`
+
+    if (!confirm(confirmMessage)) return
 
     try {
-      await api(`/api/admin/users/${userId}`, {
+      await api(`/api/admin/users/${user.id}`, {
         method: 'DELETE'
       })
+
+      alert(`User ${user.name} has been successfully deactivated.`)
+      fetchUsers()
+    } catch (error: any) {
+      console.error('Failed to delete user:', error)
+
+      // Handle specific error cases
+      let errorMessage = 'Failed to delete user'
+      if (error?.message?.includes('409')) {
+        // Business rule violation
+        const detail = error.message.split('detail":"')[1]?.split('"')[0] || 'User has active orders'
+        errorMessage = `Cannot delete user: ${detail}\n\nWould you like to force delete anyway?`
+
+        if (confirm(errorMessage)) {
+          // Retry with force=true
+          try {
+            await api(`/api/admin/users/${user.id}?force=true`, {
+              method: 'DELETE'
+            })
+            alert(`User ${user.name} has been forcefully deactivated.`)
+            fetchUsers()
+          } catch (forceError) {
+            console.error('Failed to force delete user:', forceError)
+            alert('Failed to force delete user. Please try again.')
+          }
+        }
+      } else if (error?.message?.includes('400')) {
+        if (error.message.includes('already inactive')) {
+          errorMessage = 'User is already inactive'
+        } else if (error.message.includes('own account')) {
+          errorMessage = 'You cannot delete your own account'
+        }
+        alert(errorMessage)
+      } else {
+        alert('Failed to delete user. Please try again.')
+      }
+    }
+  }
+
+  const handleResetPassword = async (user: User) => {
+    const confirmMessage = `Reset password for ${user.name}?\n\nThis will:\n• Set their password to "password123"\n• Force them to change it on next login\n• Log this action for audit purposes`
+
+    if (!confirm(confirmMessage)) return
+
+    try {
+      const response = await api(`/api/admin/users/${user.id}/reset-password`, {
+        method: 'POST'
+      })
+
+      alert(`Password reset successfully!\n\nUser: ${response.user_name}\nEmail: ${response.user_email}\nTemporary Password: ${response.temporary_password}\n\nThe user must change this password on their next login.`)
+
+      // Refresh users list to show any status changes
       fetchUsers()
     } catch (error) {
-      console.error('Failed to delete user:', error)
-      alert('Failed to delete user')
+      console.error('Failed to reset password:', error)
+      alert('Failed to reset password. Please try again.')
     }
   }
 
@@ -367,7 +442,9 @@ function UserManagementContent() {
             <p className="text-gray-600">
               Manage staff accounts, roles, and permissions
               {currentUser?.role === 'supervisor' && (
-                <span className="text-amber-600 ml-2">(Limited Access)</span>
+                <span className="text-amber-600 ml-2">
+                  (Limited Access - Cannot manage Admin/Supervisor accounts)
+                </span>
               )}
             </p>
           </div>
@@ -591,18 +668,38 @@ function UserManagementContent() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(user)}
-                          className="text-maroon-600 hover:text-maroon-900"
-                        >
-                          <PencilIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <TrashIcon className="h-5 w-5" />
-                        </button>
+                        {canEditUser(user) && (
+                          <button
+                            onClick={() => openEditModal(user)}
+                            className="text-maroon-600 hover:text-maroon-900"
+                            title="Edit user"
+                          >
+                            <PencilIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        {canResetPassword(user) && (
+                          <button
+                            onClick={() => handleResetPassword(user)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Reset password to 'password123'"
+                          >
+                            <KeyIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        {canDeleteUser(user) && (
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete user"
+                          >
+                            <TrashIcon className="h-5 w-5" />
+                          </button>
+                        )}
+                        {!canEditUser(user) && !canResetPassword(user) && !canDeleteUser(user) && (
+                          <span className="text-gray-400 text-sm">
+                            No actions available
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

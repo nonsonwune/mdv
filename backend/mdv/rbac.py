@@ -53,6 +53,8 @@ class Permission(str, Enum):
     USER_DELETE = "user:delete"
     USER_ACTIVATE = "user:activate"
     USER_ASSIGN_ROLE = "user:assign_role"
+    USER_MANAGE_SUPERVISORS = "user:manage_supervisors"  # Admin-only: manage supervisor accounts
+    USER_RESET_PASSWORD = "user:reset_password"  # Reset other users' passwords
     # Aliases for frontend compatibility
     MANAGE_USERS = "user:manage"
     VIEW_USERS = "user:view"  # Alias
@@ -111,14 +113,16 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.ORDER_CANCEL,
         Permission.ORDER_FULFILL,
         Permission.ORDER_REFUND,
-        # Users - limited access
+        # Users - limited access (cannot manage supervisors)
         Permission.USER_VIEW,
         Permission.VIEW_USERS,  # Alias
         Permission.USER_CREATE,
         Permission.USER_EDIT,
         Permission.USER_ACTIVATE,
+        Permission.USER_RESET_PASSWORD,
         Permission.MANAGE_USERS,
         Permission.DELETE_USERS,
+        # Note: USER_MANAGE_SUPERVISORS is excluded for supervisors
         # Payments - view and process
         Permission.PAYMENT_VIEW,
         Permission.PAYMENT_PROCESS,

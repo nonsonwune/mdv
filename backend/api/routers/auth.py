@@ -70,10 +70,68 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
             user.password_hash = hash_password(body.password)
             await db.commit()
     
+    # Check if password change is required
+    if user.force_password_change:
+        # Return special response indicating password change required
+        return {
+            "access_token": None,
+            "token": None,
+            "role": user.role.value,
+            "token_type": "bearer",
+            "force_password_change": True,
+            "user_id": user.id,
+            "message": "Password change required before accessing the system"
+        }
+
     # Create access token
     token = create_access_token(subject=str(user.id), role=user.role)
-    
+
     # Return both access_token and token for client compatibility
+    return AuthLoginResponse(
+        access_token=token,
+        token=token,
+        role=user.role.value,
+        token_type="bearer"
+    )
+
+
+@router.post("/change-password-forced")
+async def change_password_forced(
+    body: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Change password for users who are forced to change it.
+    Does not require authentication token.
+    """
+    user_id = body.get("user_id")
+    current_password = body.get("current_password")
+    new_password = body.get("new_password")
+
+    if not all([user_id, current_password, new_password]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+
+    if len(new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    # Get user
+    user = await db.get(User, user_id)
+    if not user or not user.active:
+        raise HTTPException(status_code=404, detail="User not found or inactive")
+
+    # Verify current password
+    if not verify_password(current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid current password")
+
+    # Update password and clear force flag
+    user.password_hash = hash_password(new_password)
+    user.force_password_change = False
+
+    await db.commit()
+
+    # Create access token now that password is changed
+    token = create_access_token(subject=str(user.id), role=user.role)
+
     return AuthLoginResponse(
         access_token=token,
         token=token,

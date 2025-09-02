@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from datetime import datetime
+from datetime import datetime, timedelta
 import hashlib
 import secrets
 
@@ -246,15 +246,23 @@ async def create_user(
 ):
     """
     Create a new user.
-    Admin only.
+    Admin only. Supervisors cannot create other supervisor accounts.
     """
     actor_id = parse_actor_id(claims)
-    
+    actor_role = claims.get("role")
+
+    # Check supervisor restrictions
+    if actor_role == "supervisor" and request.role in [Role.admin, Role.supervisor]:
+        raise HTTPException(
+            status_code=403,
+            detail="Supervisors cannot create admin or supervisor accounts"
+        )
+
     # Check if email already exists
     existing = await db.execute(select(User).where(User.email == request.email))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Create user
     user = User(
         name=request.name,
@@ -358,15 +366,31 @@ async def update_user(
 ):
     """
     Update an existing user.
-    Admin only.
+    Admin only. Supervisors cannot modify admin or supervisor accounts.
     """
     actor_id = parse_actor_id(claims)
-    
+    actor_role = claims.get("role")
+
     # Get user
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    # Check supervisor restrictions
+    if actor_role == "supervisor":
+        # Supervisors cannot modify admin or supervisor accounts
+        if user.role in [Role.admin, Role.supervisor]:
+            raise HTTPException(
+                status_code=403,
+                detail="Supervisors cannot modify admin or supervisor accounts"
+            )
+        # Supervisors cannot promote users to admin or supervisor
+        if request.role and request.role in [Role.admin, Role.supervisor]:
+            raise HTTPException(
+                status_code=403,
+                detail="Supervisors cannot promote users to admin or supervisor roles"
+            )
+
     # Prevent self-demotion for admin
     if user_id == actor_id and request.role and request.role != Role.admin:
         raise HTTPException(status_code=400, detail="Cannot change your own admin role")
@@ -428,41 +452,98 @@ async def update_user(
     )
 
 
-@router.delete("/{user_id}", dependencies=[Depends(require_roles(*ADMINS))])
+@router.delete("/{user_id}")
 async def delete_user(
     user_id: int,
+    force: bool = Query(False, description="Force deletion even if user has active orders"),
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(get_current_claims)
+    claims: dict = Depends(require_roles(*ADMINS))
 ):
     """
     Delete a user (soft delete by deactivating).
-    Admin only.
+    Checks for business rules unless force=true.
+    Admin only. Supervisors cannot delete admin or supervisor accounts.
     """
     actor_id = parse_actor_id(claims)
-    
+    actor_role = claims.get("role")
+
     # Prevent self-deletion
     if user_id == actor_id:
         raise HTTPException(status_code=400, detail="Cannot delete your own account")
-    
+
     # Get user
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    # Check supervisor restrictions
+    if actor_role == "supervisor" and user.role in [Role.admin, Role.supervisor]:
+        raise HTTPException(
+            status_code=403,
+            detail="Supervisors cannot delete admin or supervisor accounts"
+        )
+
+    # Check if user is already inactive
+    if not user.active:
+        raise HTTPException(status_code=400, detail="User is already inactive")
+
+    # Business rule checks (unless forced)
+    if not force:
+        # Check for active orders
+        from mdv.models import Order, OrderStatus
+        active_orders = await db.execute(
+            select(func.count(Order.id))
+            .where(
+                (Order.user_id == user_id) &
+                (Order.status.in_([OrderStatus.pending_payment, OrderStatus.paid]))
+            )
+        )
+        active_order_count = active_orders.scalar_one()
+
+        if active_order_count > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"User has {active_order_count} active order(s). Use force=true to delete anyway."
+            )
+
+        # Check for recent orders (within last 30 days)
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_orders = await db.execute(
+            select(func.count(Order.id))
+            .where(
+                (Order.user_id == user_id) &
+                (Order.created_at >= thirty_days_ago)
+            )
+        )
+        recent_order_count = recent_orders.scalar_one()
+
+        if recent_order_count > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"User has {recent_order_count} recent order(s) within 30 days. Use force=true to delete anyway."
+            )
+
     # Soft delete by deactivating
     before = {"active": user.active}
     user.active = False
-    
+
     # Audit log
     await audit(
         db, actor_id, "user.delete", "User", user.id,
         before=before,
-        after={"active": False}
+        after={"active": False, "forced": force}
     )
-    
+
     await db.commit()
-    
-    return {"message": "User deactivated successfully", "user_id": user_id}
+
+    return {
+        "message": "User deleted successfully",
+        "user_id": user_id,
+        "user_name": user.name,
+        "user_email": user.email,
+        "forced": force
+    }
 
 
 @router.post("/{user_id}/activate", dependencies=[Depends(require_roles(*ADMINS))])
@@ -508,34 +589,49 @@ async def reset_user_password(
     claims: dict = Depends(get_current_claims)
 ):
     """
-    Reset a user's password and generate a temporary one.
-    Admin only.
+    Reset a user's password to 'password123' and require change on next login.
+    Admin only. Supervisors cannot reset admin or supervisor passwords.
     """
     actor_id = parse_actor_id(claims)
-    
+    actor_role = claims.get("role")
+
+    # Prevent self-reset
+    if user_id == actor_id:
+        raise HTTPException(status_code=400, detail="Cannot reset your own password")
+
     # Get user
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    # Generate temporary password
-    temp_password = generate_temp_password()
-    user.password_hash = hash_password(temp_password)
-    
+
+    # Check supervisor restrictions
+    if actor_role == "supervisor" and user.role in [Role.admin, Role.supervisor]:
+        raise HTTPException(
+            status_code=403,
+            detail="Supervisors cannot reset admin or supervisor passwords"
+        )
+
+    # Set password to "password123" and force change on next login
+    default_password = "password123"
+    user.password_hash = hash_password(default_password)
+    user.force_password_change = True
+
     # Audit log
     await audit(
         db, actor_id, "user.password_reset", "User", user.id,
-        before=None,
-        after={"password_reset": True}
+        before={"force_password_change": False},
+        after={"password_reset": True, "force_password_change": True}
     )
-    
+
     await db.commit()
-    
+
     return {
         "message": "Password reset successfully",
         "user_id": user_id,
-        "temporary_password": temp_password,
-        "note": "Please share this temporary password securely with the user"
+        "user_name": user.name,
+        "user_email": user.email,
+        "temporary_password": default_password,
+        "note": "User must change password on next login"
     }
 
 
