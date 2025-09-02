@@ -116,8 +116,10 @@ async def change_password_forced(
 
     # Get user
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
-    if not user or not user.active:
-        raise HTTPException(status_code=404, detail="User not found or inactive")
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found")
+    if not user.active:
+        raise HTTPException(status_code=404, detail=f"User with ID {user_id} is inactive")
 
     # Verify current password
     if not verify_password(current_password, user.password_hash):
