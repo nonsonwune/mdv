@@ -100,8 +100,11 @@ class AuthLoginRequest(BaseModel):
 
 
 class AuthLoginResponse(BaseModel):
-    access_token: str
+    access_token: Optional[str] = None
     token: Optional[str] = None  # For backward compatibility
     role: str
     token_type: str = "bearer"
+    force_password_change: Optional[bool] = None
+    user_id: Optional[int] = None
+    message: Optional[str] = None
 

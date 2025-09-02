@@ -423,10 +423,13 @@ components:
     AuthLoginResponse:
       type: object
       properties:
-        access_token: { type: string }
-        token: { type: string }
+        access_token: { type: string, nullable: true }
+        token: { type: string, nullable: true }
         token_type: { type: string }
         role: { type: string }
+        force_password_change: { type: boolean, nullable: true }
+        user_id: { type: integer, nullable: true }
+        message: { type: string, nullable: true }
     ProductImage:
       type: object
       properties:

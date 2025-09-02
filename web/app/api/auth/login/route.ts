@@ -21,6 +21,16 @@ export async function POST(req: NextRequest) {
     const token = data.token || data.access_token
     const role = data.role || "customer"
 
+    // Handle force password change scenario
+    if (data.force_password_change) {
+      return NextResponse.json({
+        force_password_change: true,
+        user_id: data.user_id,
+        message: data.message || "Password change required before accessing the system",
+        role: role
+      }, { status: 200 })
+    }
+
     if (!token) {
       return NextResponse.json({ error: "Missing token from auth response" }, { status: 500 })
     }

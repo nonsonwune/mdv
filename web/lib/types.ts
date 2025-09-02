@@ -68,5 +68,8 @@ export type AuthLoginResponse = {
   token?: string
   access_token?: string
   role?: string
+  force_password_change?: boolean
+  user_id?: number
+  message?: string
 }
 
