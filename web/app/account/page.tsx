@@ -9,6 +9,7 @@ import UserProfile from '../../components/account/UserProfile'
 import OrderHistory from '../../components/account/OrderHistory'
 import AccountSettings from '../../components/account/AccountSettings'
 import { useToast } from '../_components/ToastProvider'
+import { useAuth } from '../../lib/auth-context'
 
 interface UserData {
   id: number
@@ -31,21 +32,23 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const router = useRouter()
   const toast = useToast()
+  const { isAuthenticated, loading: authLoading } = useAuth()
 
   useEffect(() => {
-    loadUserData()
-  }, [])
-
-  async function loadUserData() {
-    try {
-      // Check if user is authenticated
-      const tokenResponse = await fetch('/api/auth/check')
-      if (!tokenResponse.ok) {
+    // Only load user data if authenticated
+    if (!authLoading) {
+      if (!isAuthenticated) {
         router.push('/login?next=/account')
         return
       }
+      loadUserData()
+    }
+  }, [authLoading, isAuthenticated, router])
 
+  async function loadUserData() {
+    try {
       // Fetch user profile through local API proxy
+      // Auth check is now handled by useAuth hook
       const response = await fetch('/api/users/profile', {
         headers: {
           'Accept': 'application/json'
