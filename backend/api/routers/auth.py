@@ -73,15 +73,15 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
     # Check if password change is required
     if user.force_password_change:
         # Return special response indicating password change required
-        return {
-            "access_token": None,
-            "token": None,
-            "role": user.role.value,
-            "token_type": "bearer",
-            "force_password_change": True,
-            "user_id": user.id,
-            "message": "Password change required before accessing the system"
-        }
+        return AuthLoginResponse(
+            access_token=None,
+            token=None,
+            role=user.role.value,
+            token_type="bearer",
+            force_password_change=True,
+            user_id=user.id,
+            message="Password change required before accessing the system"
+        )
 
     # Create access token
     token = create_access_token(subject=str(user.id), role=user.role)
