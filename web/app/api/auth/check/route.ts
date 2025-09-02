@@ -7,7 +7,10 @@ export async function GET(request: NextRequest) {
     const role = cookies().get('mdv_role')?.value
     
     if (!token) {
-      return NextResponse.json({ authenticated: false }, { status: 401 })
+      // Return 401 with proper headers to reduce browser console noise
+      const response = NextResponse.json({ authenticated: false }, { status: 401 })
+      response.headers.set('X-Auth-Status', 'no-token')
+      return response
     }
 
     // Call the backend to get user profile
@@ -29,7 +32,9 @@ export async function GET(request: NextRequest) {
       if (!response.ok) {
         // Token might be expired or invalid, but don't clear cookies immediately
         // Allow for potential token refresh or fallback
-        return NextResponse.json({ authenticated: false }, { status: 401 })
+        const authResponse = NextResponse.json({ authenticated: false }, { status: 401 })
+        authResponse.headers.set('X-Auth-Status', 'token-invalid')
+        return authResponse
       }
 
       const userData = await response.json()

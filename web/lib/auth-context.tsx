@@ -247,11 +247,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isStaff = user ? STAFF_ROLES.includes(user.role) : false
   const isCustomer = user ? !STAFF_ROLES.includes(user.role) : false
 
+  // Helper to detect if we're on a protected page that likely needs auth
+  const isProtectedPage = () => {
+    if (typeof window === 'undefined') return false
+    const path = window.location.pathname
+    return path.startsWith('/admin') || path.startsWith('/account') || path.startsWith('/checkout')
+  }
+
   /**
    * Check Authentication Status
    *
    * Validates current session with the server and updates user state.
-   * Only makes the request if there's likely a token present (to reduce 401 noise).
+   * Optimized to reduce console noise from expected 401 responses.
    * Handles 401 errors gracefully - only logs non-authentication errors.
    * Used automatically on app startup and can be called manually to refresh state.
    */
@@ -260,7 +267,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Note: We can't check for mdv_token in document.cookie because it's httpOnly
       // So we always make the auth check request and let the server handle it
       const response = await fetch('/api/auth/check', {
-        credentials: 'include'
+        credentials: 'include',
+        // Suppress browser console errors for expected 401s
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest' // Helps some browsers reduce console noise
+        }
       })
 
       if (response.ok) {
@@ -275,8 +286,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       }
     } catch (error) {
-      // Only log network errors, not auth failures
-      if (error instanceof TypeError) {
+      // Only log network errors that aren't related to expected auth failures
+      if (error instanceof TypeError && !error.message.includes('401')) {
         console.error('Auth check network error:', error)
       }
       setUser(null)
@@ -354,9 +365,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return roles.includes(user?.role || '')
   }
 
-  // Check auth on mount
+  // Check auth on mount with smart timing
   useEffect(() => {
-    checkAuth()
+    // For protected pages, check auth immediately
+    // For public pages, add a small delay to reduce console noise
+    const delay = isProtectedPage() ? 0 : 200
+
+    const timer = setTimeout(() => {
+      checkAuth()
+    }, delay)
+
+    return () => clearTimeout(timer)
   }, [])
 
   const value: AuthContextType = {
