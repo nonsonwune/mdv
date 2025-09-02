@@ -358,6 +358,174 @@ export interface paths {
       };
     };
   };
+  "/api/admin/logistics/stats": {
+    /**
+     * Get logistics dashboard statistics
+     * @description Returns comprehensive statistics for the logistics dashboard including shipment counts by status and tab-specific counts.
+     */
+    get: {
+      responses: {
+        /** @description Logistics statistics */
+        200: {
+          content: {
+            "application/json": components["schemas"]["LogisticsStatsResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/all-orders": {
+    /**
+     * Get all orders in logistics pipeline
+     * @description Returns all paid orders that have fulfillments (in logistics pipeline) with comprehensive status information.
+     */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          page_size?: number;
+        };
+      };
+      responses: {
+        /** @description Orders in logistics pipeline */
+        200: {
+          content: {
+            "application/json": components["schemas"]["LogisticsOrdersResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/ready-to-ship": {
+    /**
+     * Get orders ready to ship
+     * @description Returns orders that are ready to ship (fulfillment ready but no shipment created).
+     */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          page_size?: number;
+        };
+      };
+      responses: {
+        /** @description Orders ready to ship */
+        200: {
+          content: {
+            "application/json": components["schemas"]["LogisticsOrdersResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/in-transit": {
+    /**
+     * Get orders in transit
+     * @description Returns orders that are currently being shipped (dispatched or in_transit status).
+     */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          page_size?: number;
+        };
+      };
+      responses: {
+        /** @description Orders in transit */
+        200: {
+          content: {
+            "application/json": components["schemas"]["LogisticsOrdersResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/delivered": {
+    /**
+     * Get delivered orders
+     * @description Returns orders that have been successfully delivered.
+     */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          page_size?: number;
+        };
+      };
+      responses: {
+        /** @description Delivered orders */
+        200: {
+          content: {
+            "application/json": components["schemas"]["LogisticsOrdersResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/pending-dispatch": {
+    /**
+     * Get orders pending dispatch
+     * @description Returns orders that are ready to ship but awaiting shipment creation.
+     */
+    get: {
+      parameters: {
+        query?: {
+          page?: number;
+          page_size?: number;
+        };
+      };
+      responses: {
+        /** @description Orders pending dispatch */
+        200: {
+          content: {
+            "application/json": components["schemas"]["LogisticsOrdersResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/bulk-create-shipments": {
+    /**
+     * Create shipments for multiple orders in bulk
+     * @description Creates shipments for multiple orders simultaneously. Supports up to 100 orders per request.
+     */
+    post: {
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["BulkCreateShipmentsRequest"];
+        };
+      };
+      responses: {
+        /** @description Bulk shipment creation results */
+        200: {
+          content: {
+            "application/json": components["schemas"]["BulkActionResponse"];
+          };
+        };
+      };
+    };
+  };
+  "/api/admin/logistics/bulk-update-status": {
+    /**
+     * Update shipment status for multiple orders in bulk
+     * @description Updates shipment status for multiple orders simultaneously. Supports up to 100 orders per request.
+     */
+    post: {
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["BulkUpdateStatusRequest"];
+        };
+      };
+      responses: {
+        /** @description Bulk status update results */
+        200: {
+          content: {
+            "application/json": components["schemas"]["BulkActionResponse"];
+          };
+        };
+      };
+    };
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -447,10 +615,13 @@ export interface components {
       password?: string;
     };
     AuthLoginResponse: {
-      access_token?: string;
-      token?: string;
+      access_token?: string | null;
+      token?: string | null;
       token_type?: string;
       role?: string;
+      force_password_change?: boolean | null;
+      user_id?: number | null;
+      message?: string | null;
     };
     ProductImage: {
       id?: number;
@@ -496,6 +667,90 @@ export interface components {
       total_categories?: number;
       summary?: components["schemas"]["CategoriesReportSummary"];
       categories?: components["schemas"]["CategoriesReportCategory"][];
+    };
+    LogisticsStatsResponse: {
+      total_shipments?: number;
+      dispatched?: number;
+      in_transit?: number;
+      delivered?: number;
+      returned?: number;
+      pending_dispatch?: number;
+      ready_to_ship?: number;
+      all_orders?: number;
+      in_transit_total?: number;
+      tabs?: {
+        all_orders?: number;
+        ready_to_ship?: number;
+        in_transit?: number;
+        delivered?: number;
+        pending_dispatch?: number;
+      };
+    };
+    LogisticsOrdersResponse: {
+      orders?: components["schemas"]["LogisticsOrder"][];
+    };
+    LogisticsOrder: {
+      id?: number;
+      order_number?: string;
+      customer_name?: string;
+      items_count?: number;
+      total_amount?: number;
+      /** Format: date-time */
+      created_at?: string;
+      logistics_status?: string;
+      fulfillment_status?: string;
+      shipment_status?: string;
+      tracking_id?: string;
+      courier?: string;
+      /** Format: date-time */
+      dispatched_at?: string;
+      /** Format: date-time */
+      delivered_at?: string;
+      /** Format: date-time */
+      packed_at?: string;
+      pending_hours?: number;
+      fulfillment_notes?: string;
+      shipping_address?: {
+        city?: string;
+        state?: string;
+        street?: string;
+      };
+    };
+    BulkCreateShipmentsRequest: {
+      /** @description Array of order IDs to create shipments for (max 100) */
+      order_ids: number[];
+      /**
+       * @description Courier service for the shipments
+       * @default DHL
+       */
+      courier?: string;
+    };
+    BulkUpdateStatusRequest: {
+      /** @description Array of order IDs to update (max 100) */
+      order_ids: number[];
+      /**
+       * @description New shipment status
+       * @enum {string}
+       */
+      status: "dispatched" | "in_transit" | "delivered" | "returned";
+      /** @description Optional notes for the status update */
+      notes?: string;
+    };
+    BulkActionResponse: {
+      message?: string;
+      results?: {
+        total_processed?: number;
+        success?: {
+            order_id?: number;
+            tracking_id?: string;
+            old_status?: string;
+            new_status?: string;
+          }[];
+        failed?: {
+            order_id?: number;
+            error?: string;
+          }[];
+      };
     };
   };
   responses: never;

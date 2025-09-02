@@ -311,6 +311,165 @@ paths:
               schema:
                 type: string
 
+  /api/admin/logistics/stats:
+    get:
+      summary: Get logistics dashboard statistics
+      description: Returns comprehensive statistics for the logistics dashboard including shipment counts by status and tab-specific counts.
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Logistics statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsStatsResponse'
+
+  /api/admin/logistics/all-orders:
+    get:
+      summary: Get all orders in logistics pipeline
+      description: Returns all paid orders that have fulfillments (in logistics pipeline) with comprehensive status information.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        200:
+          description: Orders in logistics pipeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsOrdersResponse'
+
+  /api/admin/logistics/ready-to-ship:
+    get:
+      summary: Get orders ready to ship
+      description: Returns orders that are ready to ship (fulfillment ready but no shipment created).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        200:
+          description: Orders ready to ship
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsOrdersResponse'
+
+  /api/admin/logistics/in-transit:
+    get:
+      summary: Get orders in transit
+      description: Returns orders that are currently being shipped (dispatched or in_transit status).
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        200:
+          description: Orders in transit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsOrdersResponse'
+
+  /api/admin/logistics/delivered:
+    get:
+      summary: Get delivered orders
+      description: Returns orders that have been successfully delivered.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        200:
+          description: Delivered orders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsOrdersResponse'
+
+  /api/admin/logistics/pending-dispatch:
+    get:
+      summary: Get orders pending dispatch
+      description: Returns orders that are ready to ship but awaiting shipment creation.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        200:
+          description: Orders pending dispatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogisticsOrdersResponse'
+
+  /api/admin/logistics/bulk-create-shipments:
+    post:
+      summary: Create shipments for multiple orders in bulk
+      description: Creates shipments for multiple orders simultaneously. Supports up to 100 orders per request.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkCreateShipmentsRequest'
+      responses:
+        200:
+          description: Bulk shipment creation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkActionResponse'
+
+  /api/admin/logistics/bulk-update-status:
+    post:
+      summary: Update shipment status for multiple orders in bulk
+      description: Updates shipment status for multiple orders simultaneously. Supports up to 100 orders per request.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkUpdateStatusRequest'
+      responses:
+        200:
+          description: Bulk status update results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkActionResponse'
+
 components:
   schemas:
     HealthResponse:
@@ -484,3 +643,116 @@ components:
         categories:
           type: array
           items: { $ref: '#/components/schemas/CategoriesReportCategory' }
+
+    LogisticsStatsResponse:
+      type: object
+      properties:
+        total_shipments: { type: integer }
+        dispatched: { type: integer }
+        in_transit: { type: integer }
+        delivered: { type: integer }
+        returned: { type: integer }
+        pending_dispatch: { type: integer }
+        ready_to_ship: { type: integer }
+        all_orders: { type: integer }
+        in_transit_total: { type: integer }
+        tabs:
+          type: object
+          properties:
+            all_orders: { type: integer }
+            ready_to_ship: { type: integer }
+            in_transit: { type: integer }
+            delivered: { type: integer }
+            pending_dispatch: { type: integer }
+
+    LogisticsOrdersResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items: { $ref: '#/components/schemas/LogisticsOrder' }
+
+    LogisticsOrder:
+      type: object
+      properties:
+        id: { type: integer }
+        order_number: { type: string }
+        customer_name: { type: string }
+        items_count: { type: integer }
+        total_amount: { type: number }
+        created_at: { type: string, format: date-time }
+        logistics_status: { type: string }
+        fulfillment_status: { type: string }
+        shipment_status: { type: string }
+        tracking_id: { type: string }
+        courier: { type: string }
+        dispatched_at: { type: string, format: date-time }
+        delivered_at: { type: string, format: date-time }
+        packed_at: { type: string, format: date-time }
+        pending_hours: { type: number }
+        fulfillment_notes: { type: string }
+        shipping_address:
+          type: object
+          properties:
+            city: { type: string }
+            state: { type: string }
+            street: { type: string }
+
+    BulkCreateShipmentsRequest:
+      type: object
+      required:
+        - order_ids
+      properties:
+        order_ids:
+          type: array
+          items: { type: integer }
+          maxItems: 100
+          description: Array of order IDs to create shipments for (max 100)
+        courier:
+          type: string
+          default: "DHL"
+          description: Courier service for the shipments
+
+    BulkUpdateStatusRequest:
+      type: object
+      required:
+        - order_ids
+        - status
+      properties:
+        order_ids:
+          type: array
+          items: { type: integer }
+          maxItems: 100
+          description: Array of order IDs to update (max 100)
+        status:
+          type: string
+          enum: ["dispatched", "in_transit", "delivered", "returned"]
+          description: New shipment status
+        notes:
+          type: string
+          description: Optional notes for the status update
+
+    BulkActionResponse:
+      type: object
+      properties:
+        message: { type: string }
+        results:
+          type: object
+          properties:
+            total_processed: { type: integer }
+            success:
+              type: array
+              items:
+                type: object
+                properties:
+                  order_id: { type: integer }
+                  tracking_id: { type: string }
+                  old_status: { type: string }
+                  new_status: { type: string }
+            failed:
+              type: array
+              items:
+                type: object
+                properties:
+                  order_id: { type: integer }
+                  error: { type: string }

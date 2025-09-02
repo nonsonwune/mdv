@@ -890,7 +890,7 @@ async def get_admin_analytics(
 
 @router.get("/logistics/stats", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
 async def get_logistics_stats(db: AsyncSession = Depends(get_db)):
-    """Get logistics dashboard statistics."""
+    """Get logistics dashboard statistics with tab-specific counts."""
     # Get shipment counts by status
     shipment_counts = await db.execute(
         select(
@@ -906,7 +906,9 @@ async def get_logistics_stats(db: AsyncSession = Depends(get_db)):
         'in_transit': 0,
         'delivered': 0,
         'returned': 0,
-        'pending_dispatch': 0
+        'pending_dispatch': 0,
+        'ready_to_ship': 0,
+        'all_orders': 0
     }
 
     for status, count in shipment_counts:
@@ -920,8 +922,8 @@ async def get_logistics_stats(db: AsyncSession = Depends(get_db)):
         elif status == ShipmentStatus.returned:
             stats['returned'] = count
 
-    # Get orders ready to ship (fulfillment ready but no shipment)
-    pending_dispatch_result = await db.execute(
+    # Get orders ready to ship (fulfillment ready but no shipment) - same as pending_dispatch
+    ready_to_ship_result = await db.execute(
         select(func.count(Fulfillment.id))
         .where(
             and_(
@@ -930,7 +932,29 @@ async def get_logistics_stats(db: AsyncSession = Depends(get_db)):
             )
         )
     )
-    stats['pending_dispatch'] = pending_dispatch_result.scalar_one()
+    ready_to_ship_count = ready_to_ship_result.scalar_one()
+    stats['pending_dispatch'] = ready_to_ship_count
+    stats['ready_to_ship'] = ready_to_ship_count
+
+    # Get total orders in logistics pipeline (paid orders with fulfillments)
+    all_orders_result = await db.execute(
+        select(func.count(Order.id))
+        .join(Fulfillment, Order.id == Fulfillment.order_id)
+        .where(Order.status == OrderStatus.paid)
+    )
+    stats['all_orders'] = all_orders_result.scalar_one()
+
+    # Calculate in_transit total (dispatched + in_transit)
+    stats['in_transit_total'] = stats['dispatched'] + stats['in_transit']
+
+    # Add tab-specific counts for frontend
+    stats['tabs'] = {
+        'all_orders': stats['all_orders'],
+        'ready_to_ship': stats['ready_to_ship'],
+        'in_transit': stats['in_transit_total'],
+        'delivered': stats['delivered'],
+        'pending_dispatch': stats['pending_dispatch']
+    }
 
     return stats
 
@@ -988,6 +1012,446 @@ async def get_ready_to_ship_orders(
         })
 
     return {'orders': orders_data}
+
+
+@router.get("/logistics/all-orders", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def get_all_logistics_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all orders in the logistics pipeline (paid orders with fulfillments)."""
+    # Get all paid orders that have fulfillments (in logistics pipeline)
+    stmt = (
+        select(Order, Address, Fulfillment, Shipment)
+        .join(Fulfillment, Order.id == Fulfillment.order_id)
+        .join(Address, Order.id == Address.order_id)
+        .outerjoin(Shipment, Fulfillment.id == Shipment.fulfillment_id)
+        .where(Order.status == OrderStatus.paid)
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(Order.created_at.desc())
+    )
+
+    result = await db.execute(stmt)
+    orders_data = []
+
+    for order, address, fulfillment, shipment in result:
+        # Get order items count
+        items_count_result = await db.execute(
+            select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+        )
+        items_count = items_count_result.scalar_one()
+
+        # Get total amount from order.totals
+        total_amount = 0
+        if order.totals and isinstance(order.totals, dict):
+            total_amount = float(order.totals.get('total', 0))
+
+        # Determine logistics status
+        logistics_status = "processing"
+        if fulfillment.status == FulfillmentStatus.ready_to_ship:
+            if shipment:
+                logistics_status = shipment.status.value.lower()
+            else:
+                logistics_status = "ready_to_ship"
+
+        orders_data.append({
+            'id': order.id,
+            'order_number': f"MDV-{order.id:06d}",
+            'customer_name': address.name,
+            'items_count': items_count,
+            'total_amount': total_amount,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'logistics_status': logistics_status,
+            'fulfillment_status': fulfillment.status.value,
+            'shipment_status': shipment.status.value if shipment else None,
+            'tracking_id': shipment.tracking_id if shipment else None,
+            'courier': shipment.courier if shipment else None,
+            'shipping_address': {
+                'city': address.city,
+                'state': address.state,
+                'street': address.street
+            }
+        })
+
+    return {'orders': orders_data}
+
+
+@router.get("/logistics/in-transit", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def get_in_transit_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get orders that are currently in transit."""
+    # Get shipments with dispatched or in_transit status
+    stmt = (
+        select(Order, Address, Fulfillment, Shipment)
+        .join(Fulfillment, Order.id == Fulfillment.order_id)
+        .join(Address, Order.id == Address.order_id)
+        .join(Shipment, Fulfillment.id == Shipment.fulfillment_id)
+        .where(
+            or_(
+                Shipment.status == ShipmentStatus.dispatched,
+                Shipment.status == ShipmentStatus.in_transit
+            )
+        )
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(Shipment.dispatched_at.desc())
+    )
+
+    result = await db.execute(stmt)
+    orders_data = []
+
+    for order, address, fulfillment, shipment in result:
+        # Get order items count
+        items_count_result = await db.execute(
+            select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+        )
+        items_count = items_count_result.scalar_one()
+
+        # Get total amount from order.totals
+        total_amount = 0
+        if order.totals and isinstance(order.totals, dict):
+            total_amount = float(order.totals.get('total', 0))
+
+        orders_data.append({
+            'id': order.id,
+            'order_number': f"MDV-{order.id:06d}",
+            'customer_name': address.name,
+            'items_count': items_count,
+            'total_amount': total_amount,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'dispatched_at': shipment.dispatched_at.isoformat() if shipment.dispatched_at else None,
+            'shipment_status': shipment.status.value,
+            'tracking_id': shipment.tracking_id,
+            'courier': shipment.courier,
+            'shipping_address': {
+                'city': address.city,
+                'state': address.state,
+                'street': address.street
+            }
+        })
+
+    return {'orders': orders_data}
+
+
+@router.get("/logistics/delivered", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def get_delivered_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get orders that have been delivered."""
+    # Get shipments with delivered status
+    stmt = (
+        select(Order, Address, Fulfillment, Shipment)
+        .join(Fulfillment, Order.id == Fulfillment.order_id)
+        .join(Address, Order.id == Address.order_id)
+        .join(Shipment, Fulfillment.id == Shipment.fulfillment_id)
+        .where(Shipment.status == ShipmentStatus.delivered)
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(Shipment.dispatched_at.desc())
+    )
+
+    result = await db.execute(stmt)
+    orders_data = []
+
+    for order, address, fulfillment, shipment in result:
+        # Get order items count
+        items_count_result = await db.execute(
+            select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+        )
+        items_count = items_count_result.scalar_one()
+
+        # Get total amount from order.totals
+        total_amount = 0
+        if order.totals and isinstance(order.totals, dict):
+            total_amount = float(order.totals.get('total', 0))
+
+        # Get delivery date from shipment events
+        delivery_date = None
+        events_result = await db.execute(
+            select(ShipmentEvent.occurred_at)
+            .where(
+                and_(
+                    ShipmentEvent.shipment_id == shipment.id,
+                    ShipmentEvent.code == "Delivered"
+                )
+            )
+            .order_by(ShipmentEvent.occurred_at.desc())
+            .limit(1)
+        )
+        delivery_event = events_result.scalar_one_or_none()
+        if delivery_event:
+            delivery_date = delivery_event.isoformat()
+
+        orders_data.append({
+            'id': order.id,
+            'order_number': f"MDV-{order.id:06d}",
+            'customer_name': address.name,
+            'items_count': items_count,
+            'total_amount': total_amount,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'dispatched_at': shipment.dispatched_at.isoformat() if shipment.dispatched_at else None,
+            'delivered_at': delivery_date,
+            'tracking_id': shipment.tracking_id,
+            'courier': shipment.courier,
+            'shipping_address': {
+                'city': address.city,
+                'state': address.state,
+                'street': address.street
+            }
+        })
+
+    return {'orders': orders_data}
+
+
+@router.get("/logistics/pending-dispatch", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def get_pending_dispatch_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get orders that are pending dispatch (ready to ship but no shipment created)."""
+    # This is the same as ready-to-ship but with a different name for clarity
+    # Get fulfillments that are ready to ship but don't have shipments
+    stmt = (
+        select(Order, Address, Fulfillment)
+        .join(Fulfillment, Order.id == Fulfillment.order_id)
+        .join(Address, Order.id == Address.order_id)
+        .where(
+            and_(
+                Fulfillment.status == FulfillmentStatus.ready_to_ship,
+                ~Fulfillment.id.in_(select(Shipment.fulfillment_id))
+            )
+        )
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(Order.created_at.asc())
+    )
+
+    result = await db.execute(stmt)
+    orders_data = []
+
+    for order, address, fulfillment in result:
+        # Get order items count
+        items_count_result = await db.execute(
+            select(func.count(OrderItem.id)).where(OrderItem.order_id == order.id)
+        )
+        items_count = items_count_result.scalar_one()
+
+        # Get total amount from order.totals
+        total_amount = 0
+        if order.totals and isinstance(order.totals, dict):
+            total_amount = float(order.totals.get('total', 0))
+
+        # Calculate how long it's been pending
+        pending_hours = None
+        if fulfillment.packed_at:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            pending_delta = now - fulfillment.packed_at
+            pending_hours = round(pending_delta.total_seconds() / 3600, 1)
+
+        orders_data.append({
+            'id': order.id,
+            'order_number': f"MDV-{order.id:06d}",
+            'customer_name': address.name,
+            'items_count': items_count,
+            'total_amount': total_amount,
+            'created_at': order.created_at.isoformat() if order.created_at else None,
+            'packed_at': fulfillment.packed_at.isoformat() if fulfillment.packed_at else None,
+            'pending_hours': pending_hours,
+            'fulfillment_notes': fulfillment.notes,
+            'shipping_address': {
+                'city': address.city,
+                'state': address.state,
+                'street': address.street
+            }
+        })
+
+    return {'orders': orders_data}
+
+
+@router.post("/logistics/bulk-create-shipments", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def bulk_create_shipments(
+    body: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create shipments for multiple orders in bulk."""
+    order_ids = body.get('order_ids', [])
+    courier = body.get('courier', 'DHL')
+
+    if not order_ids:
+        raise HTTPException(status_code=400, detail="No order IDs provided")
+
+    if len(order_ids) > 100:
+        raise HTTPException(status_code=400, detail="Cannot process more than 100 orders at once")
+
+    results = {
+        'success': [],
+        'failed': [],
+        'total_processed': len(order_ids)
+    }
+
+    for order_id in order_ids:
+        try:
+            # Get the fulfillment for this order
+            fulfillment_result = await db.execute(
+                select(Fulfillment)
+                .where(
+                    and_(
+                        Fulfillment.order_id == order_id,
+                        Fulfillment.status == FulfillmentStatus.ready_to_ship
+                    )
+                )
+            )
+            fulfillment = fulfillment_result.scalar_one_or_none()
+
+            if not fulfillment:
+                results['failed'].append({
+                    'order_id': order_id,
+                    'error': 'Order not found or not ready to ship'
+                })
+                continue
+
+            # Check if shipment already exists
+            existing_shipment = await db.execute(
+                select(Shipment).where(Shipment.fulfillment_id == fulfillment.id)
+            )
+            if existing_shipment.scalar_one_or_none():
+                results['failed'].append({
+                    'order_id': order_id,
+                    'error': 'Shipment already exists for this order'
+                })
+                continue
+
+            # Create new shipment
+            from datetime import datetime, timezone
+            import uuid
+
+            shipment = Shipment(
+                fulfillment_id=fulfillment.id,
+                tracking_id=f"MDV{uuid.uuid4().hex[:8].upper()}",
+                courier=courier,
+                status=ShipmentStatus.dispatched,
+                dispatched_at=datetime.now(timezone.utc)
+            )
+
+            db.add(shipment)
+
+            # Add shipment event
+            event = ShipmentEvent(
+                shipment_id=shipment.id,
+                code="Dispatched",
+                description=f"Package dispatched via {courier}",
+                occurred_at=datetime.now(timezone.utc)
+            )
+            db.add(event)
+
+            results['success'].append({
+                'order_id': order_id,
+                'tracking_id': shipment.tracking_id
+            })
+
+        except Exception as e:
+            results['failed'].append({
+                'order_id': order_id,
+                'error': str(e)
+            })
+
+    await db.commit()
+
+    return {
+        'message': f"Processed {results['total_processed']} orders. {len(results['success'])} successful, {len(results['failed'])} failed.",
+        'results': results
+    }
+
+
+@router.post("/logistics/bulk-update-status", dependencies=[Depends(require_roles(*LOGISTICS_STAFF))])
+async def bulk_update_shipment_status(
+    body: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """Update shipment status for multiple orders in bulk."""
+    order_ids = body.get('order_ids', [])
+    new_status = body.get('status')
+    notes = body.get('notes', '')
+
+    if not order_ids:
+        raise HTTPException(status_code=400, detail="No order IDs provided")
+
+    if not new_status:
+        raise HTTPException(status_code=400, detail="Status is required")
+
+    # Validate status
+    try:
+        status_enum = ShipmentStatus(new_status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid status: {new_status}")
+
+    if len(order_ids) > 100:
+        raise HTTPException(status_code=400, detail="Cannot process more than 100 orders at once")
+
+    results = {
+        'success': [],
+        'failed': [],
+        'total_processed': len(order_ids)
+    }
+
+    for order_id in order_ids:
+        try:
+            # Get the shipment for this order
+            shipment_result = await db.execute(
+                select(Shipment)
+                .join(Fulfillment, Shipment.fulfillment_id == Fulfillment.id)
+                .where(Fulfillment.order_id == order_id)
+            )
+            shipment = shipment_result.scalar_one_or_none()
+
+            if not shipment:
+                results['failed'].append({
+                    'order_id': order_id,
+                    'error': 'No shipment found for this order'
+                })
+                continue
+
+            # Update shipment status
+            old_status = shipment.status
+            shipment.status = status_enum
+
+            # Add shipment event
+            from datetime import datetime, timezone
+            event = ShipmentEvent(
+                shipment_id=shipment.id,
+                code=status_enum.value.title(),
+                description=f"Status updated from {old_status.value} to {status_enum.value}" + (f". Notes: {notes}" if notes else ""),
+                occurred_at=datetime.now(timezone.utc)
+            )
+            db.add(event)
+
+            results['success'].append({
+                'order_id': order_id,
+                'old_status': old_status.value,
+                'new_status': status_enum.value
+            })
+
+        except Exception as e:
+            results['failed'].append({
+                'order_id': order_id,
+                'error': str(e)
+            })
+
+    await db.commit()
+
+    return {
+        'message': f"Processed {results['total_processed']} orders. {len(results['success'])} successful, {len(results['failed'])} failed.",
+        'results': results
+    }
 
 
 @router.get("/categories/{category_id}/size-options", dependencies=[Depends(require_roles(*ALL_STAFF))])
