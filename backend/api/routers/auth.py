@@ -115,7 +115,7 @@ async def change_password_forced(
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
     # Get user
-    user = await db.get(User, user_id)
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user or not user.active:
         raise HTTPException(status_code=404, detail="User not found or inactive")
 
