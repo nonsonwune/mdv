@@ -114,20 +114,19 @@ async def change_password_forced(
     if len(new_password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-    # Get user
+    # Get user (allow inactive users to change forced passwords)
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=f"User with ID {user_id} not found")
-    if not user.active:
-        raise HTTPException(status_code=404, detail=f"User with ID {user_id} is inactive")
 
     # Verify current password
     if not verify_password(current_password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid current password")
 
-    # Update password and clear force flag
+    # Update password, clear force flag, and ensure user is active
     user.password_hash = hash_password(new_password)
     user.force_password_change = False
+    user.active = True  # Activate user when they change forced password
 
     await db.commit()
 
