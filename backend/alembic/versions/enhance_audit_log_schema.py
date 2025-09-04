@@ -1,41 +1,23 @@
-"""enhance audit log schema
+"""
+
+e
+
+Revisio
 
 Revision ID: enhance_audit_log_schema
-Revises: c2d8e9f3a1b5
-Create Date: 2025-09-04 12:00:00.000000
+Revises: create_audit_logs_simple
+Create Date: 2025-09-04 19:59:07.206190
 
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision = 'enhance_audit_log_schema'
-down_revision = 'c2d8e9f3a1b5'
+down_revision = 'create_audit_logs_simple'
 branch_labels = None
 depends_on = None
-
-# Define enum types
-audit_action_enum = postgresql.ENUM(
-    'LOGIN', 'LOGOUT', 'LOGIN_FAILED', 'PASSWORD_CHANGE', 'PASSWORD_RESET',
-    'CREATE', 'READ', 'UPDATE', 'DELETE', 'BULK_UPDATE', 'BULK_DELETE',
-    'ORDER_STATUS_CHANGE', 'PAYMENT_STATUS_CHANGE', 'ORDER_CANCEL', 'ORDER_REFUND', 'TRACKING_UPDATE',
-    'STOCK_ADJUSTMENT', 'INVENTORY_UPDATE',
-    'SYSTEM_CONFIG_CHANGE', 'ROLE_CHANGE', 'PERMISSION_CHANGE',
-    'CART_ADD', 'CART_REMOVE', 'CART_UPDATE', 'REVIEW_CREATE', 'REVIEW_UPDATE', 'REVIEW_DELETE',
-    name='audit_action'
-)
-
-audit_entity_enum = postgresql.ENUM(
-    'USER', 'ORDER', 'PRODUCT', 'VARIANT', 'CATEGORY', 'CART', 'CART_ITEM',
-    'REVIEW', 'INVENTORY', 'COUPON', 'SHIPMENT', 'RETURN', 'SYSTEM',
-    name='audit_entity'
-)
-
-audit_status_enum = postgresql.ENUM(
-    'SUCCESS', 'FAILURE', 'PARTIAL',
-    name='audit_status'
-)
 
 
 def upgrade() -> None:
@@ -111,6 +93,12 @@ def upgrade() -> None:
         ON audit_logs (status, created_at) 
         WHERE status = 'FAILURE'
     """)
+
+
+
+
+
+
 
 
 def downgrade() -> None:

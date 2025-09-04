@@ -1,25 +1,36 @@
-"""add parent_id to categories table
-
-Revision ID: f064035cc545
-Revises: c2d8e9f3a1b5
-Create Date: 2025-09-01 07:03:09.731967
 """
 
+add pare
+
+Revisio
+
+Revision ID: f064035cc545
+Revises: 3c25fab13c32
+Create Date: 2025-09-04 19:59:07.204997
+
+"""
 from alembic import op
 import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
 revision = 'f064035cc545'
-down_revision = 'c2d8e9f3a1b5'
+down_revision = '3c25fab13c32'
 branch_labels = None
 depends_on = None
+
 
 def upgrade() -> None:
     # Add parent_id column to categories table
     op.add_column('categories', sa.Column('parent_id', sa.Integer(), nullable=True))
     op.create_index(op.f('ix_categories_parent_id'), 'categories', ['parent_id'], unique=False)
     op.create_foreign_key(None, 'categories', 'categories', ['parent_id'], ['id'])
+
+
+
+
+
+
 
 
 def downgrade() -> None:

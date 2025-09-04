@@ -1,19 +1,24 @@
-"""add_password_hash_column and customer tables
-
-Revision ID: 55fb081a9d2a
-Revises: b3bf7ca54a70
-Create Date:
 """
 
+add_password_hash_colum
+
+Revisio
+
+Revision ID: 55fb081a9d2a
+Revises: f064035cc545
+Create Date: 2025-09-04 19:59:07.205250
+
+"""
 from alembic import op
 import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
 revision = '55fb081a9d2a'
-down_revision = 'b3bf7ca54a70'
+down_revision = 'f064035cc545'
 branch_labels = None
 depends_on = None
+
 
 def upgrade() -> None:
     # Add password_hash column to users table
@@ -107,6 +112,12 @@ def upgrade() -> None:
         sa.UniqueConstraint('review_id', 'user_id', name='uq_review_vote_user')
     )
     op.create_index(op.f('ix_review_votes_review_id'), 'review_votes', ['review_id'])
+
+
+
+
+
+
 
 
 def downgrade() -> None:

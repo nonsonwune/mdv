@@ -1,0 +1,11 @@
+-- Auto-generated enum fix script
+-- Review carefully before executing!
+
+-- Create missing enum type: audit_action
+CREATE TYPE audit_action AS ENUM ('BULK_DELETE', 'BULK_UPDATE', 'CART_ADD', 'CART_REMOVE', 'CART_UPDATE', 'CREATE', 'DELETE', 'INVENTORY_UPDATE', 'LOGIN', 'LOGIN_FAILED', 'LOGOUT', 'ORDER_CANCEL', 'ORDER_REFUND', 'ORDER_STATUS_CHANGE', 'PASSWORD_CHANGE', 'PASSWORD_RESET', 'PAYMENT_STATUS_CHANGE', 'PERMISSION_CHANGE', 'READ', 'REVIEW_CREATE', 'REVIEW_DELETE', 'REVIEW_UPDATE', 'ROLE_CHANGE', 'STOCK_ADJUSTMENT', 'SYSTEM_CONFIG_CHANGE', 'TRACKING_UPDATE', 'UPDATE');
+
+-- Create missing enum type: audit_entity
+CREATE TYPE audit_entity AS ENUM ('CART', 'CART_ITEM', 'CATEGORY', 'COUPON', 'INVENTORY', 'ORDER', 'PRODUCT', 'RETURN', 'REVIEW', 'SHIPMENT', 'SYSTEM', 'USER', 'VARIANT');
+
+-- Create missing enum type: audit_status
+CREATE TYPE audit_status AS ENUM ('FAILURE', 'PARTIAL', 'SUCCESS');

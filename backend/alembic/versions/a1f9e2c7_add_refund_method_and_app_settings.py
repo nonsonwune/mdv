@@ -1,19 +1,24 @@
-"""add refund method and app settings
-
-Revision ID: a1f9e2c7
-Revises: 55fb081a9d2a
-Create Date: 2025-08-23 11:10:00.000000
 """
 
+add refu
+
+Revisio
+
+Revision ID: a1f9e2c7
+Revises: e93d7f7e267f
+Create Date: 2025-09-04 19:59:07.205685
+
+"""
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision = 'a1f9e2c7'
-down_revision = '55fb081a9d2a'
+down_revision = 'e93d7f7e267f'
 branch_labels = None
 depends_on = None
+
 
 def upgrade() -> None:
     # Create Enum type for refund_method
@@ -34,6 +39,12 @@ def upgrade() -> None:
         sa.Column('updated_by', sa.Integer(), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     )
+
+
+
+
+
+
 
 
 def downgrade() -> None:

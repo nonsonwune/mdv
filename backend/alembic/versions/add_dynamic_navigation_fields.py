@@ -1,16 +1,21 @@
-"""Add dynamic navigation fields to categories
+"""
+
+Add dy
+
+Revisio
 
 Revision ID: add_dynamic_navigation_fields
-Revises: bd41eba8dd9e
-Create Date: 2025-01-04 12:00:00.000000
+Revises: a1f9e2c7
+Create Date: 2025-09-04 19:59:07.205804
 
 """
 from alembic import op
 import sqlalchemy as sa
 
+
 # revision identifiers, used by Alembic.
 revision = 'add_dynamic_navigation_fields'
-down_revision = 'bd41eba8dd9e'
+down_revision = 'a1f9e2c7'
 branch_labels = None
 depends_on = None
 
@@ -28,6 +33,12 @@ def upgrade() -> None:
     op.create_index('ix_categories_show_in_navigation', 'categories', ['show_in_navigation'])
     op.create_index('ix_categories_is_sale_category', 'categories', ['is_sale_category'])
     op.create_index('ix_categories_created_at', 'categories', ['created_at'])
+
+
+
+
+
+
 
 
 def downgrade() -> None:

@@ -1,8 +1,14 @@
-"""Create audit logs table with simple schema
+"""
+
+Create audit logs table with simple schema
+
+Revisio
+
+Revisio
 
 Revision ID: create_audit_logs_simple
-Revises: e93d7f7e267f
-Create Date: 2024-01-15 12:00:00.000000
+Revises: add_dynamic_navigation_fields
+Create Date: 2025-09-04 19:59:07.205982
 
 """
 from alembic import op
@@ -11,7 +17,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'create_audit_logs_simple'
-down_revision = 'e93d7f7e267f'
+down_revision = 'add_dynamic_navigation_fields'
 branch_labels = None
 depends_on = None
 
@@ -68,6 +74,12 @@ def upgrade():
     op.create_index('ix_audit_logs_request_id', 'audit_logs', ['request_id'])
     
     print("✅ Created audit_logs table with SQLite-compatible schema")
+
+
+
+
+
+
 
 
 def downgrade():

@@ -1,8 +1,12 @@
-"""Fix audit metadata column name conflict
+"""
+
+Fix audit metadata colum
+
+Revisio
 
 Revision ID: fix_audit_metadata_column
 Revises: enhance_audit_log_schema
-Create Date: 2024-01-15 10:00:00.000000
+Create Date: 2025-09-04 19:59:07.206545
 
 """
 from alembic import op
@@ -40,6 +44,12 @@ def upgrade():
             print("ℹ️  'metadata' column not found in audit_logs table, skipping rename")
     else:
         print("ℹ️  audit_logs table not found, skipping migration")
+
+
+
+
+
+
 
 
 def downgrade():
