@@ -111,10 +111,10 @@ async def seed_basic_categories():
         async with session_scope() as db:
             # Define the categories that match frontend expectations
             categories_to_create = [
-                {"name": "Men's Collection", "slug": "men"},
-                {"name": "Women's Collection", "slug": "women"},
-                {"name": "Essentials", "slug": "essentials"},
-                {"name": "Sale & Clearance", "slug": "sale"},
+                {"name": "Men's Collection", "slug": "men", "show_in_navigation": True, "sort_order": 1},
+                {"name": "Women's Collection", "slug": "women", "show_in_navigation": True, "sort_order": 2},
+                {"name": "Essentials", "slug": "essentials", "show_in_navigation": True, "sort_order": 3},
+                {"name": "Sale & Clearance", "slug": "sale", "show_in_navigation": True, "sort_order": 4},
             ]
 
             created_count = 0
@@ -133,7 +133,8 @@ async def seed_basic_categories():
                         name=cat_data["name"],
                         slug=cat_data["slug"],
                         is_active=True,
-                        sort_order=0
+                        show_in_navigation=cat_data.get("show_in_navigation", True),
+                        sort_order=cat_data.get("sort_order", 0)
                     )
                     db.add(category)
                     created_count += 1
