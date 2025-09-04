@@ -9,13 +9,8 @@ const nextConfig = {
   experimental: {
     typedRoutes: true,
   },
-  // Increase API route timeout for admin operations
-  api: {
-    responseLimit: false,
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
-  },
+  // Note: API route configuration moved to individual API routes as needed
+  // The 'api' key is not valid in next.config.mjs for Next.js 14+
   typescript: {
     // !! WARN !!
     // Dangerously allow production builds to successfully complete even if

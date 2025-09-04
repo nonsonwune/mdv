@@ -19,6 +19,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/lodash": "^4.17.20",
     "canvas-confetti": "^1.9.3",
+    "date-fns": "^3.6.0",
     "framer-motion": "^12.23.12",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
