@@ -748,26 +748,70 @@ export default function OrderDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
                 {/* Check if user can modify payment status - ensure user exists and has admin role */}
                 {user && user.role === 'admin' && !order.payment_ref?.trim() ? (
-                  <select
-                    value={newPaymentStatus}
-                    onChange={(e) => setNewPaymentStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="paid">Paid</option>
-                    <option value="failed">Failed</option>
-                    <option value="refunded">Refunded</option>
-                  </select>
+                  /* Editable Payment Status for Non-Paystack Orders */
+                  <div>
+                    <select
+                      value={newPaymentStatus}
+                      onChange={(e) => setNewPaymentStatus(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="paid">Paid</option>
+                      <option value="failed">Failed</option>
+                      <option value="refunded">Refunded</option>
+                    </select>
+                    <div className="flex items-center mt-2 text-xs text-gray-500">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      Manual payment management - Admin can modify status
+                    </div>
+                  </div>
+                ) : order.payment_ref?.trim() ? (
+                  /* Read-only Payment Status for Paystack Orders */
+                  <div className="w-full">
+                    <div className="flex items-center justify-between p-4 border-2 border-blue-200 rounded-lg bg-blue-50">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <div className="flex items-center">
+                            <span className="text-lg font-semibold text-gray-900">
+                              {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+                            </span>
+                            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Paystack
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Payment status managed by Paystack
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-gray-500 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                      This payment status cannot be modified - automatically managed by payment processor
+                    </div>
+                  </div>
                 ) : (
+                  /* Read-only for non-admin users */
                   <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50">
                     <span className="text-gray-600">
                       {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                     </span>
                     <div className="text-xs text-gray-500 mt-1">
-                      {order.payment_ref?.trim()
-                        ? "Paystack orders are read-only"
-                        : "Only Admin users can modify payment status"
-                      }
+                      Only Admin users can modify payment status
                     </div>
                   </div>
                 )}
