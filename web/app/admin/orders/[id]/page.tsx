@@ -203,8 +203,24 @@ export default function OrderDetailPage() {
       setTrackingNumber(order.tracking_number || '')
       setCarrier(order.carrier || '')
       setNotes(order.notes || '')
+
+      // Debug logging for payment_ref detection
+      const canModifyPaymentStatus = user && user.role === 'admin' && !order.payment_ref?.trim()
+      console.log('🔍 Payment Status Debug (Page Load):', {
+        orderId: order.id,
+        payment_ref: order.payment_ref,
+        payment_ref_type: typeof order.payment_ref,
+        payment_ref_length: order.payment_ref?.length,
+        payment_ref_trimmed: order.payment_ref?.trim(),
+        payment_ref_trimmed_length: order.payment_ref?.trim()?.length,
+        canModifyPaymentStatus,
+        userRole: user?.role,
+        isAdmin: user?.role === 'admin',
+        hasPaymentRef: !!order.payment_ref,
+        hasPaymentRefTrimmed: !!order.payment_ref?.trim()
+      })
     }
-  }, [order])
+  }, [order, user])
 
   const fetchOrder = async () => {
     try {
