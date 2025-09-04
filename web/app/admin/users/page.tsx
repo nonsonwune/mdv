@@ -133,17 +133,25 @@ const roleColors: Record<string, string> = {
   'logistics': 'bg-green-100 text-green-800'
 }
 
+// User type definitions for enhanced interface
+type UserType = 'customer' | 'staff'
+type StaffRole = 'admin' | 'supervisor' | 'operations' | 'logistics'
+
 // Main user management content component
 function UserManagementContent() {
   const { user: currentUser, hasPermission } = useAuth()
   const router = useRouter()
-  
+
   // Permission checks
   const canManageUsers = hasPermission(Permission.MANAGE_USERS)
   const canViewUsers = hasPermission(Permission.VIEW_USERS) || hasPermission(Permission.MANAGE_USERS)
   const canDeleteUsers = hasPermission(Permission.DELETE_USERS) || hasPermission(Permission.MANAGE_USERS)
   const canManageSupervisors = currentUser?.role === 'admin' // Only admins can manage supervisors
   const isCurrentUserSupervisor = currentUser?.role === 'supervisor'
+
+  // Enhanced state for Customer/Staff sections
+  const [activeSection, setActiveSection] = useState<UserType>('staff')
+  const [activeStaffTab, setActiveStaffTab] = useState<StaffRole | 'all'>('all')
 
   // Helper functions for role-based restrictions
   const canEditUser = (user: User) => {
@@ -162,6 +170,53 @@ function UserManagementContent() {
     if (!canManageUsers) return false
     if (isCurrentUserSupervisor && ['admin', 'supervisor'].includes(user.role)) return false
     return true
+  }
+
+  // Helper functions for user categorization
+  const isCustomerUser = (user: User): boolean => {
+    // For now, we'll consider users without admin roles as potential customers
+    // This can be refined based on actual customer identification logic
+    return !['admin', 'supervisor', 'operations', 'logistics'].includes(user.role)
+  }
+
+  const isStaffUser = (user: User): boolean => {
+    return ['admin', 'supervisor', 'operations', 'logistics'].includes(user.role)
+  }
+
+  const getFilteredUsers = (): User[] => {
+    let filteredUsers = users
+
+    // Filter by section (customer vs staff)
+    if (activeSection === 'customer') {
+      filteredUsers = filteredUsers.filter(isCustomerUser)
+    } else {
+      filteredUsers = filteredUsers.filter(isStaffUser)
+
+      // Further filter by staff role if not 'all'
+      if (activeStaffTab !== 'all') {
+        filteredUsers = filteredUsers.filter(user => user.role === activeStaffTab)
+      }
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      filteredUsers = filteredUsers.filter(user =>
+        user.name.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower)
+      )
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filteredUsers = filteredUsers.filter(user => {
+        if (statusFilter === 'active') return user.active
+        if (statusFilter === 'inactive') return !user.active
+        return true
+      })
+    }
+
+    return filteredUsers
   }
   const [users, setUsers] = useState<User[]>([])
   const [stats, setStats] = useState<UserStats | null>(null)
@@ -450,7 +505,12 @@ function UserManagementContent() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
             <p className="text-gray-600">
-              Manage staff accounts, roles, and permissions
+              {activeSection === 'customer'
+                ? 'Manage customer accounts and access'
+                : activeStaffTab === 'all'
+                  ? 'Manage staff accounts, roles, and permissions'
+                  : `Manage ${ROLE_CONFIG[activeStaffTab as keyof typeof ROLE_CONFIG]?.label || activeStaffTab} staff members`
+              }
               {currentUser?.role === 'supervisor' && (
                 <span className="text-amber-600 ml-2">
                   (Limited Access - Cannot manage Admin/Supervisor accounts)
@@ -560,6 +620,116 @@ function UserManagementContent() {
         </div>
       )}
 
+      {/* Customer/Staff Section Navigation */}
+      <div className="bg-white rounded-lg shadow mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="flex space-x-8 px-6" aria-label="User sections">
+            <button
+              onClick={() => setActiveSection('customer')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeSection === 'customer'
+                  ? 'border-maroon-500 text-maroon-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <UsersIcon className="h-5 w-5" />
+                Customer Users
+                <span className="bg-gray-100 text-gray-600 py-1 px-2 rounded-full text-xs">
+                  {users.filter(isCustomerUser).length}
+                </span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveSection('staff')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeSection === 'staff'
+                  ? 'border-maroon-500 text-maroon-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <UserGroupIcon className="h-5 w-5" />
+                Staff Users
+                <span className="bg-gray-100 text-gray-600 py-1 px-2 rounded-full text-xs">
+                  {users.filter(isStaffUser).length}
+                </span>
+              </div>
+            </button>
+          </nav>
+        </div>
+
+        {/* Staff Role Tabs - Only show when Staff section is active */}
+        {activeSection === 'staff' && (
+          <div className="border-b border-gray-200 bg-gray-50">
+            <nav className="flex space-x-6 px-6" aria-label="Staff roles">
+              <button
+                onClick={() => setActiveStaffTab('all')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  activeStaffTab === 'all'
+                    ? 'border-maroon-500 text-maroon-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                All Staff ({users.filter(isStaffUser).length})
+              </button>
+              <button
+                onClick={() => setActiveStaffTab('admin')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  activeStaffTab === 'admin'
+                    ? 'border-maroon-500 text-maroon-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <ShieldCheckIcon className="h-4 w-4" />
+                  Admin ({users.filter(u => u.role === 'admin').length})
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveStaffTab('supervisor')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  activeStaffTab === 'supervisor'
+                    ? 'border-maroon-500 text-maroon-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <UserGroupIcon className="h-4 w-4" />
+                  Supervisor ({users.filter(u => u.role === 'supervisor').length})
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveStaffTab('operations')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  activeStaffTab === 'operations'
+                    ? 'border-maroon-500 text-maroon-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CogIcon className="h-4 w-4" />
+                  Operations ({users.filter(u => u.role === 'operations').length})
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveStaffTab('logistics')}
+                className={`py-3 px-1 border-b-2 font-medium text-sm ${
+                  activeStaffTab === 'logistics'
+                    ? 'border-maroon-500 text-maroon-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <BuildingOfficeIcon className="h-4 w-4" />
+                  Logistics ({users.filter(u => u.role === 'logistics').length})
+                </div>
+              </button>
+            </nav>
+          </div>
+        )}
+      </div>
+
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow mb-6">
         <div className="p-4 border-b border-gray-200">
@@ -574,17 +744,18 @@ function UserManagementContent() {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
               />
             </div>
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
-            >
-              <option value="all">All Roles</option>
-              <option value="admin">Admin</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="operations">Operations</option>
-              <option value="logistics">Logistics</option>
-            </select>
+            {/* Status Filter - Only show for staff users */}
+            {activeSection === 'staff' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-maroon-500 focus:border-maroon-500"
+              >
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            )}
             <button
               type="submit"
               className="px-4 py-2 bg-maroon-700 text-white rounded-lg hover:bg-maroon-800 transition-colors"
@@ -620,14 +791,19 @@ function UserManagementContent() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.length === 0 ? (
+              {getFilteredUsers().length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                    No users found
+                    {activeSection === 'customer'
+                      ? 'No customer users found'
+                      : activeStaffTab === 'all'
+                        ? 'No staff users found'
+                        : `No ${activeStaffTab} users found`
+                    }
                   </td>
                 </tr>
               ) : (
-                users.map((user) => (
+                getFilteredUsers().map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
