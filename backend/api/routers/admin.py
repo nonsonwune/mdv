@@ -1661,9 +1661,10 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
     user_change = calculate_change(recent_users, prev_users)
     product_change = calculate_change(recent_products, prev_products)
 
-    # Get recent orders for dashboard display
+    # Get recent orders for dashboard display with customer information
     recent_orders_query = await db.execute(
         select(Order)
+        .options(selectinload(Order.user))
         .order_by(Order.created_at.desc())
         .limit(5)
     )
@@ -1673,7 +1674,9 @@ async def get_admin_stats(db: AsyncSession = Depends(get_db)):
             "id": order.id,
             "status": order.status.value if order.status else "unknown",
             "total": float(order.totals.get("total", 0)) if order.totals else 0,
-            "created_at": order.created_at.isoformat() if order.created_at else None
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "customer_name": order.user.name if order.user else "Guest",
+            "customer_email": order.user.email if order.user else None
         })
 
     # Get low stock products
