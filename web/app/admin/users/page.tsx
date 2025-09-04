@@ -241,9 +241,19 @@ function UserManagementContent() {
         detail = data?.detail || ''
       } catch {}
       if (detail.includes('Email already registered')) {
-        setEmailError('This email is already registered')
+        if (detail.includes('active')) {
+          setEmailError('This email is already registered as an active user')
+        } else if (detail.includes('operations')) {
+          setEmailError('This email belongs to a customer account and will be converted to staff')
+        } else {
+          setEmailError('This email is already registered')
+        }
+      } else if (detail.includes('Password is required when converting')) {
+        setEmailError('Password is required when converting customer to staff account')
+      } else if (detail.includes('already registered as')) {
+        setEmailError(detail)
       } else {
-        alert('Failed to create user')
+        alert('Failed to create user: ' + (detail || 'Unknown error'))
       }
     }
   }

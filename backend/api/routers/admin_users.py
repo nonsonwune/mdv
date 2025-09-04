@@ -265,11 +265,17 @@ async def create_user(
     if existing_user:
         # If user exists but is a customer (operations role with no password), convert to staff
         if existing_user.role == Role.operations and not existing_user.password_hash:
+            # Convert customer to staff - password is required for conversion
+            if not request.password:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Password is required when converting customer to staff account"
+                )
+
             # Convert customer to staff
             existing_user.role = request.role
             existing_user.active = request.active
-            if request.password:
-                existing_user.password_hash = hash_password(request.password)
+            existing_user.password_hash = hash_password(request.password)
 
             # Audit log for conversion
             await audit(
@@ -301,10 +307,16 @@ async def create_user(
             )
         else:
             # User already exists as staff or customer with password
-            raise HTTPException(
-                status_code=400,
-                detail=f"Email already registered as {existing_user.role.value}"
-            )
+            if existing_user.password_hash:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Email already registered as active {existing_user.role.value} user"
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Email already registered as {existing_user.role.value} user"
+                )
 
     # Create user
     user = User(
@@ -319,7 +331,16 @@ async def create_user(
         user.password_hash = hash_password(request.password)
     
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except Exception as e:
+        # Handle database constraint violations as fallback
+        if "unique constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Email address is already registered"
+            )
+        raise
     
     # Audit log
     await audit(
@@ -400,10 +421,16 @@ async def create_supervisor(
             )
         else:
             # User already exists as staff or customer with password
-            raise HTTPException(
-                status_code=400,
-                detail=f"Email already registered as {existing_user.role.value}"
-            )
+            if existing_user.password_hash:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Email already registered as active {existing_user.role.value} user"
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Email already registered as {existing_user.role.value} user"
+                )
     
     # Create supervisor user
     user = User(
@@ -415,7 +442,16 @@ async def create_supervisor(
     )
     
     db.add(user)
-    await db.flush()
+    try:
+        await db.flush()
+    except Exception as e:
+        # Handle database constraint violations as fallback
+        if "unique constraint" in str(e).lower() or "duplicate" in str(e).lower():
+            raise HTTPException(
+                status_code=400,
+                detail="Email address is already registered"
+            )
+        raise
     
     # Audit log
     await audit(
@@ -738,51 +774,108 @@ async def create_bulk_users(
     if len(emails) != len(set(emails)):
         raise HTTPException(status_code=400, detail="Duplicate emails in request")
     
-    # Check if any email already exists
-    existing = await db.execute(select(User.email).where(User.email.in_(emails)))
-    existing_emails = [e for e, in existing.all()]
-    if existing_emails:
+    # Check for existing users and categorize them
+    existing = await db.execute(select(User).where(User.email.in_(emails)))
+    existing_users = {user.email: user for user in existing.scalars().all()}
+
+    # Separate convertible customers from conflicting users
+    convertible_customers = []
+    conflicting_emails = []
+
+    for email in existing_users:
+        user = existing_users[email]
+        if user.role == Role.operations and not user.password_hash:
+            convertible_customers.append(email)
+        else:
+            conflicting_emails.append(email)
+
+    if conflicting_emails:
         raise HTTPException(
             status_code=400,
-            detail=f"These emails already exist: {', '.join(existing_emails)}"
+            detail=f"These emails already exist as active users: {', '.join(conflicting_emails)}"
         )
     
-    # Create all users
+    # Create or convert users
     for user_data in request.users:
-        user = User(
-            name=user_data.name,
-            email=user_data.email,
-            role=user_data.role,
-            active=user_data.active
-        )
-        
-        if user_data.password:
-            user.password_hash = hash_password(user_data.password)
-        
-        db.add(user)
-        await db.flush()
-        
-        # Audit log
-        await audit(
-            db, actor_id, "user.bulk_create", "User", user.id,
-            before=None,
-            after={
-                "name": user.name,
-                "email": user.email,
-                "role": user.role.value,
-                "active": user.active
-            }
-        )
-        
-        created_users.append(UserResponse(
-            id=user.id,
-            name=user.name,
-            email=user.email,
-            role=user.role.value,
-            active=user.active,
-            created_at=user.created_at,
-            has_password=bool(user.password_hash)
-        ))
+        if user_data.email in existing_users:
+            # Convert existing customer to staff
+            existing_user = existing_users[user_data.email]
+
+            # Password is required for conversion
+            if not user_data.password:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Password is required when converting customer {user_data.email} to staff account"
+                )
+
+            # Convert customer to staff
+            existing_user.role = user_data.role
+            existing_user.active = user_data.active
+            existing_user.password_hash = hash_password(user_data.password)
+
+            # Audit log for conversion
+            await audit(
+                db, actor_id, "user.bulk_convert_to_staff", "User", existing_user.id,
+                before={
+                    "role": "operations",
+                    "active": existing_user.active,
+                    "has_password": False
+                },
+                after={
+                    "name": existing_user.name,
+                    "email": existing_user.email,
+                    "role": existing_user.role.value,
+                    "active": existing_user.active,
+                    "has_password": True
+                }
+            )
+
+            created_users.append(UserResponse(
+                id=existing_user.id,
+                name=existing_user.name,
+                email=existing_user.email,
+                role=existing_user.role.value,
+                active=existing_user.active,
+                created_at=existing_user.created_at,
+                has_password=True
+            ))
+        else:
+            # Create new user
+            user = User(
+                name=user_data.name,
+                email=user_data.email,
+                role=user_data.role,
+                active=user_data.active
+            )
+
+            if user_data.password:
+                user.password_hash = hash_password(user_data.password)
+
+            db.add(user)
+            await db.flush()
+
+            # Audit log
+            await audit(
+                db, actor_id, "user.bulk_create", "User", user.id,
+                before=None,
+                after={
+                    "name": user.name,
+                    "email": user.email,
+                    "role": user.role.value,
+                    "active": user.active,
+                    "has_password": bool(user.password_hash)
+                }
+            )
+
+            created_users.append(UserResponse(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                role=user.role.value,
+                active=user.active,
+                created_at=user.created_at,
+                has_password=bool(user.password_hash)
+            ))
     
     await db.commit()
     
