@@ -289,9 +289,56 @@ export default function AdminHome() {
             </Link>
           </div>
           <div className="p-6">
-            {stats?.recentOrders.length ? (
+            {!stats ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-maroon-700"></div>
+                <span className="ml-2 text-gray-500">Loading recent orders...</span>
+              </div>
+            ) : stats.recentOrders.length ? (
               <div className="space-y-4">
-                {/* Order items would go here */}
+                {stats.recentOrders.map((order: any) => (
+                  <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            Order #{order.id}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {order.customer_name || 'Guest'}
+                            {order.customer_email && (
+                              <span className="text-gray-400 ml-1">({order.customer_email})</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(order.created_at).toLocaleDateString('en-NG', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-gray-900">
+                            ₦{order.total.toLocaleString()}
+                          </p>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            order.status === 'Paid'
+                              ? 'bg-green-100 text-green-800'
+                              : order.status === 'PendingPayment'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : order.status === 'Cancelled'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-gray-500 text-center py-8">No recent orders</p>
@@ -308,9 +355,57 @@ export default function AdminHome() {
             </Link>
           </div>
           <div className="p-6">
-            {stats?.lowStockProducts.length ? (
+            {!stats ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-maroon-700"></div>
+                <span className="ml-2 text-gray-500">Loading inventory status...</span>
+              </div>
+            ) : stats.lowStockProducts.length ? (
               <div className="space-y-4">
-                {/* Low stock items would go here */}
+                {stats.lowStockProducts.map((product: any) => (
+                  <div key={`${product.id}-${product.variant_sku}`} className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">
+                            {product.title}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            SKU: {product.variant_sku}
+                          </p>
+                          <div className="flex items-center gap-4 mt-1">
+                            <span className="text-xs text-red-600 font-medium">
+                              Current: {product.current_stock} units
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Safety Level: {product.safety_stock} units
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              product.current_stock === 0
+                                ? 'bg-red-600'
+                                : product.current_stock <= product.safety_stock / 2
+                                ? 'bg-red-500'
+                                : 'bg-yellow-500'
+                            }`}></div>
+                            <span className="text-xs font-medium text-gray-700">
+                              {product.current_stock === 0
+                                ? 'Out of Stock'
+                                : product.current_stock <= product.safety_stock / 2
+                                ? 'Critical'
+                                : 'Low Stock'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-gray-500 text-center py-8">All products have sufficient stock</p>
