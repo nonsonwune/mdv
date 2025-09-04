@@ -16,7 +16,7 @@ from mdv.models import (
     Order, OrderItem, OrderStatus, Address,
     Fulfillment, FulfillmentStatus, FulfillmentItem,
     Shipment, ShipmentStatus, ShipmentEvent,
-    Variant, Product, Cart, CartItem, Return
+    Variant, Product, ProductImage, Cart, CartItem, Return
 )
 from ..deps import get_db
 
@@ -35,6 +35,7 @@ class OrderItemResponse(BaseModel):
     unit_price: float
     subtotal: float
     on_sale: bool = False
+    image_url: Optional[str] = None
 
 class AddressResponse(BaseModel):
     name: str
@@ -149,7 +150,18 @@ async def get_order_details(
                 select(Product).where(Product.id == variant.product_id)
             )
             product = product_result.scalar_one_or_none()
-            
+
+            # Get product image URL
+            image_url = None
+            if product:
+                image_result = await db.execute(
+                    select(ProductImage.url)
+                    .where(ProductImage.product_id == product.id)
+                    .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+                    .limit(1)
+                )
+                image_url = image_result.scalar_one_or_none()
+
             items_response.append(OrderItemResponse(
                 id=item.id,
                 variant_id=item.variant_id,
@@ -160,7 +172,8 @@ async def get_order_details(
                 qty=item.qty,
                 unit_price=float(item.unit_price),
                 subtotal=float(item.unit_price * item.qty),
-                on_sale=item.on_sale
+                on_sale=item.on_sale,
+                image_url=image_url
             ))
     
     # Format address

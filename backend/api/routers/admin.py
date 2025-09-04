@@ -24,6 +24,7 @@ from mdv.models import (
     RefundMethod,
     User,
     Product,
+    ProductImage,
     Category,
     Address,
     Variant,
@@ -218,10 +219,22 @@ async def admin_get_order_details(
     for it in (order.items or []):
         variant = await db.get(Variant, it.variant_id)
         product = None
+        image_url = None
         if variant:
             product = (
                 await db.execute(select(Product).where(Product.id == variant.product_id))
             ).scalar_one_or_none()
+
+            # Get product image URL
+            if product:
+                image_result = await db.execute(
+                    select(ProductImage.url)
+                    .where(ProductImage.product_id == product.id)
+                    .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+                    .limit(1)
+                )
+                image_url = image_result.scalar_one_or_none()
+
         items_response.append(
             {
                 "id": it.id,
@@ -235,7 +248,7 @@ async def admin_get_order_details(
                 "quantity": it.qty,
                 "unit_price": float(it.unit_price),
                 "total_price": float(it.unit_price * it.qty),
-                "image_url": None,
+                "image_url": image_url,
             }
         )
 
