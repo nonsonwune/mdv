@@ -10,7 +10,8 @@ from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
 from mdv.models import Category, Product, Variant
-from mdv.audit import audit_action
+from mdv.audit import AuditService
+from mdv.models import AuditAction, AuditEntity
 
 
 class SaleCategoryService:
@@ -105,20 +106,20 @@ class SaleCategoryService:
                 
                 # Audit the change
                 if user_id:
-                    await audit_action(
-                        self.db,
-                        user_id=user_id,
-                        action="update_sale_category_visibility",
-                        entity_type="category",
+                    await AuditService.log_event(
+                        action=AuditAction.UPDATE,
+                        entity=AuditEntity.CATEGORY,
                         entity_id=category.id,
-                        details={
+                        before={"show_in_navigation": old_visibility},
+                        after={"show_in_navigation": should_show},
+                        metadata={
                             "category_name": category.name,
                             "threshold": threshold,
                             "sale_products_count": len(sale_products),
-                            "old_visibility": old_visibility,
-                            "new_visibility": should_show,
                             "reason": "automatic_sale_category_update"
-                        }
+                        },
+                        actor_id=user_id,
+                        session=self.db
                     )
         
         await self.db.commit()
@@ -152,17 +153,22 @@ class SaleCategoryService:
         
         # Audit the creation
         if user_id:
-            await audit_action(
-                self.db,
-                user_id=user_id,
-                action="create_sale_category",
-                entity_type="category",
+            await AuditService.log_event(
+                action=AuditAction.CREATE,
+                entity=AuditEntity.CATEGORY,
                 entity_id=sale_category.id,
-                details={
+                after={
+                    "name": sale_category.name,
+                    "is_sale_category": True,
+                    "auto_sale_threshold": sale_category.auto_sale_threshold
+                },
+                metadata={
                     "category_name": sale_category.name,
                     "threshold": sale_category.auto_sale_threshold,
                     "reason": "automatic_sale_category_creation"
-                }
+                },
+                actor_id=user_id,
+                session=self.db
             )
         
         await self.db.commit()
