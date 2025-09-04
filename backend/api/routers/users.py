@@ -158,11 +158,10 @@ async def register_user(
     
     # Create new user with hashed password
     # Note: We need to add password_hash field to User model
-    # TODO: Change back to Role.customer after database migration
     user = User(
         name=registration.name,
         email=registration.email,
-        role=Role.operations,  # Temporary: will be migrated to customer role
+        role=Role.customer,  # Proper customer role assignment
         active=True
     )
     # TODO: Store password_hash = pwd_context.hash(registration.password)
