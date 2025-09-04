@@ -107,7 +107,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     user = User(
         name=body.name,
         email=body.email,
-        role=Role.operations,  # Default role for new users
+        role=Role.customer,  # Default role for customer registrations
         active=True,
         password_hash=hash_password(body.password)
     )

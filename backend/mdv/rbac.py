@@ -15,6 +15,7 @@ FULFILLMENT_STAFF = (Role.admin, Role.supervisor, Role.operations)
 LOGISTICS_STAFF = (Role.admin, Role.supervisor, Role.logistics)
 SUPERVISORS = (Role.admin, Role.supervisor)
 ADMINS = (Role.admin,)
+ALL_USERS = (Role.admin, Role.supervisor, Role.operations, Role.logistics, Role.customer)
 
 
 class Permission(str, Enum):
@@ -184,6 +185,12 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.VIEW_INVENTORY_REPORTS,  # Alias
         # Analytics - view logistics analytics
         Permission.ANALYTICS_VIEW,
+    },
+
+    Role.customer: {
+        # Customers have minimal permissions - mainly for their own account and orders
+        # No admin dashboard access, no product/inventory management
+        # These permissions would be used for customer-facing features
     },
 }
 

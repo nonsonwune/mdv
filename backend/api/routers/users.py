@@ -161,7 +161,7 @@ async def register_user(
     user = User(
         name=registration.name,
         email=registration.email,
-        role=Role.operations,  # Default role for customers
+        role=Role.customer,  # Default role for customer registrations
         active=True
     )
     # TODO: Store password_hash = pwd_context.hash(registration.password)
