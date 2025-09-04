@@ -227,4 +227,40 @@ describe('Admin Order Detail Page - Status Update Flow', () => {
       expect(screen.getByText('Paystack orders are read-only')).toBeInTheDocument()
     })
   })
+
+  test('Paystack orders do not send payment_status in update requests', async () => {
+    const paystackOrder = {
+      ...mockOrderData,
+      payment_ref: 'paystack_ref_123',
+      payment_status: 'paid'
+    }
+
+    mockApi.mockResolvedValue(paystackOrder)
+
+    render(<OrderDetailPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Paystack orders are read-only')).toBeInTheDocument()
+    })
+
+    // Try to update the order (only tracking number should be sent)
+    const trackingInput = screen.getByPlaceholderText('Enter tracking number')
+    fireEvent.change(trackingInput, { target: { value: 'TRACK123' } })
+
+    const updateButton = screen.getByText('Update Order')
+    fireEvent.click(updateButton)
+
+    await waitFor(() => {
+      expect(mockApi).toHaveBeenCalledWith(
+        '/api/admin/orders/1',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({
+            tracking_number: 'TRACK123'
+            // payment_status should NOT be included
+          })
+        })
+      )
+    })
+  })
 })

@@ -236,7 +236,13 @@ export default function OrderDetailPage() {
 
     const updateData: any = {}
     if (newStatus !== order.status) updateData.status = newStatus
-    if (newPaymentStatus !== order.payment_status) updateData.payment_status = newPaymentStatus
+
+    // Only include payment_status if user can modify it (Admin + non-Paystack order)
+    const canModifyPaymentStatus = user && user.role === 'admin' && !order.payment_ref
+    if (canModifyPaymentStatus && newPaymentStatus !== order.payment_status) {
+      updateData.payment_status = newPaymentStatus
+    }
+
     if (trackingNumber !== (order.tracking_number || '')) updateData.tracking_number = trackingNumber
     if (carrier !== (order.carrier || '')) updateData.carrier = carrier
     if (notes !== (order.notes || '')) updateData.notes = notes
@@ -281,7 +287,9 @@ export default function OrderDetailPage() {
       // Provide more specific error messages
       let errorMessage = 'Failed to update order'
       if (error instanceof Error) {
-        if (error.message.includes('409')) {
+        if (error.message.includes('Cannot modify payment status for Paystack orders')) {
+          errorMessage = 'Paystack orders are read-only: Payment status is managed automatically by Paystack and cannot be modified manually.'
+        } else if (error.message.includes('409')) {
           errorMessage = 'Update conflict: The order status cannot be changed due to business rules (e.g., shipment already exists).'
         } else if (error.message.includes('400')) {
           errorMessage = 'Invalid update request: Please check your input values.'
