@@ -261,35 +261,45 @@ async def get_product_recommendations(
     )
     results = await db.execute(stmt)
     products = results.scalars().all()
-    
+
     recommendations = []
     for product in products:
         # Get first variant price
         variant_stmt = select(Variant).where(Variant.product_id == product.id).limit(1)
         variant_result = await db.execute(variant_stmt)
         variant = variant_result.scalar_one_or_none()
-        
-        # Get first image
+
+        # Get all images for this product (matching the format used in other endpoints)
+        images = []
         image_stmt = (
-            select(ProductImage.url)
+            select(ProductImage)
             .where(ProductImage.product_id == product.id)
             .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
-            .limit(1)
         )
-        image_result = await db.execute(image_stmt)
-        image_url = image_result.scalar_one_or_none()
-        
+        image_results = await db.execute(image_stmt)
+        for img in image_results.scalars().all():
+            images.append({
+                "id": img.id,
+                "url": img.url,
+                "alt_text": img.alt_text,
+                "width": img.width,
+                "height": img.height,
+                "sort_order": img.sort_order,
+                "is_primary": img.is_primary
+            })
+
         recommendations.append({
             "id": product.id,
             "title": product.title,
             "description": product.description,
-            "image": image_url,
+            "images": images,  # Changed from "image" to "images" array
             "slug": product.slug,
             "price": float(variant.price) if variant else None,
             "originalPrice": float(variant.price) if variant else None,
-            "discount": 0
+            "discount": 0,
+            "variants": [{"id": variant.id, "sku": variant.sku, "size": variant.size, "color": variant.color, "price": float(variant.price)}] if variant else []
         })
-    
+
     return {"products": recommendations}
 
 
