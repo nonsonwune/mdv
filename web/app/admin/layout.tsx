@@ -16,6 +16,7 @@ import {
   ClipboardDocumentListIcon,
   TagIcon,
   DocumentChartBarIcon,
+  DocumentTextIcon,
   ArchiveBoxIcon,
   TruckIcon,
   BuildingStorefrontIcon,
@@ -142,17 +143,25 @@ export default function AdminLayout({
     {
       name: 'Administration',
       items: [
-        { 
-          name: 'Users', 
-          href: '/admin/users', 
+        {
+          name: 'Users',
+          href: '/admin/users',
           icon: UserGroupIcon,
           permission: Permission.USER_VIEW,
           roles: ['admin', 'supervisor'],
           description: 'Staff account management'
         },
-        { 
-          name: 'Settings', 
-          href: '/admin/settings', 
+        {
+          name: 'Audit Logs',
+          href: '/admin/audit',
+          icon: DocumentTextIcon,
+          permission: null, // Handled by AdminRouteGuard component
+          roles: ['admin'],
+          description: 'System activity monitoring and compliance'
+        },
+        {
+          name: 'Settings',
+          href: '/admin/settings',
           icon: Cog6ToothIcon,
           permission: Permission.SYSTEM_SETTINGS,
           roles: ['admin'],
