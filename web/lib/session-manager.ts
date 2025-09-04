@@ -6,7 +6,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from './auth-context'
-import { useToast } from '../components/ui/toast'
+import { useToast } from '../app/_components/ToastProvider'
 
 interface SessionConfig {
   warningTime: number // Minutes before expiry to show warning
@@ -28,7 +28,7 @@ const DEFAULT_CONFIG: SessionConfig = {
 export function useSessionTimeout(config: Partial<SessionConfig> = {}) {
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
   const { user, logout, refreshToken } = useAuth()
-  const { addToast } = useToast()
+  const toast = useToast()
   const router = useRouter()
   
   const warningShownRef = useRef(false)
@@ -90,59 +90,24 @@ export function useSessionTimeout(config: Partial<SessionConfig> = {}) {
 
   // Handle session expiry
   const handleSessionExpired = useCallback(() => {
-    addToast({
-      type: 'warning',
-      title: 'Session Expired',
-      message: 'Your session has expired. Please sign in again.',
-      duration: 8000
-    })
-    
+    toast.error('Session Expired', 'Your session has expired. Please sign in again.')
+
     logout()
     router.push('/staff-login?error=session_expired')
-  }, [addToast, logout, router])
+  }, [toast, logout, router])
 
   // Handle idle timeout
   const handleIdleTimeout = useCallback(() => {
-    addToast({
-      type: 'info',
-      title: 'Idle Timeout',
-      message: 'You have been signed out due to inactivity.',
-      duration: 8000
-    })
-    
+    toast.info('Idle Timeout', 'You have been signed out due to inactivity.')
+
     logout()
     router.push('/staff-login?error=idle_timeout')
-  }, [addToast, logout, router])
+  }, [toast, logout, router])
 
   // Show session warning
   const showSessionWarning = useCallback((minutesLeft: number) => {
-    addToast({
-      type: 'warning',
-      title: 'Session Expiring Soon',
-      message: `Your session will expire in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}. Click to extend.`,
-      duration: 0, // Don't auto-dismiss
-      action: {
-        label: 'Extend Session',
-        onClick: async () => {
-          try {
-            await refreshToken()
-            addToast({
-              type: 'success',
-              title: 'Session Extended',
-              message: 'Your session has been extended successfully.'
-            })
-          } catch (error) {
-            addToast({
-              type: 'error',
-              title: 'Extension Failed',
-              message: 'Failed to extend session. Please sign in again.'
-            })
-            handleSessionExpired()
-          }
-        }
-      }
-    })
-  }, [addToast, refreshToken, handleSessionExpired])
+    toast.error('Session Expiring Soon', `Your session will expire in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}. Please save your work.`)
+  }, [toast])
 
   // Set up activity listeners
   useEffect(() => {
