@@ -97,6 +97,62 @@ def run_migrations():
     
     print("=" * 50)
 
+async def seed_basic_categories():
+    """Seed basic categories required for the platform."""
+    print("=" * 50)
+    print("Seeding basic categories...")
+    print("=" * 50)
+
+    try:
+        from mdv.db import session_scope
+        from mdv.models import Category
+        from sqlalchemy import select
+
+        async with session_scope() as db:
+            # Define the categories that match frontend expectations
+            categories_to_create = [
+                {"name": "Men's Collection", "slug": "men"},
+                {"name": "Women's Collection", "slug": "women"},
+                {"name": "Essentials", "slug": "essentials"},
+                {"name": "Sale & Clearance", "slug": "sale"},
+            ]
+
+            created_count = 0
+
+            for cat_data in categories_to_create:
+                # Check if category already exists
+                existing = await db.execute(
+                    select(Category).where(Category.slug == cat_data["slug"])
+                )
+
+                if existing.scalar_one_or_none():
+                    print(f"✓ Category exists: {cat_data['name']} ({cat_data['slug']})")
+                else:
+                    # Create new category
+                    category = Category(
+                        name=cat_data["name"],
+                        slug=cat_data["slug"],
+                        is_active=True,
+                        sort_order=0
+                    )
+                    db.add(category)
+                    created_count += 1
+                    print(f"✓ Created category: {cat_data['name']} ({cat_data['slug']})")
+
+            if created_count > 0:
+                await db.commit()
+                print(f"✓ Successfully created {created_count} categories!")
+            else:
+                print("✓ All required categories already exist")
+
+        return True
+
+    except Exception as e:
+        print(f"✗ Category seeding error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def setup_async_database_url():
     """Ensure DATABASE_URL is properly formatted for async operations"""
     original_db_url = os.environ.get('DATABASE_URL', '')
@@ -210,6 +266,10 @@ if __name__ == "__main__":
     
     # Run migrations (non-blocking)
     run_migrations()
-    
+
+    # Seed basic categories (async)
+    import asyncio
+    asyncio.run(seed_basic_categories())
+
     # Start server (blocking)
     start_server()
