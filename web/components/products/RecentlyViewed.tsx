@@ -1,127 +1,297 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import type { Product } from "../../lib/types"
 import { Card } from "../ui"
 
 // Version for localStorage cleanup - increment when validation logic changes
-const RECENTLY_VIEWED_VERSION = "v2.0"
+const RECENTLY_VIEWED_VERSION = "v3.0"
 const VERSION_KEY = "mdv_recently_viewed_version"
+const STORAGE_KEY = "mdv_recently_viewed"
+const MAX_PRODUCTS = 10
+const VALIDATION_INTERVAL = 24 * 60 * 60 * 1000 // 24 hours
+const LAST_VALIDATION_KEY = "mdv_recently_viewed_last_validation"
 
-export default function RecentlyViewed({ currentProductId }: { currentProductId?: number }) {
+interface RecentlyViewedItem {
+  productId: string
+  viewedAt: string
+  product: Product
+}
+
+interface RecentlyViewedProps {
+  currentProductId?: number
+  maxProducts?: number
+  showTitle?: boolean
+  className?: string
+}
+
+export default function RecentlyViewed({
+  currentProductId,
+  maxProducts = 4,
+  showTitle = true,
+  className = ""
+}: RecentlyViewedProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [isValidating, setIsValidating] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Validate product data structure
+  const isValidProduct = useCallback((product: any): product is Product => {
+    return (
+      product &&
+      typeof product.id === 'number' &&
+      typeof product.title === 'string' &&
+      typeof product.slug === 'string' &&
+      Array.isArray(product.variants) &&
+      product.variants.length > 0 &&
+      Array.isArray(product.images) &&
+      product.variants[0] &&
+      typeof product.variants[0].price === 'number'
+    )
+  }, [])
+
+  // Check if product exists via HEAD request
+  const checkProductExists = useCallback(async (productId: number): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: 'HEAD',
+        cache: 'no-cache'
+      })
+      return response.ok
+    } catch (error) {
+      console.warn(`Could not validate product ${productId}:`, error)
+      // On network error, assume product exists to avoid removing valid products
+      return true
+    }
+  }, [])
+
+  // Get stored recently viewed items
+  const getStoredItems = useCallback((): RecentlyViewedItem[] => {
+    if (typeof window === 'undefined') return []
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (!stored) return []
+
+      const parsed = JSON.parse(stored)
+
+      // Handle both old format (Product[]) and new format (RecentlyViewedItem[])
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0) return []
+
+        // Check if it's old format (direct Product array)
+        if (parsed[0] && typeof parsed[0].id === 'number' && !parsed[0].productId) {
+          // Convert old format to new format
+          const converted: RecentlyViewedItem[] = parsed
+            .filter(isValidProduct)
+            .map((product: Product) => ({
+              productId: String(product.id),
+              viewedAt: new Date().toISOString(),
+              product
+            }))
+
+          // Save in new format
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(converted))
+          return converted
+        }
+
+        // New format - validate structure
+        return parsed.filter((item: any) =>
+          item &&
+          typeof item.productId === 'string' &&
+          typeof item.viewedAt === 'string' &&
+          isValidProduct(item.product)
+        )
+      }
+
+      return []
+    } catch (error) {
+      console.error('Error parsing recently viewed products:', error)
+      // Clear corrupted data
+      localStorage.removeItem(STORAGE_KEY)
+      return []
+    }
+  }, [isValidProduct])
+
+  // Save items to localStorage
+  const saveItems = useCallback((items: RecentlyViewedItem[]) => {
+    if (typeof window === 'undefined') return
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    } catch (error) {
+      console.error('Error saving recently viewed products:', error)
+    }
+  }, [])
 
   useEffect(() => {
     const validateAndLoadProducts = async () => {
-      // Check if we need to force cleanup due to version change
-      const currentVersion = localStorage.getItem(VERSION_KEY)
-      const forceCleanup = currentVersion !== RECENTLY_VIEWED_VERSION
+      setValidationError(null)
 
-      const stored = localStorage.getItem("mdv_recently_viewed")
-      if (!stored) {
-        if (forceCleanup) {
+      // Check if we need validation
+      const currentVersion = localStorage.getItem(VERSION_KEY)
+      const lastValidation = localStorage.getItem(LAST_VALIDATION_KEY)
+      const now = Date.now()
+
+      const needsVersionUpdate = currentVersion !== RECENTLY_VIEWED_VERSION
+      const needsPeriodicValidation = !lastValidation ||
+        (now - parseInt(lastValidation)) > VALIDATION_INTERVAL
+
+      // Get stored items
+      let items = getStoredItems()
+
+      if (items.length === 0) {
+        if (needsVersionUpdate) {
           localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
+          localStorage.setItem(LAST_VALIDATION_KEY, String(now))
         }
+        setProducts([])
         return
       }
 
-      try {
-        const parsed = JSON.parse(stored) as Product[]
+      // Filter out current product if viewing a product page
+      const filtered = currentProductId
+        ? items.filter(item => item.product.id !== currentProductId)
+        : items
 
-        // Filter out current product if viewing a product page
-        const filtered = currentProductId
-          ? parsed.filter(p => p.id !== currentProductId)
-          : parsed
+      // Filter out old items (older than 30 days)
+      const thirtyDaysAgo = new Date()
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-        // Basic data validation - ensure products have required fields
-        let validProducts = filtered.filter(product =>
-          product &&
-          product.id &&
-          product.title &&
-          product.slug &&
-          Array.isArray(product.variants) &&
-          Array.isArray(product.images)
-        )
+      const recentItems = filtered.filter(item => {
+        const viewedDate = new Date(item.viewedAt)
+        return viewedDate > thirtyDaysAgo
+      })
 
-        // Show products immediately, then validate in background
-        setProducts(validProducts.slice(0, 4))
+      // Show products immediately (optimistic UI)
+      const displayProducts = recentItems
+        .slice(0, maxProducts)
+        .map(item => item.product)
 
-        // If force cleanup, validate products exist in database (background)
-        if (forceCleanup && validProducts.length > 0) {
-          setIsValidating(true)
+      setProducts(displayProducts)
 
-          // Validate products exist in database in background
-          const validateProducts = async () => {
-            const existingProducts = []
+      // Perform validation if needed (background)
+      if (needsVersionUpdate || needsPeriodicValidation) {
+        setIsValidating(true)
 
-            // Check each product individually (more reliable than batch)
-            for (const product of validProducts.slice(0, 4)) {
-              try {
-                // Use HEAD request to check if product exists (lightweight)
-                const response = await fetch(`/api/products/${product.id}`, {
-                  method: 'HEAD',
-                  cache: 'no-cache'
-                })
+        const validateProducts = async () => {
+          try {
+            const validatedItems: RecentlyViewedItem[] = []
 
-                if (response.ok) {
-                  existingProducts.push(product)
-                } else if (response.status === 404) {
-                  // Product was deleted, don't include it
-                  console.log(`Removing deleted product from recently viewed: ${product.title}`)
-                } else {
-                  // Other error (network, server), keep the product
-                  existingProducts.push(product)
-                }
-              } catch (error) {
-                // Network error, keep the product
-                console.warn(`Could not validate product ${product.id}:`, error)
-                existingProducts.push(product)
+            // Validate each product exists in database
+            for (const item of recentItems) {
+              const exists = await checkProductExists(item.product.id)
+
+              if (exists) {
+                validatedItems.push(item)
+              } else {
+                console.log(`Removing deleted product from recently viewed: ${item.product.title}`)
               }
             }
 
-            // Update localStorage and state if products were removed
-            if (existingProducts.length !== validProducts.length) {
-              localStorage.setItem("mdv_recently_viewed", JSON.stringify(existingProducts))
-              setProducts(existingProducts.slice(0, 4))
-              console.log(`Cleaned up recently viewed: removed ${validProducts.length - existingProducts.length} deleted products`)
+            // Update storage if products were removed
+            if (validatedItems.length !== recentItems.length) {
+              saveItems(validatedItems)
+
+              // Update displayed products
+              const updatedDisplayProducts = validatedItems
+                .filter(item => !currentProductId || item.product.id !== currentProductId)
+                .slice(0, maxProducts)
+                .map(item => item.product)
+
+              setProducts(updatedDisplayProducts)
+
+              console.log(`Cleaned up recently viewed: removed ${recentItems.length - validatedItems.length} deleted products`)
             }
 
+            // Update version and validation timestamp
             localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
+            localStorage.setItem(LAST_VALIDATION_KEY, String(now))
+
+          } catch (error) {
+            console.error('Error validating recently viewed products:', error)
+            setValidationError('Failed to validate products')
+          } finally {
             setIsValidating(false)
           }
-
-          // Run validation in background
-          validateProducts()
-        } else if (forceCleanup) {
-          // No products to validate, just update version
-          localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
         }
 
-        // Update localStorage if we cleaned anything during basic validation
-        if (validProducts.length !== parsed.length) {
-          localStorage.setItem("mdv_recently_viewed", JSON.stringify(validProducts))
+        // Run validation in background
+        validateProducts()
+      } else {
+        // Update storage if we cleaned old items
+        if (recentItems.length !== items.length) {
+          saveItems(recentItems)
         }
-      } catch (error) {
-        console.error('Error parsing recently viewed products:', error)
-        // Clear corrupted data and set version
-        localStorage.removeItem("mdv_recently_viewed")
-        localStorage.setItem(VERSION_KEY, RECENTLY_VIEWED_VERSION)
-        setProducts([])
-        setIsValidating(false)
       }
     }
 
     validateAndLoadProducts()
-  }, [currentProductId])
+  }, [currentProductId, maxProducts, getStoredItems, saveItems, checkProductExists, isValidProduct])
+
+  // Function to add a product to recently viewed
+  const addProduct = useCallback((product: Product) => {
+    if (!isValidProduct(product)) {
+      console.warn('Invalid product data provided to addProduct:', product)
+      return
+    }
+
+    const items = getStoredItems()
+    const productId = String(product.id)
+
+    // Remove existing entry if present
+    const filteredItems = items.filter(item => item.productId !== productId)
+
+    // Add new entry at the beginning
+    const newItem: RecentlyViewedItem = {
+      productId,
+      viewedAt: new Date().toISOString(),
+      product
+    }
+
+    const updatedItems = [newItem, ...filteredItems].slice(0, MAX_PRODUCTS)
+    saveItems(updatedItems)
+
+    // Update displayed products if not on current product page
+    if (!currentProductId || product.id !== currentProductId) {
+      const displayProducts = updatedItems
+        .filter(item => !currentProductId || item.product.id !== currentProductId)
+        .slice(0, maxProducts)
+        .map(item => item.product)
+
+      setProducts(displayProducts)
+    }
+  }, [isValidProduct, getStoredItems, saveItems, currentProductId, maxProducts])
+
+  // Expose addProduct function for external use
+  React.useImperativeHandle(React.forwardRef(() => null), () => ({
+    addProduct
+  }), [addProduct])
 
   if (products.length === 0) return null
 
   return (
-    <div className="mt-12">
-      <h2 className="text-xl font-semibold mb-4">Recently Viewed</h2>
+    <div className={`mt-12 ${className}`}>
+      {showTitle && (
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Recently Viewed</h2>
+          {isValidating && (
+            <div className="flex items-center text-sm text-muted-foreground">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+              Validating...
+            </div>
+          )}
+        </div>
+      )}
+
+      {validationError && (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <p className="text-sm text-yellow-800">{validationError}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {products.map(product => {
           const price = product.variants?.[0]?.price || 0
@@ -166,4 +336,75 @@ export default function RecentlyViewed({ currentProductId }: { currentProductId?
       )}
     </div>
   )
+}
+
+// Hook for adding products to recently viewed from other components
+export function useRecentlyViewed() {
+  const addProduct = useCallback((product: Product) => {
+    if (typeof window === 'undefined') return
+
+    // Validate product data
+    const isValid = (
+      product &&
+      typeof product.id === 'number' &&
+      typeof product.title === 'string' &&
+      typeof product.slug === 'string' &&
+      Array.isArray(product.variants) &&
+      product.variants.length > 0 &&
+      Array.isArray(product.images) &&
+      product.variants[0] &&
+      typeof product.variants[0].price === 'number'
+    )
+
+    if (!isValid) {
+      console.warn('Invalid product data provided to useRecentlyViewed:', product)
+      return
+    }
+
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      let items: RecentlyViewedItem[] = []
+
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          // Handle both old and new formats
+          if (parsed.length > 0 && parsed[0] && typeof parsed[0].id === 'number' && !parsed[0].productId) {
+            // Old format - convert
+            items = parsed
+              .filter((p: any) => p && p.id !== product.id)
+              .map((p: Product) => ({
+                productId: String(p.id),
+                viewedAt: new Date().toISOString(),
+                product: p
+              }))
+          } else {
+            // New format
+            items = parsed.filter((item: any) =>
+              item &&
+              item.productId !== String(product.id) &&
+              typeof item.productId === 'string' &&
+              typeof item.viewedAt === 'string' &&
+              item.product
+            )
+          }
+        }
+      }
+
+      // Add new item at the beginning
+      const newItem: RecentlyViewedItem = {
+        productId: String(product.id),
+        viewedAt: new Date().toISOString(),
+        product
+      }
+
+      const updatedItems = [newItem, ...items].slice(0, MAX_PRODUCTS)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedItems))
+
+    } catch (error) {
+      console.error('Error adding product to recently viewed:', error)
+    }
+  }, [])
+
+  return { addProduct }
 }

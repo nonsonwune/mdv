@@ -9,6 +9,7 @@ import { addItemWithRecovery } from "../../lib/cart"
 import { Button, Badge } from "../ui"
 import { useToast } from "../../app/_components/ToastProvider"
 import { useWishlist } from "../../hooks/useWishlist"
+import { useRecentlyViewed } from "./RecentlyViewed"
 import ProductQuickView from "./ProductQuickView"
 
 interface ProductCardProps {
@@ -25,6 +26,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const router = useRouter()
   const toast = useToast()
   const { toggleItem, isAuthenticated } = useWishlist()
+  const { addProduct } = useRecentlyViewed()
   
   const defaultVariant: Variant | undefined = product.variants?.[0]
   const price = defaultVariant?.price || 0
@@ -51,11 +53,8 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
       await addItemWithRecovery(defaultVariant.id, 1)
       toast.success("Added to cart", `${product.title} has been added to your cart`)
       
-      // Store in recently viewed
-      const recentlyViewed = JSON.parse(localStorage.getItem("mdv_recently_viewed") || "[]")
-      const filtered = recentlyViewed.filter((p: Product) => p.id !== product.id)
-      filtered.unshift(product)
-      localStorage.setItem("mdv_recently_viewed", JSON.stringify(filtered.slice(0, 10)))
+      // Store in recently viewed using the new system
+      addProduct(product)
     } catch (error) {
       toast.error("Failed to add to cart", "Please try again")
       console.error("Quick add error:", error)

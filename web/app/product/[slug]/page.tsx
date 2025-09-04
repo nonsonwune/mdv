@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { ProductResponse } from "../../../lib/api-types";
 import type { ProductImage, Variant } from "../../../lib/types";
+import ProductPageClient from "../../../components/products/ProductPageClient";
 
 async function getProduct(idOrSlug: string): Promise<ProductResponse | null> {
   const res = await fetch(`${API_BASE}/api/products/${idOrSlug}`, { cache: "no-store" });
@@ -16,7 +17,9 @@ export default async function ProductPage({ params }: { params: { slug: string }
   const product = await getProduct(params.slug);
   if (!product) return notFound();
   const v0 = product.variants?.[0];
+
   return (
+    <ProductPageClient product={product}>
     <div className="mx-auto max-w-4xl px-4 py-10">
       <Link href="/" className="text-sm underline">← Back</Link>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -79,6 +82,7 @@ export default async function ProductPage({ params }: { params: { slug: string }
         </div>
       </div>
     </div>
+    </ProductPageClient>
   );
 }
 
