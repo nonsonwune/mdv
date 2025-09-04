@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation"
 import type { Product, Variant } from "../../lib/types"
 import { addItemWithRecovery } from "../../lib/cart"
 import { Button, Badge } from "../ui"
-import { useToast } from "../../app/_components/ToastProvider"
 import { useWishlist } from "../../hooks/useWishlist"
 import { useRecentlyViewed } from "./RecentlyViewed"
 import ProductQuickView from "./ProductQuickView"
@@ -25,20 +24,6 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const [showQuickView, setShowQuickView] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const router = useRouter()
-
-  // Safe toast hook that won't break SSR
-  let toast: any = null
-  try {
-    toast = useToast()
-  } catch (error) {
-    // Toast provider not available during SSR
-    toast = {
-      success: () => {},
-      error: () => {},
-      info: () => {}
-    }
-  }
-
   const { toggleItem, isAuthenticated } = useWishlist()
   const { addProduct } = useRecentlyViewed()
 
@@ -70,13 +55,12 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
     setIsAdding(true)
     try {
       await addItemWithRecovery(defaultVariant.id, 1)
-      toast.success("Added to cart", `${product.title} has been added to your cart`)
-      
+      console.log("Added to cart:", product.title)
+
       // Store in recently viewed using the new system
       addProduct(product)
     } catch (error) {
-      toast.error("Failed to add to cart", "Please try again")
-      console.error("Quick add error:", error)
+      console.error("Failed to add to cart:", error)
     } finally {
       setIsAdding(false)
     }
@@ -210,7 +194,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                   e.stopPropagation()
 
                   if (!isAuthenticated) {
-                    toast.error("Please log in", "You need to be logged in to add items to your wishlist")
+                    console.log("Please log in to add items to your wishlist")
                     return
                   }
 
@@ -218,13 +202,12 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
                   try {
                     const wasAdded = await toggleItem(product.id)
                     if (wasAdded) {
-                      toast.success("Added to wishlist", `${product.title} has been added to your wishlist`)
+                      console.log("Added to wishlist:", product.title)
                     } else {
-                      toast.info("Removed from wishlist", `${product.title} has been removed from your wishlist`)
+                      console.log("Removed from wishlist:", product.title)
                     }
                   } catch (error) {
-                    toast.error("Failed to update wishlist", "Please try again")
-                    console.error("Wishlist error:", error)
+                    console.error("Failed to update wishlist:", error)
                   } finally {
                     setIsAddingToWishlist(false)
                   }
