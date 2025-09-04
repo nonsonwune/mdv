@@ -15,7 +15,6 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
-import { useErrorHandler } from '../hooks/use-error-handler'
 import { useErrorRecovery } from '../hooks/use-error-recovery'
 
 // Permission enum matching backend permissions
@@ -258,12 +257,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState<AuthError | null>(null)
 
-  // Error handling for auth operations
-  const authErrorHandler = useErrorHandler({
-    context: 'login',
-    showToast: false, // We'll handle auth errors specially
-    logErrors: true
-  })
+  // Simple error logging for auth operations (no toast dependency)
+  const logAuthError = useCallback((error: any, context: string) => {
+    console.error(`Auth error in ${context}:`, error)
+  }, [])
 
   // Computed values
   const isAuthenticated = user !== null
@@ -397,12 +394,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         console.warn(`Auth check retry ${attempt} failed:`, authErr.message)
 
-        // Only show toast for final failure or non-retryable errors
+        // Log final failure or non-retryable errors
         if (attempt >= 3 || !authErr.retryable) {
-          authErrorHandler.handleError(error, {
-            showToast: authErr.type !== 'expired', // Don't show toast for expired sessions
-            context: 'login'
-          })
+          logAuthError(error, 'auth-check')
         }
       },
       circuitBreakerThreshold: 5, // Open circuit after 5 failures in a minute
@@ -493,20 +487,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
           if (authErr.retryable) {
             authRecovery.handleError(error)
           } else {
-            authErrorHandler.handleError(error, { showToast: true, context: 'login' })
+            logAuthError(error, 'server-error')
           }
           break
 
         default:
           // Other errors - log but don't show intrusive messages on public pages
           if (isProtectedPage()) {
-            authErrorHandler.handleError(error, { showToast: true, context: 'login' })
+            logAuthError(error, 'protected-page')
           }
       }
     } finally {
       setLoading(false)
     }
-  }, [shouldCheckAuth, performAuthCheck, categorizeAuthError, authRecovery, authErrorHandler, isProtectedPage])
+  }, [shouldCheckAuth, performAuthCheck, categorizeAuthError, authRecovery, logAuthError, isProtectedPage])
 
   // Retry auth check
   const retryAuth = useCallback(async () => {
