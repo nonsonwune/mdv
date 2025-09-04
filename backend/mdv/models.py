@@ -71,7 +71,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Hashed password for customers
-    role: Mapped[Role] = mapped_column(SAEnum(Role, name="role", values_callable=lambda x: [e.value for e in x]), default=Role.customer, index=True)
+    role: Mapped[Role] = mapped_column(SAEnum(Role, name="role", values_callable=lambda x: [e.value for e in x]), default=Role.operations, index=True)  # TODO: Change to Role.customer after migration
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     force_password_change: Mapped[bool] = mapped_column(Boolean, default=False)  # Force password change on next login
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

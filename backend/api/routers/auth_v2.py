@@ -104,10 +104,11 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         )
     
     # Create new user with hashed password
+    # TODO: Change back to Role.customer after database migration
     user = User(
         name=body.name,
         email=body.email,
-        role=Role.customer,  # Default role for customer registrations
+        role=Role.operations,  # Temporary: will be migrated to customer role
         active=True,
         password_hash=hash_password(body.password)
     )
