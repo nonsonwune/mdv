@@ -12,8 +12,8 @@ async function getProducts(): Promise<Product[]> {
       headers: {
         'Content-Type': 'application/json',
       },
-      // Force revalidation on every request for testing
-      next: { revalidate: 0 }
+      // Revalidate every 60 seconds for production
+      next: { revalidate: 60 }
     })
 
     if (!response.ok) {
