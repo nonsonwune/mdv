@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -23,10 +23,29 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const [isAdding, setIsAdding] = useState(false)
   const [isAddingToWishlist, setIsAddingToWishlist] = useState(false)
   const [showQuickView, setShowQuickView] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const router = useRouter()
-  const toast = useToast()
+
+  // Safe toast hook that won't break SSR
+  let toast: any = null
+  try {
+    toast = useToast()
+  } catch (error) {
+    // Toast provider not available during SSR
+    toast = {
+      success: () => {},
+      error: () => {},
+      info: () => {}
+    }
+  }
+
   const { toggleItem, isAuthenticated } = useWishlist()
   const { addProduct } = useRecentlyViewed()
+
+  // Ensure component is mounted before using client-side features
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
   
   const defaultVariant: Variant | undefined = product.variants?.[0]
   const price = defaultVariant?.price || 0
