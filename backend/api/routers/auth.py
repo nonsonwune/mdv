@@ -8,6 +8,7 @@ from mdv.models import User, Role
 from mdv.password import hash_password, verify_password, needs_rehash
 from mdv.rate_limit import limiter, RATE_LIMITS
 from mdv.schemas import AuthLoginRequest, AuthLoginResponse
+from mdv.audit import audit_context, audit_login, audit_logout, AuditService, AuditAction, AuditEntity
 from ..deps import get_db
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -24,10 +25,22 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
     Authenticate user with email and password.
     Supports both bcrypt and legacy SHA256 hashes.
     """
+    # Set up audit context
+    audit_context.set_request_context(request)
+
     # Look up user by email
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     
     if not user:
+        # Log failed login attempt
+        await AuditService.log_authentication(
+            action=AuditAction.LOGIN_FAILED,
+            email=body.email,
+            success=False,
+            error_message="User not found",
+            metadata={"reason": "user_not_found"}
+        )
+
         # Special handling for MVP mode - auto-create users
         # Remove this block in production
         if body.email.endswith("@mdv.ng"):
@@ -43,6 +56,15 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
             db.add(user)
             await db.flush()
             await db.commit()
+
+            # Log user auto-creation
+            await AuditService.log_event(
+                action=AuditAction.CREATE,
+                entity=AuditEntity.USER,
+                entity_id=user.id,
+                after={"email": user.email, "role": user.role.value, "auto_created": True},
+                metadata={"reason": "mvp_auto_creation"}
+            )
         else:
             raise HTTPException(
                 status_code=401,
@@ -53,6 +75,15 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
     if user.password_hash:
         # Verify password
         if not verify_password(body.password, user.password_hash):
+            # Log failed login attempt
+            await AuditService.log_authentication(
+                action=AuditAction.LOGIN_FAILED,
+                user_id=user.id,
+                email=user.email,
+                success=False,
+                error_message="Invalid password",
+                metadata={"reason": "invalid_password"}
+            )
             raise HTTPException(
                 status_code=401,
                 detail="Invalid email or password"
@@ -85,6 +116,23 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
 
     # Create access token
     token = create_access_token(subject=str(user.id), role=user.role)
+
+    # Set audit context with authenticated user
+    audit_context.actor_id = user.id
+    audit_context.actor_role = user.role.value
+    audit_context.actor_email = user.email
+
+    # Log successful login
+    await AuditService.log_authentication(
+        action=AuditAction.LOGIN,
+        user_id=user.id,
+        email=user.email,
+        success=True,
+        metadata={
+            "role": user.role.value,
+            "force_password_change": user.force_password_change
+        }
+    )
 
     # Return both access_token and token for client compatibility
     return AuthLoginResponse(

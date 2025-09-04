@@ -10,8 +10,9 @@ from sqlalchemy import and_, select
 
 from .config import settings
 from .db import session_scope
+from .audit import AuditService, AuditAction, AuditEntity, AuditStatus
 from .models import (
-    Order, OrderStatus, OrderItem, Fulfillment, FulfillmentStatus, 
+    Order, OrderStatus, OrderItem, Fulfillment, FulfillmentStatus,
     Inventory, StockLedger, Reservation, ReservationStatus, CartItem,
     Address, Product, Variant, User
 )
@@ -52,7 +53,33 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
                 return  # idempotent
             
             print(f"[WEBHOOK] Updating order {order.id} from {order.status} to Paid")
+
+            # Capture before state for audit
+            before_state = {
+                "status": order.status.value,
+                "payment_ref": order.payment_ref
+            }
+
             order.status = OrderStatus.paid
+
+            # Log payment success
+            await AuditService.log_event(
+                action=AuditAction.PAYMENT_STATUS_CHANGE,
+                entity=AuditEntity.ORDER,
+                entity_id=order.id,
+                before=before_state,
+                after={"status": order.status.value, "payment_ref": order.payment_ref},
+                metadata={
+                    "payment_gateway": "paystack",
+                    "payment_reference": reference,
+                    "event_type": kind,
+                    "amount": data.get("amount"),
+                    "currency": data.get("currency"),
+                    "customer_email": data.get("customer", {}).get("email"),
+                    "payment_method": "online"
+                },
+                session=db
+            )
 
             # Create fulfillment if missing
             ful = (await db.execute(select(Fulfillment).where(Fulfillment.order_id == order.id))).scalar_one_or_none()
@@ -145,6 +172,25 @@ async def handle_paystack_event(event: dict[str, Any]) -> None:
             order = (await db.execute(select(Order).where(Order.payment_ref == reference))).scalar_one_or_none()
             if not order:
                 return
+
+            # Log payment failure
+            await AuditService.log_event(
+                action=AuditAction.PAYMENT_STATUS_CHANGE,
+                entity=AuditEntity.ORDER,
+                entity_id=order.id,
+                status=AuditStatus.FAILURE,
+                error_message=f"Payment failed: {kind}",
+                metadata={
+                    "payment_gateway": "paystack",
+                    "payment_reference": reference,
+                    "event_type": kind,
+                    "failure_reason": data.get("gateway_response"),
+                    "amount": data.get("amount"),
+                    "currency": data.get("currency"),
+                    "customer_email": data.get("customer", {}).get("email")
+                },
+                session=db
+            )
             await db.execute(
                 Reservation.__table__.update()
                 .where(and_(Reservation.cart_id == order.cart_id, Reservation.status == ReservationStatus.active))

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from mdv.auth import get_current_claims
+from mdv.audit import audit_context, AuditService, AuditAction, AuditEntity
 from mdv.models import (
     Order, OrderItem, OrderStatus, Address,
     Fulfillment, FulfillmentStatus, FulfillmentItem,
@@ -214,26 +215,47 @@ async def cancel_order(
 ):
     """Cancel an order (only if pending payment)."""
     user_id = int(claims["sub"])
-    
+
     # Get order
     result = await db.execute(
         select(Order).where(and_(Order.id == order_id, Order.user_id == user_id))
     )
     order = result.scalar_one_or_none()
-    
+
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
+
     if order.status != OrderStatus.pending_payment:
         raise HTTPException(
             status_code=400,
             detail="Order can only be cancelled if payment is pending"
         )
-    
+
+    # Capture before state for audit
+    before_state = {
+        "status": order.status.value,
+        "totals": order.totals
+    }
+
     # Update order status
     order.status = OrderStatus.cancelled
     await db.commit()
-    
+
+    # Log order cancellation
+    await AuditService.log_event(
+        action=AuditAction.ORDER_CANCEL,
+        entity=AuditEntity.ORDER,
+        entity_id=order_id,
+        before=before_state,
+        after={"status": order.status.value},
+        metadata={
+            "cancelled_by": "customer",
+            "user_id": user_id,
+            "reason": "customer_cancellation"
+        },
+        session=db
+    )
+
     return {"message": "Order cancelled successfully", "order_id": order_id}
 
 

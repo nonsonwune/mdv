@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -18,6 +19,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -77,17 +79,116 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# Audit Log Enums
+class AuditAction(str, enum.Enum):
+    # Authentication Actions
+    LOGIN = "LOGIN"
+    LOGOUT = "LOGOUT"
+    LOGIN_FAILED = "LOGIN_FAILED"
+    PASSWORD_CHANGE = "PASSWORD_CHANGE"
+    PASSWORD_RESET = "PASSWORD_RESET"
+
+    # CRUD Operations
+    CREATE = "CREATE"
+    READ = "READ"
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    BULK_UPDATE = "BULK_UPDATE"
+    BULK_DELETE = "BULK_DELETE"
+
+    # Order Management
+    ORDER_STATUS_CHANGE = "ORDER_STATUS_CHANGE"
+    PAYMENT_STATUS_CHANGE = "PAYMENT_STATUS_CHANGE"
+    ORDER_CANCEL = "ORDER_CANCEL"
+    ORDER_REFUND = "ORDER_REFUND"
+    TRACKING_UPDATE = "TRACKING_UPDATE"
+
+    # Inventory Management
+    STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT"
+    INVENTORY_UPDATE = "INVENTORY_UPDATE"
+
+    # System Actions
+    SYSTEM_CONFIG_CHANGE = "SYSTEM_CONFIG_CHANGE"
+    ROLE_CHANGE = "ROLE_CHANGE"
+    PERMISSION_CHANGE = "PERMISSION_CHANGE"
+
+    # Customer Actions
+    CART_ADD = "CART_ADD"
+    CART_REMOVE = "CART_REMOVE"
+    CART_UPDATE = "CART_UPDATE"
+    REVIEW_CREATE = "REVIEW_CREATE"
+    REVIEW_UPDATE = "REVIEW_UPDATE"
+    REVIEW_DELETE = "REVIEW_DELETE"
+
+
+class AuditEntity(str, enum.Enum):
+    USER = "USER"
+    ORDER = "ORDER"
+    PRODUCT = "PRODUCT"
+    VARIANT = "VARIANT"
+    CATEGORY = "CATEGORY"
+    CART = "CART"
+    CART_ITEM = "CART_ITEM"
+    REVIEW = "REVIEW"
+    INVENTORY = "INVENTORY"
+    COUPON = "COUPON"
+    SHIPMENT = "SHIPMENT"
+    RETURN = "RETURN"
+    SYSTEM = "SYSTEM"
+
+
+class AuditStatus(str, enum.Enum):
+    SUCCESS = "SUCCESS"
+    FAILURE = "FAILURE"
+    PARTIAL = "PARTIAL"
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    actor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
-    action: Mapped[str] = mapped_column(String(120))
-    entity: Mapped[str] = mapped_column(String(120))
-    entity_id: Mapped[int] = mapped_column(Integer)
+
+    # Actor Information
+    actor_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    actor_role: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Snapshot of role at time of action
+    actor_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Snapshot for audit trail
+
+    # Action Details
+    action: Mapped[AuditAction] = mapped_column(SAEnum(AuditAction, name="audit_action", values_callable=lambda x: [e.value for e in x]), index=True)
+    entity: Mapped[AuditEntity] = mapped_column(SAEnum(AuditEntity, name="audit_entity", values_callable=lambda x: [e.value for e in x]), index=True)
+    entity_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)  # Made nullable for system-wide actions
+
+    # Data Changes
     before: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     after: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    changes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Computed diff for easier analysis
+
+    # Request Context
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True, index=True)  # IPv6 support
+    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    request_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)  # For request correlation
+
+    # Status and Metadata
+    status: Mapped[AuditStatus] = mapped_column(SAEnum(AuditStatus, name="audit_status", values_callable=lambda x: [e.value for e in x]), default=AuditStatus.SUCCESS, index=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Additional context data
+
+    # Timing
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+    # Relationships
+    actor: Mapped[Optional["User"]] = relationship("User", lazy="selectin")
+
+    # Constraints
+    __table_args__ = (
+        # Index for common queries
+        sa.Index('ix_audit_logs_actor_action', 'actor_id', 'action'),
+        sa.Index('ix_audit_logs_entity_action', 'entity', 'action'),
+        sa.Index('ix_audit_logs_created_at_desc', 'created_at', postgresql_using='btree'),
+        # Partial index for failed actions
+        sa.Index('ix_audit_logs_failures', 'status', 'created_at', postgresql_where=sa.text("status = 'FAILURE'")),
+    )
 
 
 # Catalog

@@ -46,7 +46,12 @@ class Permission(str, Enum):
     ORDER_CANCEL = "order:cancel"
     ORDER_FULFILL = "order:fulfill"
     ORDER_REFUND = "order:refund"
-    
+
+    # Audit permissions
+    VIEW_AUDIT_LOGS = "audit:view"
+    MANAGE_AUDIT_LOGS = "audit:manage"
+    EXPORT_AUDIT_LOGS = "audit:export"
+
     # User permissions
     USER_VIEW = "user:view"
     USER_CREATE = "user:create"
@@ -140,6 +145,8 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         # Analytics
         Permission.ANALYTICS_VIEW,
         Permission.ANALYTICS_EXPORT,
+        # Audit - view access
+        Permission.VIEW_AUDIT_LOGS,
     },
     
     Role.operations: {
