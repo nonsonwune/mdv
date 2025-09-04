@@ -97,6 +97,61 @@ def run_migrations():
     
     print("=" * 50)
 
+async def seed_basic_users():
+    """Seed basic admin users required for the platform."""
+    print("=" * 50)
+    print("Seeding basic users...")
+    print("=" * 50)
+
+    try:
+        from mdv.db import session_scope
+        from mdv.models import User, Role
+        from mdv.password import hash_password
+        from sqlalchemy import select
+
+        async with session_scope() as db:
+            # Define the basic users that should exist
+            users_to_create = [
+                {"name": "Admin User", "email": "admin@mdv.ng", "role": Role.admin, "password": "admin123"},
+                {"name": "Supervisor User", "email": "supervisor@mdv.ng", "role": Role.supervisor, "password": "supervisor123"},
+                {"name": "Operations User", "email": "operations@mdv.ng", "role": Role.operations, "password": "operations123"},
+                {"name": "Logistics User", "email": "logistics@mdv.ng", "role": Role.logistics, "password": "logistics123"},
+            ]
+
+            created_count = 0
+
+            for user_data in users_to_create:
+                # Check if user already exists
+                existing = await db.execute(
+                    select(User).where(User.email == user_data["email"])
+                )
+
+                if existing.scalar_one_or_none():
+                    print(f"✓ User exists: {user_data['name']} ({user_data['email']})")
+                else:
+                    # Create new user
+                    user = User(
+                        name=user_data["name"],
+                        email=user_data["email"],
+                        role=user_data["role"],
+                        active=True,
+                        password_hash=hash_password(user_data["password"])
+                    )
+                    db.add(user)
+                    created_count += 1
+                    print(f"✓ Created user: {user_data['name']} ({user_data['email']}) - Role: {user_data['role'].value}")
+
+            if created_count > 0:
+                await db.commit()
+                print(f"✓ Successfully created {created_count} users!")
+            else:
+                print("✓ All required users already exist")
+
+    except Exception as e:
+        print(f"Warning: Failed to seed users: {e}")
+        print("Continuing without seeding - users might need to be created manually")
+
+
 async def seed_basic_categories():
     """Seed basic categories required for the platform."""
     print("=" * 50)
@@ -268,8 +323,9 @@ if __name__ == "__main__":
     # Run migrations (non-blocking)
     run_migrations()
 
-    # Seed basic categories (async)
+    # Seed basic data (async)
     import asyncio
+    asyncio.run(seed_basic_users())
     asyncio.run(seed_basic_categories())
 
     # Start server (blocking)
