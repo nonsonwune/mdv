@@ -174,12 +174,12 @@ function UserManagementContent() {
 
   // Helper functions for user categorization
   const isCustomerUser = (user: User): boolean => {
-    // For now, we'll consider users without admin roles as potential customers
-    // This can be refined based on actual customer identification logic
-    return !['admin', 'supervisor', 'operations', 'logistics'].includes(user.role)
+    // Customer users have the 'customer' role
+    return user.role === 'customer'
   }
 
   const isStaffUser = (user: User): boolean => {
+    // Staff users have admin roles
     return ['admin', 'supervisor', 'operations', 'logistics'].includes(user.role)
   }
 
