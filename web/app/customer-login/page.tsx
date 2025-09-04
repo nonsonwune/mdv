@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "../../lib/auth-context"
 import { LoadingButton } from "../../components/ui/loading-spinner"
-import { useAuthToast } from "../../components/ui/toast"
+import { useToast } from "../_components/ToastProvider"
 import {
   LoginError,
   ValidationErrors,
@@ -30,7 +30,7 @@ export default function CustomerLoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { checkAuth } = useAuth()
-  const { showLoginSuccess, showLoginError } = useAuthToast()
+  const toast = useToast()
 
   // Enhanced URL error parameter handling
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function CustomerLoginPage() {
       setRetryCount(0)
 
       // Show success toast
-      showLoginSuccess(data.user?.name)
+      toast.success("Welcome back!", data.user?.name ? `Hello ${data.user.name}, you're now signed in.` : "You have successfully signed in.")
 
       // Refresh auth state to update navigation
       await checkAuth()
