@@ -266,7 +266,7 @@ def extract_token_claims_unsafe(token: str) -> Optional[dict]:
 
 async def get_current_claims(
     creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
-    request: Optional[Request] = None
+    request: Request
 ) -> dict:
     """Get current user claims from JWT token with enhanced validation."""
     if creds is None or creds.scheme.lower() != "bearer":
@@ -280,8 +280,7 @@ async def get_current_claims(
         claims = decode_token(creds.credentials)
 
         # Additional security checks
-        if request:
-            await validate_token_context(claims, request)
+        await validate_token_context(claims, request)
 
         return claims
 
@@ -328,7 +327,7 @@ async def validate_token_context(claims: dict, request: Request) -> None:
 
 async def get_current_claims_optional(
     creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
-    request: Optional[Request] = None
+    request: Request
 ) -> Optional[dict]:
     """Get current user claims if available, otherwise return None."""
     if creds is None or creds.scheme.lower() != "bearer":
@@ -336,8 +335,7 @@ async def get_current_claims_optional(
 
     try:
         claims = decode_token(creds.credentials)
-        if request:
-            await validate_token_context(claims, request)
+        await validate_token_context(claims, request)
         return claims
     except Exception as e:
         logger.debug(f"Optional token validation failed: {str(e)}")
@@ -350,7 +348,7 @@ def require_roles(*allowed: Iterable[Role]):
 
     async def _checker(
         claims: Annotated[dict, Depends(get_current_claims)],
-        request: Optional[Request] = None
+        request: Request
     ):
         user_role = claims.get("role")
         user_id = claims.get("sub")
@@ -479,7 +477,7 @@ async def get_current_user(
 async def get_current_user_optional(
     creds: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)],
     db: AsyncSession,
-    request: Optional[Request] = None
+    request: Request
 ) -> Optional[User]:
     """Get current user if authenticated, otherwise return None."""
     if creds is None or creds.scheme.lower() != "bearer":
@@ -487,8 +485,7 @@ async def get_current_user_optional(
 
     try:
         claims = decode_token(creds.credentials)
-        if request:
-            await validate_token_context(claims, request)
+        await validate_token_context(claims, request)
 
         user_id = int(claims.get("sub"))
         result = await db.execute(select(User).where(User.id == user_id))
