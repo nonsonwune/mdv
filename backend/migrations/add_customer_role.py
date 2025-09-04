@@ -19,14 +19,17 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 # Add the backend directory to the path so we can import our modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mdv.db import get_db_url
+from mdv.config import settings
 
 
 async def migrate_add_customer_role():
     """Add customer role to the database enum and migrate existing users."""
-    
+
     # Create database connection
-    db_url = get_db_url()
+    db_url = settings.database_url
+    # Transform for asyncpg driver
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     engine = create_async_engine(db_url)
     
     try:
@@ -103,8 +106,11 @@ async def migrate_add_customer_role():
 
 async def rollback_customer_role():
     """Rollback the customer role migration (for emergency use only)."""
-    
-    db_url = get_db_url()
+
+    db_url = settings.database_url
+    # Transform for asyncpg driver
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     engine = create_async_engine(db_url)
     
     try:
