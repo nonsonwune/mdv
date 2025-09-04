@@ -19,7 +19,7 @@ from mdv.schemas import (
     CartItemQtyUpdate,
     ShippingEstimate,
 )
-from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category, Review
+from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category, Review, User, Role
 from mdv.config import settings
 from ..deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
