@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { createPortal } from "react-dom"
 import { useAuth } from "../../lib/auth-context"
+import { DynamicMobileNavigation } from "./DynamicNavigation"
 
 interface MobileNavProps {
   cartCount?: number
@@ -36,13 +37,7 @@ export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
     }
   }, [isOpen])
 
-  const menuItems = [
-    { label: "Home", href: "/", icon: "🏠" },
-    { label: "Men", href: "/men", icon: "👔" },
-    { label: "Women", href: "/women", icon: "👗" },
-    { label: "Essentials", href: "/essentials", icon: "✨" },
-    { label: "Sale", href: "/sale", icon: "🏷️", accent: true },
-  ]
+  // Remove hardcoded menu items - now using dynamic navigation
 
   const getAccountItems = () => {
     if (!isAuthenticated) {
@@ -221,34 +216,10 @@ export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
                 </Link>
               </div>
 
-              {/* Main Navigation */}
+              {/* Main Navigation - Dynamic */}
               <nav className="p-4">
                 <h3 className="text-xs font-semibold uppercase text-neutral-500 mb-2">Shop</h3>
-                <ul className="space-y-1">
-                  {menuItems.map((item) => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href as any}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors ${
-                          pathname === item.href ? "bg-neutral-100" : ""
-                        }`}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <span className="text-lg">{item.icon}</span>
-                        <span
-                          className={`font-medium ${item.accent ? "text-maroon-700" : ""}`}
-                        >
-                          {item.label}
-                        </span>
-                        {item.accent && (
-                          <span className="ml-auto bg-maroon-700 text-white text-xs px-2 py-0.5 rounded">
-                            NEW
-                          </span>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <DynamicMobileNavigation />
               </nav>
 
               {/* Account Section */}

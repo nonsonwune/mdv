@@ -36,6 +36,8 @@ from mdv.schemas.admin_products import (
 )
 from mdv.cloudinary_utils import cloudinary_manager
 from mdv.utils import parse_actor_id, audit
+from mdv.services.sale_category_service import SaleCategoryService, update_all_sale_categories
+from mdv.services.slug_service import SlugService
 from ..deps import get_db
 
 logger = logging.getLogger(__name__)
@@ -1112,9 +1114,35 @@ async def create_category(
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="Slug already exists")
     
+    # Generate unique slug using slug service
+    slug_service = SlugService(db)
+
+    if request.slug:
+        # Validate provided slug
+        if await slug_service.check_slug_conflict(request.slug, request.parent_id):
+            raise HTTPException(status_code=400, detail="Slug already exists at this level")
+        category_slug = request.slug
+    else:
+        # Generate unique slug from name
+        category_slug = await slug_service.generate_unique_slug(request.name, request.parent_id)
+
+    # Validate hierarchy if parent is specified
+    if request.parent_id:
+        parent_exists = await db.execute(select(Category).where(Category.id == request.parent_id))
+        if not parent_exists.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Parent category not found")
+
     category = Category(
         name=request.name,
-        slug=request.slug or request.name.lower().replace(" ", "-")
+        slug=category_slug,
+        parent_id=request.parent_id,
+        description=request.description,
+        sort_order=request.sort_order,
+        is_active=request.is_active,
+        show_in_navigation=request.show_in_navigation,
+        navigation_icon=request.navigation_icon,
+        is_sale_category=request.is_sale_category,
+        auto_sale_threshold=request.auto_sale_threshold
     )
     db.add(category)
     
@@ -1149,11 +1177,58 @@ async def update_category(
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     
-    # Update fields
+    # Handle slug and hierarchy updates with validation
+    slug_service = SlugService(db)
+
+    # Check if name or parent is changing (affects slug)
+    name_changing = request.name is not None and request.name != category.name
+    parent_changing = request.parent_id is not None and request.parent_id != category.parent_id
+    slug_provided = request.slug is not None
+
+    # Validate parent change if specified
+    if parent_changing:
+        if request.parent_id:
+            parent_exists = await db.execute(select(Category).where(Category.id == request.parent_id))
+            if not parent_exists.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Parent category not found")
+
+        # Validate hierarchy to prevent circular references
+        is_valid, error_message = await slug_service.validate_hierarchy_path(category.id, request.parent_id)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error_message)
+
+    # Handle slug update
+    if slug_provided:
+        # User provided a specific slug
+        new_parent_id = request.parent_id if parent_changing else category.parent_id
+        if await slug_service.check_slug_conflict(request.slug, new_parent_id, category.id):
+            raise HTTPException(status_code=400, detail="Slug already exists at this level")
+        category.slug = request.slug
+    elif name_changing or parent_changing:
+        # Auto-generate new slug due to name or parent change
+        new_name = request.name if request.name is not None else category.name
+        new_parent_id = request.parent_id if parent_changing else category.parent_id
+        category.slug = await slug_service.update_category_slug(category, new_name, new_parent_id)
+
+    # Update other fields
     if request.name is not None:
         category.name = request.name
-    if request.slug is not None:
-        category.slug = request.slug
+    if request.parent_id is not None:
+        category.parent_id = request.parent_id
+    if request.description is not None:
+        category.description = request.description
+    if request.sort_order is not None:
+        category.sort_order = request.sort_order
+    if request.is_active is not None:
+        category.is_active = request.is_active
+    if request.show_in_navigation is not None:
+        category.show_in_navigation = request.show_in_navigation
+    if request.navigation_icon is not None:
+        category.navigation_icon = request.navigation_icon
+    if request.is_sale_category is not None:
+        category.is_sale_category = request.is_sale_category
+    if request.auto_sale_threshold is not None:
+        category.auto_sale_threshold = request.auto_sale_threshold
     
     # Log action
     await log_admin_action(
@@ -1175,7 +1250,17 @@ async def update_category(
         id=category.id,
         name=category.name,
         slug=category.slug,
-        product_count=product_count
+        parent_id=category.parent_id,
+        description=category.description,
+        sort_order=category.sort_order,
+        is_active=category.is_active,
+        show_in_navigation=category.show_in_navigation,
+        navigation_icon=category.navigation_icon,
+        is_sale_category=category.is_sale_category,
+        auto_sale_threshold=category.auto_sale_threshold,
+        product_count=product_count,
+        created_at=category.created_at.isoformat() if category.created_at else None,
+        updated_at=category.updated_at.isoformat() if category.updated_at else None
     )
 
 
@@ -1253,7 +1338,17 @@ async def list_categories(
             id=category.id,
             name=category.name,
             slug=category.slug,
-            product_count=product_count or 0
+            parent_id=category.parent_id,
+            description=category.description,
+            sort_order=category.sort_order,
+            is_active=category.is_active,
+            show_in_navigation=category.show_in_navigation,
+            navigation_icon=category.navigation_icon,
+            is_sale_category=category.is_sale_category,
+            auto_sale_threshold=category.auto_sale_threshold,
+            product_count=product_count or 0,
+            created_at=category.created_at.isoformat() if category.created_at else None,
+            updated_at=category.updated_at.isoformat() if category.updated_at else None
         ))
     
     return categories
@@ -1343,3 +1438,92 @@ async def build_product_detail_response(db: AsyncSession, product: Product) -> P
         created_at=getattr(product, 'created_at', datetime.now(timezone.utc)),
         updated_at=getattr(product, 'updated_at', None)
     )
+
+
+@router.get("/admin/sale-categories/stats")
+async def get_sale_category_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.PRODUCT_VIEW))
+):
+    """Get statistics about sale categories and products on sale."""
+    service = SaleCategoryService(db)
+    stats = await service.get_sale_category_stats()
+    return stats
+
+
+@router.post("/admin/sale-categories/update")
+async def update_sale_categories(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.MANAGE_CATEGORIES))
+):
+    """Update sale category visibility based on current product discounts."""
+    changes = await update_all_sale_categories(db, current_user.id)
+
+    # Audit the bulk update
+    await audit(
+        db,
+        user_id=current_user.id,
+        action="update_sale_categories",
+        entity_type="category",
+        details={
+            "changes": changes,
+            "triggered_by": "manual_update"
+        }
+    )
+
+    return {
+        "message": "Sale categories updated successfully",
+        "changes": changes
+    }
+
+
+@router.get("/admin/sale-categories/products")
+async def get_sale_products(
+    threshold: int = Query(10, ge=1, le=100, description="Minimum discount percentage"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_permission(Permission.PRODUCT_VIEW))
+):
+    """Get products that are currently on sale."""
+    service = SaleCategoryService(db)
+
+    # Get products on sale
+    sale_products = await service.get_products_on_sale(threshold)
+
+    # Paginate results
+    total = len(sale_products)
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_products = sale_products[start:end]
+
+    # Format response
+    items = []
+    for product in paginated_products:
+        discount_percentage = await service.calculate_discount_percentage(product)
+
+        # Get the lowest price variant
+        min_price = min(variant.price for variant in product.variants if variant.price) if product.variants else None
+
+        items.append({
+            "id": product.id,
+            "title": product.title,
+            "slug": product.slug,
+            "compare_at_price": float(product.compare_at_price) if product.compare_at_price else None,
+            "sale_price": float(min_price) if min_price else None,
+            "discount_percentage": discount_percentage,
+            "discount_amount": float(product.compare_at_price - min_price) if product.compare_at_price and min_price else None,
+            "category": {
+                "id": product.category.id,
+                "name": product.category.name
+            } if product.category else None
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size,
+        "threshold": threshold
+    }

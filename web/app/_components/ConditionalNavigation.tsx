@@ -7,6 +7,7 @@ import HeaderCart from "./HeaderCart"
 import SearchBar from "./SearchBar"
 import MobileNav from "../../components/navigation/MobileNav"
 import NavigationAuth from "./NavigationAuth"
+import DynamicNavigation from "../../components/navigation/DynamicNavigation"
 
 export default function ConditionalNavigation() {
   const pathname = usePathname()
@@ -35,14 +36,8 @@ export default function ConditionalNavigation() {
             </Link>
           </div>
           
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6 text-sm">
-            <Link href="/men" className="hover:text-maroon-700 transition-colors">Men</Link>
-            <Link href="/women" className="hover:text-maroon-700 transition-colors">Women</Link>
-            <Link href="/essentials" className="hover:text-maroon-700 transition-colors">Essentials</Link>
-            <Link href="/sale" className="font-medium" style={{color: "var(--maroon-700)"}}>Sale</Link>
-            <Link href="/about" className="hover:text-maroon-700 transition-colors">About</Link>
-          </nav>
+          {/* Desktop Navigation - Dynamic */}
+          <DynamicNavigation />
           
           {/* Right Side Actions */}
           <div className="flex items-center gap-4">

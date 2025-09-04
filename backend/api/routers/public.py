@@ -21,6 +21,7 @@ from mdv.schemas import (
 )
 from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category, Review, User, Role
 from mdv.config import settings
+from mdv.services.slug_service import get_category_by_path
 from ..deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
@@ -1091,30 +1092,206 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
 
 @router.get("/api/navigation/categories")
 async def get_navigation_categories(db: AsyncSession = Depends(get_db)):
-    """Get categories for navigation with product counts."""
-    # Query categories with product counts
+    """Get categories for navigation with hierarchical structure and product counts."""
+    # Query categories that should be shown in navigation
     query = (
-        select(
-            Category.id,
-            Category.name,
-            Category.slug,
-            func.count(Product.id).label("product_count")
-        )
-        .outerjoin(Product, Category.id == Product.category_id)
-        .group_by(Category.id, Category.name, Category.slug)
-        .order_by(Category.name)
+        select(Category)
+        .where(Category.show_in_navigation == True)
+        .where(Category.is_active == True)
+        .order_by(Category.sort_order, Category.name)
     )
 
     result = await db.execute(query)
-    categories = []
+    categories = result.scalars().all()
 
-    for row in result:
-        categories.append({
-            "id": row.id,
-            "name": row.name,
-            "slug": row.slug,
-            "product_count": row.product_count or 0
+    # Build hierarchical structure
+    category_map = {}
+    root_categories = []
+
+    # First pass: create map and get product counts
+    for category in categories:
+        # Get product count for this category
+        product_count_query = (
+            select(func.count(Product.id))
+            .where(Product.category_id == category.id)
+        )
+        product_count_result = await db.execute(product_count_query)
+        product_count = product_count_result.scalar_one()
+
+        category_data = {
+            "id": category.id,
+            "name": category.name,
+            "slug": category.slug,
+            "parent_id": category.parent_id,
+            "navigation_icon": category.navigation_icon,
+            "sort_order": category.sort_order,
+            "product_count": product_count,
+            "children": []
+        }
+        category_map[category.id] = category_data
+
+        if not category.parent_id:
+            root_categories.append(category_data)
+
+    # Second pass: build hierarchy
+    for category in categories:
+        if category.parent_id and category.parent_id in category_map:
+            parent = category_map[category.parent_id]
+            child = category_map[category.id]
+            parent["children"].append(child)
+
+    # Sort children by sort_order
+    def sort_children(cats):
+        cats.sort(key=lambda x: (x["sort_order"], x["name"]))
+        for cat in cats:
+            if cat["children"]:
+                sort_children(cat["children"])
+
+    sort_children(root_categories)
+
+    return {"categories": root_categories}
+
+
+@router.get("/api/navigation/sale-products")
+async def get_sale_products(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get products that are on sale (discount > 10%)."""
+    # Query products with significant discounts
+    stmt = (
+        select(Product)
+        .join(Variant, Product.id == Variant.product_id)
+        .where(
+            sa.and_(
+                Product.compare_at_price.isnot(None),
+                Variant.price.isnot(None),
+                # Calculate discount percentage: ((compare_at_price - price) / compare_at_price) * 100 > 10
+                ((Product.compare_at_price - Variant.price) / Product.compare_at_price * 100) > 10
+            )
+        )
+        .distinct()
+        .limit(page_size)
+        .offset((page - 1) * page_size)
+        .order_by(
+            # Order by discount percentage descending
+            ((Product.compare_at_price - Variant.price) / Product.compare_at_price * 100).desc()
+        )
+    )
+
+    result = await db.execute(stmt)
+    products = result.scalars().all()
+
+    # Get total count for pagination
+    count_stmt = (
+        select(func.count(Product.id.distinct()))
+        .join(Variant, Product.id == Variant.product_id)
+        .where(
+            sa.and_(
+                Product.compare_at_price.isnot(None),
+                Variant.price.isnot(None),
+                ((Product.compare_at_price - Variant.price) / Product.compare_at_price * 100) > 10
+            )
+        )
+    )
+
+    count_result = await db.execute(count_stmt)
+    total = count_result.scalar_one()
+
+    # Convert to response format
+    items = []
+    for product in products:
+        # Get the best variant (lowest price)
+        variant = min(product.variants, key=lambda v: v.price or float('inf'))
+
+        # Calculate discount
+        discount_amount = (product.compare_at_price or 0) - (variant.price or 0)
+        discount_percentage = (discount_amount / (product.compare_at_price or 1)) * 100 if product.compare_at_price else 0
+
+        items.append({
+            "id": product.id,
+            "title": product.title,
+            "slug": product.slug,
+            "description": product.description,
+            "price": float(variant.price) if variant.price else 0,
+            "compare_at_price": float(product.compare_at_price) if product.compare_at_price else None,
+            "discount_percentage": round(discount_percentage, 1),
+            "discount_amount": float(discount_amount),
+            "images": [{"url": img.url, "alt": img.alt_text} for img in product.images],
+            "category": {
+                "id": product.category.id,
+                "name": product.category.name,
+                "slug": product.category.slug
+            } if product.category else None
         })
 
-    return {"categories": categories}
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size
+    }
+
+
+@router.get("/api/categories/by-path/{path:path}")
+async def get_category_by_hierarchical_path(
+    path: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a category by its hierarchical path (e.g., 'men/shirts' or 'women/accessories/bags')."""
+    category = await get_category_by_path(db, path)
+
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    # Get product count for this category
+    product_count_query = (
+        select(func.count(Product.id))
+        .where(Product.category_id == category.id)
+    )
+    product_count_result = await db.execute(product_count_query)
+    product_count = product_count_result.scalar_one()
+
+    # Get children categories
+    children_query = (
+        select(Category)
+        .where(Category.parent_id == category.id)
+        .where(Category.is_active == True)
+        .order_by(Category.sort_order, Category.name)
+    )
+    children_result = await db.execute(children_query)
+    children = children_result.scalars().all()
+
+    children_data = []
+    for child in children:
+        # Get product count for child
+        child_product_count_query = (
+            select(func.count(Product.id))
+            .where(Product.category_id == child.id)
+        )
+        child_product_count_result = await db.execute(child_product_count_query)
+        child_product_count = child_product_count_result.scalar_one()
+
+        children_data.append({
+            "id": child.id,
+            "name": child.name,
+            "slug": child.slug,
+            "description": child.description,
+            "product_count": child_product_count,
+            "navigation_icon": child.navigation_icon
+        })
+
+    return {
+        "id": category.id,
+        "name": category.name,
+        "slug": category.slug,
+        "description": category.description,
+        "parent_id": category.parent_id,
+        "product_count": product_count,
+        "navigation_icon": category.navigation_icon,
+        "children": children_data,
+        "full_path": path
+    }
 

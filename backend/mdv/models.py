@@ -202,6 +202,12 @@ class Category(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_in_navigation: Mapped[bool] = mapped_column(Boolean, default=False)
+    navigation_icon: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    is_sale_category: Mapped[bool] = mapped_column(Boolean, default=False)
+    auto_sale_threshold: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Discount percentage threshold
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     # Relationships
     products: Mapped[list["Product"]] = relationship("Product", back_populates="category")

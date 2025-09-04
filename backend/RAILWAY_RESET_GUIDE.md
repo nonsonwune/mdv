@@ -93,6 +93,9 @@ python railway_reset.py
 **Interactive Prompts:**
 1. Type `PRODUCTION` to confirm this is for production database
 2. Type `RESET` to confirm database reset
+3. Choose audit log handling:
+   - Press `Enter` or type `n` to **preserve audit logs** (recommended for compliance)
+   - Type `y` to **delete audit logs** (complete clean slate for handover)
 
 **Expected Output:**
 ```
@@ -104,6 +107,11 @@ python railway_reset.py
 ============================================================
 Type 'PRODUCTION' to confirm this is for production database: PRODUCTION
 Type 'RESET' to confirm database reset: RESET
+
+📋 Audit Log Options:
+  • Keep audit logs: Preserves compliance and debugging history
+  • Delete audit logs: Complete clean slate for project handover
+Do you want to delete audit logs? (y/N): N
 
 🔌 Connecting to Railway PostgreSQL database...
 ✅ Connected successfully!
@@ -153,15 +161,50 @@ Type 'RESET' to confirm database reset: RESET
 ✅ Admin password: admin
 ✅ Admin role: admin
 ✅ Sequences reset
+✅ Audit logs preserved (compliance mode)
 ✅ Database ready for fresh data
 ============================================================
 ```
+
+## 📋 **Audit Log Options**
+
+The script now includes flexible audit log handling for different use cases:
+
+### **Preserve Audit Logs (Default - Recommended)**
+- **Use Case**: Development resets, compliance requirements, debugging
+- **Behavior**: Keeps all audit log entries for historical tracking
+- **Command**: `python railway_reset.py` (default behavior)
+- **Interactive**: Press `Enter` or type `n` when prompted
+
+### **Delete Audit Logs (Complete Clean Slate)**
+- **Use Case**: Project handover, final deployment, complete fresh start
+- **Behavior**: Removes all audit log entries for a completely clean database
+- **Command**: `python railway_reset.py --delete-audit-logs`
+- **Interactive**: Type `y` when prompted
+
+### **Decision Guide:**
+- **Keep Audit Logs** if you need:
+  - Compliance tracking
+  - Debugging history
+  - Development environment resets
+  - Audit trail preservation
+
+- **Delete Audit Logs** if you need:
+  - Complete clean slate for handover
+  - Fresh start with no history
+  - Minimal database footprint
+  - Project transfer scenarios
 
 ## 🔧 **Advanced Usage Options**
 
 ### Skip Interactive Confirmation (Use with Extreme Caution)
 ```bash
 python railway_reset.py --confirm
+```
+
+### Delete Audit Logs (Complete Clean Slate)
+```bash
+python railway_reset.py --delete-audit-logs
 ```
 
 ### Use Custom Database URL
@@ -171,7 +214,7 @@ python railway_reset.py --database-url "postgresql://user:pass@host:port/db"
 
 ### Combine Options
 ```bash
-python railway_reset.py --dry-run --database-url "custom-url"
+python railway_reset.py --dry-run --delete-audit-logs --database-url "custom-url"
 ```
 
 ## 🔍 **Verification Steps**

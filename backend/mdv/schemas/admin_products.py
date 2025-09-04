@@ -231,8 +231,14 @@ class CategoryResponse(BaseModel):
     description: Optional[str] = None
     sort_order: int = 0
     is_active: bool = True
+    show_in_navigation: bool = False
+    navigation_icon: Optional[str] = None
+    is_sale_category: bool = False
+    auto_sale_threshold: Optional[int] = None
     product_count: int = 0
     children: List["CategoryResponse"] = []
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -245,6 +251,10 @@ class CategoryCreateRequest(BaseModel):
     description: Optional[str] = Field(None, description="Category description")
     sort_order: int = Field(0, description="Sort order within parent category")
     is_active: bool = Field(True, description="Whether category is active")
+    show_in_navigation: bool = Field(False, description="Whether to show in main navigation")
+    navigation_icon: Optional[str] = Field(None, max_length=50, description="Icon for navigation display")
+    is_sale_category: bool = Field(False, description="Whether this is an automated sale category")
+    auto_sale_threshold: Optional[int] = Field(None, ge=1, le=100, description="Discount percentage threshold for auto-sale")
 
     @validator('slug')
     def generate_slug(cls, v, values):
@@ -265,6 +275,10 @@ class CategoryUpdateRequest(BaseModel):
     description: Optional[str] = Field(None, description="Category description")
     sort_order: Optional[int] = Field(None, description="Sort order within parent category")
     is_active: Optional[bool] = Field(None, description="Whether category is active")
+    show_in_navigation: Optional[bool] = Field(None, description="Whether to show in main navigation")
+    navigation_icon: Optional[str] = Field(None, max_length=50, description="Icon for navigation display")
+    is_sale_category: Optional[bool] = Field(None, description="Whether this is an automated sale category")
+    auto_sale_threshold: Optional[int] = Field(None, ge=1, le=100, description="Discount percentage threshold for auto-sale")
 
 
 class BulkDeleteRequest(BaseModel):

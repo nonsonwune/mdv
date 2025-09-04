@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api-client'
 import { useAuth, Permission } from '@/lib/auth-context'
 import { PermissionGuard, RoleGuard } from '@/components/auth/permission-guards'
+import CategoryForm from '@/components/admin/CategoryForm'
 import {
   PlusIcon,
   PencilIcon,
@@ -48,7 +49,13 @@ interface Category {
   is_active?: boolean
   parent_id?: number
   sort_order?: number
+  show_in_navigation?: boolean
+  navigation_icon?: string
+  is_sale_category?: boolean
+  auto_sale_threshold?: number
   children?: Category[]
+  created_at?: string
+  updated_at?: string
 }
 
 interface CategoryStats {
@@ -68,11 +75,10 @@ interface CategoryFormData {
   is_active: boolean
   parent_id?: number
   sort_order?: number
-  // Optional fields for future extension
-  is_featured?: boolean
-  image_url?: string
-  meta_title?: string
-  meta_description?: string
+  show_in_navigation?: boolean
+  navigation_icon?: string
+  is_sale_category?: boolean
+  auto_sale_threshold?: number
 }
 
 // Generate slug from category name
@@ -233,7 +239,11 @@ function CategoryManagementContent() {
     description: '',
     is_active: true,
     parent_id: undefined,
-    sort_order: 0
+    sort_order: 0,
+    show_in_navigation: false,
+    navigation_icon: '',
+    is_sale_category: false,
+    auto_sale_threshold: undefined
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -383,7 +393,11 @@ function CategoryManagementContent() {
       description: category.description || '',
       is_active: category.is_active ?? true,
       parent_id: category.parent_id || undefined,
-      sort_order: category.sort_order || 0
+      sort_order: category.sort_order || 0,
+      show_in_navigation: category.show_in_navigation ?? false,
+      navigation_icon: category.navigation_icon || '',
+      is_sale_category: category.is_sale_category ?? false,
+      auto_sale_threshold: category.auto_sale_threshold || undefined
     })
     setIsModalOpen(true)
   }
@@ -396,7 +410,11 @@ function CategoryManagementContent() {
       description: '',
       is_active: true,
       parent_id: undefined,
-      sort_order: 0
+      sort_order: 0,
+      show_in_navigation: false,
+      navigation_icon: '',
+      is_sale_category: false,
+      auto_sale_threshold: undefined
     })
     setFormErrors({})
   }
@@ -754,117 +772,35 @@ function CategoryManagementContent() {
 
       {/* Create / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => { setIsModalOpen(false); resetForm(); }}></div>
-            <div className="relative bg-white rounded-lg max-w-md w-full p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">{editingCategory ? 'Edit Category' : 'Create Category'}</h3>
-              <form onSubmit={handleSubmit}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-maroon-500 focus:border-maroon-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-maroon-500 focus:border-maroon-500"
-                    placeholder="Optional description"
-                  />
-                </div>
-
-                {/* Parent Category Selection */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Parent Category
-                  </label>
-                  <select
-                    value={formData.parent_id || ''}
-                    onChange={(e) => setFormData({ ...formData, parent_id: e.target.value ? parseInt(e.target.value) : undefined })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-maroon-500 focus:border-maroon-500"
-                  >
-                    <option value="">None (Root Category)</option>
-                    {categories
-                      .filter(cat => cat.id !== editingCategory?.id) // Prevent self-parenting
-                      .filter(cat => !cat.parent_id) // Only show root categories as parent options
-                      .map(category => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))
-                    }
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Select a parent category to create a subcategory
-                  </p>
-                </div>
-
-                {/* Sort Order */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Sort Order
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.sort_order || 0}
-                    onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-maroon-500 focus:border-maroon-500"
-                    placeholder="0"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Lower numbers appear first
-                  </p>
-                </div>
-
-                <div className="flex items-center mb-2">
-                  <input
-                    id="is_active"
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="h-4 w-4 text-maroon-600 focus:ring-maroon-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
-                    Active category
-                  </label>
-                </div>
-                {formErrors.submit && (
-                  <div className="mb-4 text-sm text-red-600">{formErrors.submit}</div>
-                )}
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => { setIsModalOpen(false); resetForm(); }}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="flex-1 px-4 py-2 bg-maroon-600 text-white rounded-md hover:bg-maroon-700 disabled:opacity-50"
-                  >
-                    {saving ? (editingCategory ? 'Updating...' : 'Saving...') : (editingCategory ? 'Update' : 'Save')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <CategoryForm
+          category={editingCategory || undefined}
+          categories={categories}
+          onSubmit={async (data) => {
+            setSaving(true)
+            try {
+              if (editingCategory) {
+                await api.put(`/admin/categories/${editingCategory.id}`, data)
+              } else {
+                await api.post('/admin/categories', data)
+              }
+              resetForm()
+              setIsModalOpen(false)
+              await fetchCategories()
+            } catch (error: any) {
+              console.error('Failed to save category:', error)
+              throw error
+            } finally {
+              setSaving(false)
+            }
+          }}
+          onCancel={() => {
+            setIsModalOpen(false)
+            resetForm()
+          }}
+          isLoading={saving}
+        />
       )}
+
 
       {/* Delete Confirmation */}
       {deleteConfirm && (

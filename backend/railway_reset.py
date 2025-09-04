@@ -13,11 +13,12 @@ PRODUCTION SAFETY FEATURES:
 - Proper foreign key constraint handling
 
 USAGE:
-    python railway_reset.py [--dry-run] [--confirm]
-    
+    python railway_reset.py [--dry-run] [--confirm] [--delete-audit-logs]
+
 OPTIONS:
-    --dry-run    Show what would be deleted without actually deleting
-    --confirm    Skip interactive confirmation (use with caution)
+    --dry-run           Show what would be deleted without actually deleting
+    --confirm           Skip interactive confirmation (use with caution)
+    --delete-audit-logs Delete audit logs (default: preserve for compliance)
 """
 
 import asyncio
@@ -32,12 +33,13 @@ from mdv.password import hash_password
 
 class RailwayDatabaseReset:
     """Railway PostgreSQL database reset manager."""
-    
-    def __init__(self, database_url: str, dry_run: bool = False):
+
+    def __init__(self, database_url: str, dry_run: bool = False, delete_audit_logs: bool = False):
         self.database_url = database_url
         self.dry_run = dry_run
+        self.delete_audit_logs = delete_audit_logs
         self.connection: Optional[asyncpg.Connection] = None
-        
+
         # Railway connection details
         self.public_url = "postgresql://postgres:JTITwnMYUWxDvpedixscWLBOUAUejFxM@caboose.proxy.rlwy.net:27635/railway"
         self.internal_url = "postgresql://postgres:JTITwnMYUWxDvpedixscWLBOUAUejFxM@postgres.railway.internal:5432/railway"
@@ -172,10 +174,11 @@ class RailwayDatabaseReset:
                     'coupons',
                     'zones',
                     'state_zones',
-                    
-                    # Audit logs (optional - you may want to keep these)
-                    # 'audit_logs',
                 ]
+
+                # Add audit logs to deletion list if user chose to delete them
+                if self.delete_audit_logs:
+                    deletion_order.append('audit_logs')
                 
                 deleted_counts = {}
                 
@@ -212,7 +215,14 @@ class RailwayDatabaseReset:
                 if not self.dry_run:
                     await self.connection.execute("SET session_replication_role = DEFAULT")
                 
-                print(f"\n{'[DRY RUN] ' if self.dry_run else ''}Data deletion completed successfully!")
+                # Report audit log status
+                if self.delete_audit_logs:
+                    print(f"\n{'[DRY RUN] ' if self.dry_run else ''}Data deletion completed successfully!")
+                    print(f"{'[DRY RUN] ' if self.dry_run else ''}📋 Audit logs {'would be' if self.dry_run else 'were'} deleted as requested")
+                else:
+                    print(f"\n{'[DRY RUN] ' if self.dry_run else ''}Data deletion completed successfully!")
+                    print(f"{'[DRY RUN] ' if self.dry_run else ''}📋 Audit logs {'would be' if self.dry_run else 'were'} preserved for compliance")
+
                 return True
                 
         except Exception as e:
@@ -305,7 +315,7 @@ class RailwayDatabaseReset:
             # Check other tables are empty
             tables_to_check = ['products', 'orders', 'carts', 'reviews', 'categories']
             all_empty = True
-            
+
             for table in tables_to_check:
                 try:
                     count = await self.connection.fetchval(f"SELECT COUNT(*) FROM {table}")
@@ -316,14 +326,28 @@ class RailwayDatabaseReset:
                         all_empty = False
                 except Exception as e:
                     print(f"ℹ️  {table} table check failed: {e}")
-            
+
+            # Check audit logs status
+            try:
+                audit_count = await self.connection.fetchval("SELECT COUNT(*) FROM audit_logs")
+                if self.delete_audit_logs:
+                    if audit_count == 0:
+                        print(f"✅ audit_logs table is empty (deleted as requested)")
+                    else:
+                        print(f"⚠️  audit_logs table still has {audit_count} records (should be 0)")
+                        all_empty = False
+                else:
+                    print(f"✅ audit_logs table preserved with {audit_count} records")
+            except Exception as e:
+                print(f"ℹ️  audit_logs table check failed: {e}")
+
             # Check total user count
             user_count = await self.connection.fetchval("SELECT COUNT(*) FROM users")
             print(f"✅ Total users in database: {user_count} (should be 1)")
-            
+
             if user_count != 1:
                 all_empty = False
-            
+
             return all_empty
             
         except Exception as e:
@@ -337,34 +361,52 @@ async def main():
     parser.add_argument('--dry-run', action='store_true', help='Show what would be deleted without actually deleting')
     parser.add_argument('--confirm', action='store_true', help='Skip interactive confirmation')
     parser.add_argument('--database-url', help='Custom database URL')
-    
+    parser.add_argument('--delete-audit-logs', action='store_true', help='Delete audit logs (default: preserve)')
+
     args = parser.parse_args()
-    
+
     print("🚨 RAILWAY POSTGRESQL DATABASE RESET")
     print("=" * 60)
     print("⚠️  WARNING: This will delete ALL data except admin@mdv.ng!")
     print("⚠️  This action affects the PRODUCTION database!")
     print("⚠️  This action is IRREVERSIBLE!")
     print("=" * 60)
-    
+
     if args.dry_run:
         print("🔍 DRY RUN MODE: No actual changes will be made")
         print("=" * 60)
-    
+
+    # Determine audit log deletion preference
+    delete_audit_logs = args.delete_audit_logs
+
     # Confirmation prompts
-    if not args.confirm and not args.dry_run:
-        confirm1 = input("Type 'PRODUCTION' to confirm this is for production database: ")
-        if confirm1 != 'PRODUCTION':
-            print("❌ Database reset cancelled.")
-            return 1
-        
-        confirm2 = input("Type 'RESET' to confirm database reset: ")
-        if confirm2 != 'RESET':
-            print("❌ Database reset cancelled.")
-            return 1
-    
+    if not args.confirm:
+        if not args.dry_run:
+            confirm1 = input("Type 'PRODUCTION' to confirm this is for production database: ")
+            if confirm1 != 'PRODUCTION':
+                print("❌ Database reset cancelled.")
+                return 1
+
+            confirm2 = input("Type 'RESET' to confirm database reset: ")
+            if confirm2 != 'RESET':
+                print("❌ Database reset cancelled.")
+                return 1
+
+        # Ask about audit logs if not specified via command line
+        if not args.delete_audit_logs:
+            print("\n📋 Audit Log Options:")
+            print("  • Keep audit logs: Preserves compliance and debugging history")
+            print("  • Delete audit logs: Complete clean slate for project handover")
+            audit_choice = input("Do you want to delete audit logs? (y/N): ").strip().lower()
+            delete_audit_logs = audit_choice in ['y', 'yes']
+
+            if delete_audit_logs:
+                print("⚠️  Audit logs will be deleted for complete clean slate")
+            else:
+                print("📋 Audit logs will be preserved for compliance")
+
     # Initialize reset manager
-    reset_manager = RailwayDatabaseReset(args.database_url, args.dry_run)
+    reset_manager = RailwayDatabaseReset(args.database_url, args.dry_run, delete_audit_logs)
     
     try:
         # Connect to database
@@ -412,6 +454,10 @@ async def main():
             print("✅ Dry run shows reset would work correctly")
             print("✅ Admin user would be preserved")
             print("✅ All other data would be deleted")
+            if delete_audit_logs:
+                print("✅ Audit logs would be deleted (complete clean slate)")
+            else:
+                print("✅ Audit logs would be preserved (compliance mode)")
             print("✅ Run without --dry-run to perform actual reset")
         else:
             print("🎉 RAILWAY DATABASE RESET COMPLETED SUCCESSFULLY!")
@@ -421,6 +467,10 @@ async def main():
             print("✅ Admin password: admin")
             print("✅ Admin role: admin")
             print("✅ Sequences reset")
+            if delete_audit_logs:
+                print("✅ Audit logs deleted (complete clean slate)")
+            else:
+                print("✅ Audit logs preserved (compliance mode)")
             print("✅ Database ready for fresh data")
         print("=" * 60)
         
