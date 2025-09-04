@@ -24,7 +24,25 @@ depends_on = None
 
 def upgrade():
     """Create audit logs table with SQLite-compatible schema."""
-    
+
+    # Check if audit_logs table already exists
+    from sqlalchemy import text
+    bind = op.get_bind()
+
+    try:
+        result = bind.execute(text("""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_name = 'audit_logs'
+        """))
+        table_exists = result.fetchone() is not None
+    except Exception:
+        table_exists = False
+
+    if table_exists:
+        print("✅ audit_logs table already exists, skipping creation")
+        return
+
     # Create audit_logs table with string columns instead of enums
     op.create_table('audit_logs',
         sa.Column('id', sa.Integer(), nullable=False),

@@ -22,28 +22,42 @@ depends_on = None
 
 def upgrade():
     """Rename metadata column to audit_metadata to avoid SQLAlchemy reserved keyword conflict."""
-    
+
     # Check if the audit_logs table exists and has the metadata column
     conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    
-    if 'audit_logs' in inspector.get_table_names():
-        columns = [col['name'] for col in inspector.get_columns('audit_logs')]
-        
-        if 'metadata' in columns:
-            # Rename the metadata column to audit_metadata
-            op.alter_column(
-                'audit_logs',
-                'metadata',
-                new_column_name='audit_metadata',
-                existing_type=sa.JSON(),
-                existing_nullable=True
-            )
-            print("✅ Renamed 'metadata' column to 'audit_metadata' in audit_logs table")
+
+    try:
+        inspector = sa.inspect(conn)
+
+        if 'audit_logs' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('audit_logs')]
+
+            if 'metadata' in columns:
+                print("Found 'metadata' column in audit_logs, renaming to 'audit_metadata'")
+                has_metadata_column = True
+            else:
+                print("No 'metadata' column found in audit_logs")
+                has_metadata_column = False
         else:
-            print("ℹ️  'metadata' column not found in audit_logs table, skipping rename")
+            print("audit_logs table not found")
+            has_metadata_column = False
+    except Exception as e:
+        # In SQL generation mode or other issues, assume no metadata column exists
+        print(f"Could not inspect database (likely SQL generation mode): {e}")
+        has_metadata_column = False
+
+    if has_metadata_column:
+        # Rename the metadata column to audit_metadata
+        op.alter_column(
+            'audit_logs',
+            'metadata',
+            new_column_name='audit_metadata',
+            existing_type=sa.JSON(),
+            existing_nullable=True
+        )
+        print("✅ Renamed 'metadata' column to 'audit_metadata' in audit_logs table")
     else:
-        print("ℹ️  audit_logs table not found, skipping migration")
+        print("ℹ️  No 'metadata' column to rename, skipping migration")
 
 
 

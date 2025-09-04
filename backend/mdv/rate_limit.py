@@ -108,10 +108,44 @@ limiter = Limiter(
     key_func=adaptive_rate_limit_key,
     default_limits=["200 per minute"],
     storage_uri="memory://",
-    on_breach=lambda request, response, pexpire: logger.warning(
-        f"Rate limit exceeded for {get_client_identifier(request)} on {request.url.path}"
-    )
+    headers_enabled=True,
+    swallow_errors=False
 )
+
+# Custom rate limit exceeded handler
+def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    """Enhanced rate limit exceeded handler with logging and security features."""
+    client_id = get_client_identifier(request)
+    path = request.url.path
+
+    # Log the rate limit violation
+    logger.warning(
+        f"Rate limit exceeded for {client_id} on {path}. "
+        f"Limit: {exc.detail}, Retry after: {exc.retry_after}s"
+    )
+
+    # Record as potential security event
+    rate_limit_storage.record_failed_attempt(client_id)
+
+    # Check if this should trigger IP blocking
+    failed_count = rate_limit_storage.get_failed_attempts_count(client_id, 10)  # 10 minutes
+    if failed_count >= 5:
+        rate_limit_storage.block_ip(client_id, 15)  # Block for 15 minutes
+        logger.warning(f"IP {client_id} blocked due to excessive rate limit violations")
+
+    # Return appropriate HTTP response
+    response_detail = {
+        "error": "Rate limit exceeded",
+        "message": "Too many requests. Please slow down.",
+        "retry_after": exc.retry_after,
+        "limit": exc.detail
+    }
+
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail=response_detail,
+        headers={"Retry-After": str(exc.retry_after)}
+    )
 
 # Enhanced rate limit configurations
 RATE_LIMITS = {
@@ -362,3 +396,14 @@ def reset_client_stats(client_id: str):
     if client_id in rate_limit_storage.blocked_ips:
         del rate_limit_storage.blocked_ips[client_id]
     logger.info(f"Rate limiting stats reset for client {client_id}")
+
+
+def setup_rate_limit_handler(app):
+    """Setup rate limit exceeded handler for FastAPI app."""
+    from fastapi import FastAPI
+
+    if isinstance(app, FastAPI):
+        app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+        logger.info("Rate limit exceeded handler registered with FastAPI app")
+    else:
+        logger.warning("App is not a FastAPI instance, cannot register rate limit handler")

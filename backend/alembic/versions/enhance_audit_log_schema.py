@@ -11,6 +11,7 @@ Create Date: 2025-09-04 19:59:07.206190
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as pg
 
 
 # revision identifiers, used by Alembic.
@@ -18,6 +19,20 @@ revision = 'enhance_audit_log_schema'
 down_revision = 'create_audit_logs_simple'
 branch_labels = None
 depends_on = None
+
+# Define enum types
+audit_action_enum = pg.ENUM(
+    'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'VIEW', 'EXPORT', 'IMPORT',
+    name='audit_action', create_type=False
+)
+audit_entity_enum = pg.ENUM(
+    'USER', 'PRODUCT', 'ORDER', 'CATEGORY', 'COUPON', 'REVIEW', 'CART', 'WISHLIST',
+    name='audit_entity', create_type=False
+)
+audit_status_enum = pg.ENUM(
+    'SUCCESS', 'FAILURE', 'PENDING',
+    name='audit_status', create_type=False
+)
 
 
 def upgrade() -> None:
