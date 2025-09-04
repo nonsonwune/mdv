@@ -238,7 +238,18 @@ export default function OrderDetailPage() {
     if (newStatus !== order.status) updateData.status = newStatus
 
     // Only include payment_status if user can modify it (Admin + non-Paystack order)
-    const canModifyPaymentStatus = user && user.role === 'admin' && !order.payment_ref
+    // Check for both null/undefined and empty string payment_ref
+    const canModifyPaymentStatus = user && user.role === 'admin' && !order.payment_ref?.trim()
+
+    // Debug logging for payment_ref detection
+    console.log('🔍 Payment Status Debug:', {
+      orderId: order.id,
+      payment_ref: order.payment_ref,
+      payment_ref_type: typeof order.payment_ref,
+      payment_ref_trimmed: order.payment_ref?.trim(),
+      canModifyPaymentStatus,
+      userRole: user?.role
+    })
     if (canModifyPaymentStatus && newPaymentStatus !== order.payment_status) {
       updateData.payment_status = newPaymentStatus
     }
@@ -720,7 +731,7 @@ export default function OrderDetailPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Status</label>
                 {/* Check if user can modify payment status - ensure user exists and has admin role */}
-                {user && user.role === 'admin' && !order.payment_ref ? (
+                {user && user.role === 'admin' && !order.payment_ref?.trim() ? (
                   <select
                     value={newPaymentStatus}
                     onChange={(e) => setNewPaymentStatus(e.target.value)}
@@ -737,7 +748,7 @@ export default function OrderDetailPage() {
                       {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                     </span>
                     <div className="text-xs text-gray-500 mt-1">
-                      {order.payment_ref
+                      {order.payment_ref?.trim()
                         ? "Paystack orders are read-only"
                         : "Only Admin users can modify payment status"
                       }
