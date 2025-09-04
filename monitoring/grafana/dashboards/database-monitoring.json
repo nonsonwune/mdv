@@ -1,0 +1,272 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "MDV Database Monitoring",
+    "tags": ["mdv", "database", "postgresql"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Connection Pool Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "database_pool_size",
+            "legendFormat": "Pool Size"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 15},
+                {"color": "red", "value": 30}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Active Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "database_connections_active",
+            "legendFormat": "Active"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 20},
+                {"color": "red", "value": 35}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "database_circuit_breaker_state",
+            "legendFormat": "State"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"options": {"0": {"text": "CLOSED", "color": "green"}}},
+              {"options": {"1": {"text": "OPEN", "color": "red"}}},
+              {"options": {"2": {"text": "HALF_OPEN", "color": "yellow"}}}
+            ]
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Connection Errors",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(database_connection_errors_total[5m])",
+            "legendFormat": "Errors/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Connection Pool Usage Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "database_pool_size",
+            "legendFormat": "Pool Size"
+          },
+          {
+            "expr": "database_connections_active",
+            "legendFormat": "Active Connections"
+          },
+          {
+            "expr": "database_connections_checked_out",
+            "legendFormat": "Checked Out"
+          },
+          {
+            "expr": "database_connections_overflow",
+            "legendFormat": "Overflow"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Database Query Performance",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(database_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(database_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Connection Events",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(database_connections_created_total[5m])",
+            "legendFormat": "Created/sec"
+          },
+          {
+            "expr": "rate(database_connections_closed_total[5m])",
+            "legendFormat": "Closed/sec"
+          },
+          {
+            "expr": "rate(database_connection_errors_total[5m])",
+            "legendFormat": "Errors/sec"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Database Health Check Status",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "database_health_status",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"options": {"1": {"text": "Healthy", "color": "green"}}},
+              {"options": {"0": {"text": "Unhealthy", "color": "red"}}}
+            ],
+            "custom": {
+              "displayMode": "list",
+              "filterable": false
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "Connection Pool Metrics",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "database_pool_size",
+            "legendFormat": "Pool Size",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "database_connections_active",
+            "legendFormat": "Active",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "database_connections_overflow",
+            "legendFormat": "Overflow",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "displayMode": "list",
+              "filterable": false
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s",
+    "schemaVersion": 30,
+    "version": 1
+  }
+}

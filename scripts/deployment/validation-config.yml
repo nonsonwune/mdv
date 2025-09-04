@@ -1,0 +1,312 @@
+# Deployment Health Validation Configuration
+# This file defines comprehensive health checks for MDV platform deployment
+
+environments:
+  production:
+    api_url: "https://mdv-api-production.up.railway.app"
+    web_url: "https://mdv-web-production.up.railway.app"
+    database_url: "postgresql://..."  # Will be set via environment
+    redis_url: "redis://..."          # Will be set via environment
+    
+  staging:
+    api_url: "https://mdv-api-staging.up.railway.app"
+    web_url: "https://mdv-web-staging.up.railway.app"
+    database_url: "postgresql://..."
+    redis_url: "redis://..."
+    
+  development:
+    api_url: "http://localhost:8000"
+    web_url: "http://localhost:3000"
+    database_url: "postgresql://mdv:mdv@localhost:5432/mdv"
+    redis_url: "redis://localhost:6379/0"
+
+# Health check configurations
+health_checks:
+  # API Service Health Checks
+  api:
+    endpoints:
+      - name: "Basic Health"
+        path: "/health"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: true
+        checks:
+          - type: "response_time"
+            threshold: 2000  # 2 seconds
+          - type: "json_field"
+            field: "status"
+            expected: "success"
+          - type: "json_field"
+            field: "data.service"
+            expected: "mdv-api"
+      
+      - name: "Detailed Health"
+        path: "/health/detailed"
+        method: "GET"
+        timeout: 15
+        expected_status: 200
+        critical: true
+        checks:
+          - type: "response_time"
+            threshold: 5000  # 5 seconds
+          - type: "json_field"
+            field: "status"
+            expected: "success"
+          - type: "json_field"
+            field: "data.checks.database.status"
+            expected: "healthy"
+          - type: "json_field_exists"
+            field: "data.uptime_seconds"
+      
+      - name: "Readiness Probe"
+        path: "/health/ready"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: true
+        checks:
+          - type: "json_field"
+            field: "status"
+            expected: "ready"
+      
+      - name: "Liveness Probe"
+        path: "/health/live"
+        method: "GET"
+        timeout: 5
+        expected_status: 200
+        critical: true
+        checks:
+          - type: "json_field"
+            field: "status"
+            expected: "alive"
+      
+      - name: "Products API"
+        path: "/api/products"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: false
+        checks:
+          - type: "response_time"
+            threshold: 3000
+          - type: "json_field"
+            field: "status"
+            expected: "success"
+      
+      - name: "Categories API"
+        path: "/api/categories"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: false
+        checks:
+          - type: "response_time"
+            threshold: 3000
+      
+      - name: "Auth Login Endpoint"
+        path: "/api/auth/login"
+        method: "POST"
+        timeout: 10
+        expected_status: 422  # Should return validation error for empty body
+        critical: false
+        body: {}
+        checks:
+          - type: "json_field"
+            field: "error.category"
+            expected: "validation"
+
+  # Web Frontend Health Checks
+  web:
+    endpoints:
+      - name: "Frontend Health"
+        path: "/api/health"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: true
+        checks:
+          - type: "json_field"
+            field: "status"
+            expected: "ok"
+          - type: "json_field"
+            field: "service"
+            expected: "mdv-web"
+      
+      - name: "Home Page"
+        path: "/"
+        method: "GET"
+        timeout: 15
+        expected_status: 200
+        critical: true
+        checks:
+          - type: "response_time"
+            threshold: 5000
+          - type: "content_contains"
+            text: "Maison De Valeur"
+      
+      - name: "Products Page"
+        path: "/products"
+        method: "GET"
+        timeout: 15
+        expected_status: 200
+        critical: false
+        checks:
+          - type: "response_time"
+            threshold: 5000
+      
+      - name: "Staff Login Page"
+        path: "/staff-login"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: false
+        checks:
+          - type: "content_contains"
+            text: "Staff Sign In"
+      
+      - name: "Customer Login Page"
+        path: "/customer-login"
+        method: "GET"
+        timeout: 10
+        expected_status: 200
+        critical: false
+        checks:
+          - type: "content_contains"
+            text: "Sign in"
+
+  # Cross-service checks
+  integration:
+    - name: "CORS Configuration"
+      type: "cors"
+      api_endpoint: "/api/products"
+      frontend_origin: "${web_url}"
+      critical: true
+      checks:
+        - type: "header_exists"
+          header: "access-control-allow-origin"
+        - type: "header_value"
+          header: "access-control-allow-origin"
+          expected: ["${web_url}", "*"]
+    
+    - name: "API-Frontend Communication"
+      type: "integration"
+      description: "Test frontend can communicate with API"
+      critical: true
+      # This would be implemented as a custom check
+
+# Performance thresholds
+performance:
+  response_time:
+    excellent: 500    # ms
+    good: 1000       # ms
+    acceptable: 2000 # ms
+    poor: 5000       # ms
+  
+  availability:
+    target: 99.9     # %
+    minimum: 99.0    # %
+  
+  error_rate:
+    warning: 1.0     # %
+    critical: 5.0    # %
+
+# Alerting configuration
+alerts:
+  channels:
+    - type: "slack"
+      webhook_url: "${SLACK_WEBHOOK_URL}"
+      channel: "#alerts"
+      
+    - type: "email"
+      smtp_server: "${SMTP_SERVER}"
+      recipients:
+        - "devops@mdv.com"
+        - "team@mdv.com"
+    
+    - type: "pagerduty"
+      integration_key: "${PAGERDUTY_INTEGRATION_KEY}"
+  
+  rules:
+    - name: "Critical Service Down"
+      condition: "critical_check_failed"
+      severity: "critical"
+      channels: ["slack", "email", "pagerduty"]
+      
+    - name: "Performance Degradation"
+      condition: "response_time > performance.poor"
+      severity: "warning"
+      channels: ["slack", "email"]
+      
+    - name: "High Error Rate"
+      condition: "error_rate > alerts.error_rate.warning"
+      severity: "warning"
+      channels: ["slack"]
+
+# Validation schedules
+schedules:
+  continuous:
+    interval: 60      # seconds
+    checks: ["api.basic_health", "web.frontend_health"]
+    
+  frequent:
+    interval: 300     # 5 minutes
+    checks: ["api.detailed_health", "api.readiness_probe", "integration.cors"]
+    
+  periodic:
+    interval: 900     # 15 minutes
+    checks: ["api.products_api", "web.products_page", "integration.api_frontend"]
+    
+  comprehensive:
+    interval: 3600    # 1 hour
+    checks: "all"
+
+# Reporting configuration
+reporting:
+  formats:
+    - "json"
+    - "html"
+    - "prometheus"
+  
+  retention:
+    detailed_logs: 7   # days
+    summary_reports: 30 # days
+    metrics: 90        # days
+  
+  dashboards:
+    - name: "Deployment Health"
+      url: "https://grafana.mdv.com/d/deployment-health"
+    - name: "Service Performance"
+      url: "https://grafana.mdv.com/d/service-performance"
+
+# Recovery procedures
+recovery:
+  automatic:
+    - condition: "api_health_check_failed"
+      action: "restart_api_service"
+      max_attempts: 3
+      
+    - condition: "web_health_check_failed"
+      action: "restart_web_service"
+      max_attempts: 3
+  
+  manual:
+    - condition: "database_connection_failed"
+      procedure: "docs/runbooks/database-recovery.md"
+      
+    - condition: "redis_connection_failed"
+      procedure: "docs/runbooks/redis-recovery.md"
+
+# Maintenance windows
+maintenance:
+  scheduled:
+    - day: "sunday"
+      time: "02:00"
+      duration: 120  # minutes
+      timezone: "UTC"
+      skip_alerts: true
+  
+  emergency:
+    duration: 60     # minutes
+    skip_alerts: true
+    notification_channels: ["slack", "email"]

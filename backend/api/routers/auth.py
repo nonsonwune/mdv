@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from mdv.auth import create_access_token, get_current_claims
 from mdv.models import User, Role
 from mdv.password import hash_password, verify_password, needs_rehash
-from mdv.rate_limit import limiter, RATE_LIMITS
+from mdv.rate_limit import limiter, RATE_LIMITS, record_auth_failure, create_rate_limited_endpoint
 from mdv.schemas import AuthLoginRequest, AuthLoginResponse
 from mdv.audit import audit_context, audit_login, audit_logout, AuditService, AuditAction, AuditEntity
 from ..deps import get_db
@@ -19,7 +19,7 @@ class AuthCheckResponse(BaseModel):
 
 
 @router.post("/login", response_model=AuthLoginResponse)
-@limiter.limit(RATE_LIMITS["login"])
+@create_rate_limited_endpoint("login")
 async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Authenticate user with email and password.
@@ -32,6 +32,9 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
     user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     
     if not user:
+        # Record auth failure for rate limiting
+        record_auth_failure(request)
+
         # Log failed login attempt
         await AuditService.log_authentication(
             action=AuditAction.LOGIN_FAILED,
@@ -75,6 +78,9 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
     if user.password_hash:
         # Verify password
         if not verify_password(body.password, user.password_hash):
+            # Record auth failure for rate limiting
+            record_auth_failure(request)
+
             # Log failed login attempt
             await AuditService.log_authentication(
                 action=AuditAction.LOGIN_FAILED,

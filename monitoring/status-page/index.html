@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MDV Platform Status</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            color: #64748b;
+        }
+        
+        .status-overview {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status-operational { background-color: #10b981; }
+        .status-degraded { background-color: #f59e0b; }
+        .status-down { background-color: #ef4444; }
+        .status-maintenance { background-color: #6366f1; }
+        
+        .status-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .uptime-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .uptime-stat {
+            text-align: center;
+            padding: 1rem;
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        
+        .uptime-stat .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        
+        .uptime-stat .label {
+            font-size: 0.875rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .services {
+            display: grid;
+            gap: 1rem;
+        }
+        
+        .service {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .service-info {
+            flex: 1;
+        }
+        
+        .service-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 0.25rem;
+        }
+        
+        .service-description {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .service-status {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+        }
+        
+        .service-metrics {
+            display: flex;
+            gap: 2rem;
+            margin-left: 2rem;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .metric {
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .incidents {
+            margin-top: 3rem;
+        }
+        
+        .incidents h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 1rem;
+        }
+        
+        .incident {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #ef4444;
+        }
+        
+        .incident.resolved {
+            border-left-color: #10b981;
+        }
+        
+        .incident-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .incident-title {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .incident-status {
+            font-size: 0.875rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .incident-status.investigating {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .incident-status.resolved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .incident-time {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e2e8f0;
+            color: #64748b;
+            font-size: 0.875rem;
+        }
+        
+        .refresh-info {
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .service {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .service-metrics {
+                margin-left: 0;
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>MDV Platform Status</h1>
+            <p>Real-time status and performance monitoring for MDV e-commerce platform</p>
+        </div>
+        
+        <div class="refresh-info">
+            <span id="last-updated">Last updated: Loading...</span> • 
+            <span>Auto-refresh every 60 seconds</span>
+        </div>
+        
+        <div class="status-overview">
+            <div class="status-indicator">
+                <div class="status-dot status-operational" id="overall-status-dot"></div>
+                <div class="status-text" id="overall-status-text">All Systems Operational</div>
+            </div>
+            
+            <div class="uptime-stats">
+                <div class="uptime-stat">
+                    <div class="value" id="uptime-24h">99.9%</div>
+                    <div class="label">24h Uptime</div>
+                </div>
+                <div class="uptime-stat">
+                    <div class="value" id="uptime-7d">99.8%</div>
+                    <div class="label">7d Uptime</div>
+                </div>
+                <div class="uptime-stat">
+                    <div class="value" id="uptime-30d">99.9%</div>
+                    <div class="label">30d Uptime</div>
+                </div>
+                <div class="uptime-stat">
+                    <div class="value" id="avg-response">245ms</div>
+                    <div class="label">Avg Response</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="services" id="services-list">
+            <!-- Services will be populated by JavaScript -->
+        </div>
+        
+        <div class="incidents">
+            <h2>Recent Incidents</h2>
+            <div id="incidents-list">
+                <!-- Incidents will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                Powered by MDV Monitoring • 
+                <a href="https://mdv.com" style="color: #3b82f6;">MDV.com</a> • 
+                <a href="/api/health/detailed" style="color: #3b82f6;">API Health</a>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Status page JavaScript
+        class StatusPage {
+            constructor() {
+                this.apiBase = window.location.origin;
+                this.refreshInterval = 60000; // 60 seconds
+                this.init();
+            }
+            
+            async init() {
+                await this.loadStatus();
+                this.startAutoRefresh();
+            }
+            
+            async loadStatus() {
+                try {
+                    const response = await fetch(`${this.apiBase}/health/detailed`);
+                    const data = await response.json();
+                    
+                    this.updateOverallStatus(data);
+                    this.updateServices(data);
+                    this.updateLastUpdated();
+                    
+                } catch (error) {
+                    console.error('Failed to load status:', error);
+                    this.showError();
+                }
+            }
+            
+            updateOverallStatus(data) {
+                const statusDot = document.getElementById('overall-status-dot');
+                const statusText = document.getElementById('overall-status-text');
+                
+                const isHealthy = data.status === 'healthy';
+                const isDegraded = data.status === 'degraded';
+                
+                if (isHealthy) {
+                    statusDot.className = 'status-dot status-operational';
+                    statusText.textContent = 'All Systems Operational';
+                } else if (isDegraded) {
+                    statusDot.className = 'status-dot status-degraded';
+                    statusText.textContent = 'Some Systems Degraded';
+                } else {
+                    statusDot.className = 'status-dot status-down';
+                    statusText.textContent = 'System Issues Detected';
+                }
+                
+                // Update uptime stats (mock data for now)
+                document.getElementById('avg-response').textContent = 
+                    data.metrics?.requests?.avg_response_time ? 
+                    `${Math.round(data.metrics.requests.avg_response_time * 1000)}ms` : 
+                    'N/A';
+            }
+            
+            updateServices(data) {
+                const servicesList = document.getElementById('services-list');
+                const services = [
+                    {
+                        name: 'API Service',
+                        description: 'Core API backend service',
+                        status: data.status,
+                        responseTime: data.metrics?.requests?.avg_response_time || 0,
+                        uptime: data.metrics?.requests?.success_rate || 100
+                    },
+                    {
+                        name: 'Database',
+                        description: 'PostgreSQL database service',
+                        status: data.checks?.database?.status || 'unknown',
+                        responseTime: 0.05,
+                        uptime: 99.9
+                    },
+                    {
+                        name: 'Authentication',
+                        description: 'User authentication service',
+                        status: data.checks?.middleware?.status || 'unknown',
+                        responseTime: 0.1,
+                        uptime: 99.8
+                    },
+                    {
+                        name: 'Web Frontend',
+                        description: 'Customer-facing web application',
+                        status: 'healthy',
+                        responseTime: 0.8,
+                        uptime: 99.9
+                    }
+                ];
+                
+                servicesList.innerHTML = services.map(service => this.renderService(service)).join('');
+            }
+            
+            renderService(service) {
+                const statusClass = this.getStatusClass(service.status);
+                const statusText = this.getStatusText(service.status);
+                
+                return `
+                    <div class="service">
+                        <div class="service-info">
+                            <div class="service-name">${service.name}</div>
+                            <div class="service-description">${service.description}</div>
+                        </div>
+                        <div class="service-metrics">
+                            <div class="metric">
+                                <div class="metric-value">${service.uptime.toFixed(1)}%</div>
+                                <div>Uptime</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-value">${Math.round(service.responseTime * 1000)}ms</div>
+                                <div>Response</div>
+                            </div>
+                        </div>
+                        <div class="service-status">
+                            <div class="status-dot ${statusClass}"></div>
+                            ${statusText}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            getStatusClass(status) {
+                switch (status) {
+                    case 'healthy': return 'status-operational';
+                    case 'degraded': return 'status-degraded';
+                    case 'unhealthy': return 'status-down';
+                    default: return 'status-degraded';
+                }
+            }
+            
+            getStatusText(status) {
+                switch (status) {
+                    case 'healthy': return 'Operational';
+                    case 'degraded': return 'Degraded';
+                    case 'unhealthy': return 'Down';
+                    default: return 'Unknown';
+                }
+            }
+            
+            updateLastUpdated() {
+                const now = new Date();
+                document.getElementById('last-updated').textContent = 
+                    `Last updated: ${now.toLocaleString()}`;
+            }
+            
+            showError() {
+                const statusDot = document.getElementById('overall-status-dot');
+                const statusText = document.getElementById('overall-status-text');
+                
+                statusDot.className = 'status-dot status-down';
+                statusText.textContent = 'Unable to Load Status';
+            }
+            
+            startAutoRefresh() {
+                setInterval(() => {
+                    this.loadStatus();
+                }, this.refreshInterval);
+            }
+        }
+        
+        // Initialize status page when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new StatusPage();
+        });
+    </script>
+</body>
+</html>

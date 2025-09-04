@@ -1,0 +1,170 @@
+# Alertmanager Configuration for MDV Platform
+# Handles alert routing, grouping, and notification delivery
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@mdv.com'
+  smtp_auth_username: 'alerts@mdv.com'
+  smtp_auth_password: 'your-smtp-password'
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 5m
+      
+    # Security alerts - immediate notification to security team
+    - match:
+        team: security
+      receiver: 'security-alerts'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+      
+    # Business alerts - notify product team
+    - match:
+        service: business
+      receiver: 'business-alerts'
+      group_wait: 5m
+      group_interval: 30m
+      repeat_interval: 4h
+      
+    # Warning alerts - standard notification
+    - match:
+        severity: warning
+      receiver: 'warning-alerts'
+      group_wait: 2m
+      group_interval: 10m
+      repeat_interval: 2h
+
+# Inhibition rules to suppress redundant alerts
+inhibit_rules:
+  # Suppress warning alerts when critical alerts are firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['service', 'alertname']
+    
+  # Suppress individual service alerts when API is down
+  - source_match:
+      alertname: 'APIDown'
+    target_match_re:
+      alertname: '(HighErrorRate|HighResponseTime|DatabaseConnectionPoolExhausted)'
+    equal: ['service']
+
+# Notification receivers
+receivers:
+  - name: 'default'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        title: 'MDV Alert'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        
+  - name: 'critical-alerts'
+    # PagerDuty for critical alerts
+    pagerduty_configs:
+      - routing_key: 'your-pagerduty-integration-key'
+        description: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        severity: 'critical'
+        details:
+          service: '{{ .GroupLabels.service }}'
+          environment: 'production'
+          runbook: '{{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}'
+    
+    # Also send to Slack for visibility
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#critical-alerts'
+        title: '🚨 CRITICAL ALERT'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Alert:* {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Description:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+          *Runbook:* {{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}
+        color: 'danger'
+        
+    # Email for critical alerts
+    email_configs:
+      - to: 'oncall@mdv.com'
+        subject: '🚨 MDV Critical Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          
+          Description: {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+          
+          Service: {{ .GroupLabels.service }}
+          Severity: {{ .GroupLabels.severity }}
+          
+          Runbook: {{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}
+          
+          Time: {{ range .Alerts }}{{ .StartsAt }}{{ end }}
+        
+  - name: 'security-alerts'
+    # Security team notifications
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SECURITY/WEBHOOK'
+        channel: '#security-alerts'
+        title: '🔒 Security Alert'
+        text: |
+          *Alert:* {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Description:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+          *Runbook:* {{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}
+        color: 'warning'
+        
+    email_configs:
+      - to: 'security@mdv.com'
+        subject: '🔒 MDV Security Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          Security Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          
+          Description: {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+          
+          Time: {{ range .Alerts }}{{ .StartsAt }}{{ end }}
+          
+          Please investigate immediately.
+        
+  - name: 'business-alerts'
+    # Product team notifications
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/PRODUCT/WEBHOOK'
+        channel: '#product-alerts'
+        title: '📊 Business Metric Alert'
+        text: |
+          *Metric:* {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Details:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+          *Runbook:* {{ range .Alerts }}{{ .Annotations.runbook_url }}{{ end }}
+        color: 'warning'
+        
+  - name: 'warning-alerts'
+    # Standard warning notifications
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        title: '⚠️ Warning Alert'
+        text: |
+          *Service:* {{ .GroupLabels.service }}
+          *Alert:* {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}
+          *Description:* {{ range .Alerts }}{{ .Annotations.description }}{{ end }}
+        color: 'warning'
+
+# Silence configuration
+# Silences can be configured via the Alertmanager web UI or API
+# Example: silence all alerts for maintenance window
+# amtool silence add alertname=".*" --duration="2h" --comment="Maintenance window"

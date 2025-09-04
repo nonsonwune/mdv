@@ -14,7 +14,9 @@
  */
 "use client"
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
+import { useErrorHandler } from '../hooks/use-error-handler'
+import { useErrorRecovery } from '../hooks/use-error-recovery'
 
 // Permission enum matching backend permissions
 export enum Permission {
@@ -94,15 +96,28 @@ export interface User {
   phone?: string
 }
 
+interface AuthError {
+  type: 'network' | 'expired' | 'invalid' | 'forbidden' | 'server' | 'unknown'
+  message: string
+  status?: number
+  retryable: boolean
+}
+
 interface AuthContextType {
   user: User | null
   isAuthenticated: boolean
   isStaff: boolean
   isCustomer: boolean
   loading: boolean
+  authError: AuthError | null
+  isRetrying: boolean
+  retryCount: number
   login: (token: string, userData: User) => void
+  loginWithRetry: (credentials: { email: string; password: string }) => Promise<any>
   logout: () => void
   checkAuth: () => Promise<void>
+  retryAuth: () => Promise<void>
+  clearAuthError: () => void
   getRoleDisplayName: () => string
   hasPermission: (permission: Permission) => boolean
   hasAnyPermission: (...permissions: Permission[]) => boolean
@@ -241,6 +256,14 @@ const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState<AuthError | null>(null)
+
+  // Error handling for auth operations
+  const authErrorHandler = useErrorHandler({
+    context: 'login',
+    showToast: false, // We'll handle auth errors specially
+    logErrors: true
+  })
 
   // Computed values
   const isAuthenticated = user !== null
@@ -254,69 +277,347 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return path.startsWith('/admin') || path.startsWith('/account') || path.startsWith('/checkout')
   }
 
+  // Helper to categorize auth errors
+  const categorizeAuthError = useCallback((error: any): AuthError => {
+    // Network errors
+    if (error.name === 'TypeError' && error.message?.includes('fetch')) {
+      return {
+        type: 'network',
+        message: 'Network connection failed. Please check your internet connection.',
+        retryable: true
+      }
+    }
+
+    // HTTP status-based errors
+    if (error.status) {
+      switch (error.status) {
+        case 401:
+          return {
+            type: 'expired',
+            message: 'Your session has expired. Please log in again.',
+            status: 401,
+            retryable: false
+          }
+        case 403:
+          return {
+            type: 'forbidden',
+            message: 'Access denied. You do not have permission to access this resource.',
+            status: 403,
+            retryable: false
+          }
+        case 408:
+        case 429:
+        case 502:
+        case 503:
+        case 504:
+          return {
+            type: 'server',
+            message: 'Server temporarily unavailable. Please try again in a moment.',
+            status: error.status,
+            retryable: true
+          }
+        case 500:
+          return {
+            type: 'server',
+            message: 'Server error occurred. Please try again later.',
+            status: 500,
+            retryable: false
+          }
+        default:
+          return {
+            type: 'invalid',
+            message: 'Authentication failed. Please try logging in again.',
+            status: error.status,
+            retryable: false
+          }
+      }
+    }
+
+    // Generic errors
+    return {
+      type: 'unknown',
+      message: 'An unexpected error occurred. Please try again.',
+      retryable: true
+    }
+  }, [])
+
+  // Helper to check if we should attempt auth check
+  const shouldCheckAuth = () => {
+    if (typeof window === 'undefined') return true // SSR - always check
+
+    // Always check on protected pages
+    if (isProtectedPage()) return true
+
+    // Check if we have any indication of being logged in
+    // Look for non-httpOnly cookies that might indicate auth state
+    const hasRoleIndicator = document.cookie.includes('mdv_role=')
+    if (hasRoleIndicator) return true
+
+    // Check localStorage for any auth-related data
+    try {
+      const hasAuthData = localStorage.getItem('auth_hint') === 'true'
+      if (hasAuthData) return true
+    } catch (e) {
+      // localStorage not available
+    }
+
+    // For public pages with no auth indicators, skip auth check
+    return false
+  }
+
+  // Enhanced error recovery for auth operations with automatic retry
+  const authRecovery = useErrorRecovery(
+    async () => {
+      await performAuthCheck()
+    },
+    {
+      maxRetries: 3,
+      retryDelay: 1000,
+      exponentialBackoff: true,
+      autoRetry: true, // Enable automatic retry for network errors
+      retryCondition: (error) => {
+        const authErr = categorizeAuthError(error)
+
+        // Auto-retry network errors and temporary server errors
+        if (authErr.type === 'network' ||
+            (authErr.type === 'server' && authErr.retryable)) {
+          return true
+        }
+
+        // Don't auto-retry auth failures, expired sessions, or forbidden access
+        return false
+      },
+      onRetrySuccess: () => {
+        setAuthError(null)
+        console.log('Auth check retry succeeded')
+      },
+      onRetryFailure: (error, attempt) => {
+        const authErr = categorizeAuthError(error)
+        setAuthError(authErr)
+
+        console.warn(`Auth check retry ${attempt} failed:`, authErr.message)
+
+        // Only show toast for final failure or non-retryable errors
+        if (attempt >= 3 || !authErr.retryable) {
+          authErrorHandler.handleError(error, {
+            showToast: authErr.type !== 'expired', // Don't show toast for expired sessions
+            context: 'login'
+          })
+        }
+      },
+      circuitBreakerThreshold: 5, // Open circuit after 5 failures in a minute
+      circuitBreakerTimeout: 60000, // Reset circuit after 1 minute
+      onCircuitOpen: () => {
+        console.warn('Auth circuit breaker opened - too many failures')
+        setAuthError({
+          type: 'server',
+          message: 'Authentication service temporarily unavailable. Please try again in a moment.',
+          retryable: false
+        })
+      },
+      onCircuitClose: () => {
+        console.log('Auth circuit breaker closed - service recovered')
+        setAuthError(null)
+      }
+    }
+  )
+
+  // Core auth check function
+  const performAuthCheck = useCallback(async () => {
+    const response = await fetch('/api/auth/check', {
+      credentials: 'include',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+
+    if (!response.ok) {
+      const error = new Error(`Auth check failed: ${response.status}`)
+      ;(error as any).status = response.status
+      throw error
+    }
+
+    const userData = await response.json()
+    setUser(userData.user)
+    setAuthError(null) // Clear any previous errors
+    return userData.user
+  }, [])
+
   /**
    * Check Authentication Status
    *
+   * Enhanced with better error handling, retry mechanisms, and graceful degradation.
    * Validates current session with the server and updates user state.
-   * Optimized to reduce console noise from expected 401 responses.
-   * Handles 401 errors gracefully - only logs non-authentication errors.
-   * Used automatically on app startup and can be called manually to refresh state.
+   * Handles network errors, expired sessions, and server issues appropriately.
    */
-  const checkAuth = async () => {
-    try {
-      // Note: We can't check for mdv_token in document.cookie because it's httpOnly
-      // So we always make the auth check request and let the server handle it
-      const response = await fetch('/api/auth/check', {
-        credentials: 'include',
-        // Suppress browser console errors for expected 401s
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest' // Helps some browsers reduce console noise
-        }
-      })
+  const checkAuth = useCallback(async () => {
+    // Skip auth check if we're on a public page with no auth indicators
+    if (!shouldCheckAuth()) {
+      setLoading(false)
+      return
+    }
 
-      if (response.ok) {
-        const userData = await response.json()
-        setUser(userData.user)
-      } else {
-        // Silently handle 401 errors on public pages
-        setUser(null)
-        // Only log auth errors if they're not expected 401s
-        if (response.status !== 401) {
-          console.error('Auth check failed:', response.status)
-        }
-      }
+    try {
+      await performAuthCheck()
     } catch (error) {
-      // Only log network errors that aren't related to expected auth failures
-      if (error instanceof TypeError && !error.message.includes('401')) {
-        console.error('Auth check network error:', error)
-      }
+      const authErr = categorizeAuthError(error)
+      setAuthError(authErr)
       setUser(null)
+
+      // Handle different error types appropriately
+      switch (authErr.type) {
+        case 'expired':
+          // Session expired - clear auth hints and redirect if on protected page
+          try {
+            localStorage.removeItem('auth_hint')
+          } catch (e) {
+            // localStorage not available
+          }
+
+          if (isProtectedPage()) {
+            // Redirect to login for protected pages
+            window.location.href = '/login?expired=true'
+            return
+          }
+          break
+
+        case 'network':
+          // Network error - will be retryable
+          if (authErr.retryable) {
+            authRecovery.handleError(error)
+          }
+          break
+
+        case 'server':
+          // Server error - may be retryable
+          if (authErr.retryable) {
+            authRecovery.handleError(error)
+          } else {
+            authErrorHandler.handleError(error, { showToast: true, context: 'login' })
+          }
+          break
+
+        default:
+          // Other errors - log but don't show intrusive messages on public pages
+          if (isProtectedPage()) {
+            authErrorHandler.handleError(error, { showToast: true, context: 'login' })
+          }
+      }
     } finally {
       setLoading(false)
     }
-  }
+  }, [shouldCheckAuth, performAuthCheck, categorizeAuthError, authRecovery, authErrorHandler, isProtectedPage])
 
-  // Login function
-  const login = (token: string, userData: User) => {
-    setUser(userData)
-    // Token is handled by httpOnly cookies, no need to store it locally
-  }
+  // Retry auth check
+  const retryAuth = useCallback(async () => {
+    if (authRecovery.canRetry) {
+      await authRecovery.retry()
+    } else {
+      // Force a fresh auth check
+      await checkAuth()
+    }
+  }, [authRecovery, checkAuth])
 
-  // Logout function
-  const logout = async () => {
+  // Clear auth error
+  const clearAuthError = useCallback(() => {
+    setAuthError(null)
+    authRecovery.reset()
+  }, [authRecovery])
+
+  // Enhanced login function with retry support
+  const loginWithRetry = useCallback(async (credentials: { email: string; password: string }) => {
+    const loginRecovery = useErrorRecovery(
+      async () => {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(credentials)
+        })
+
+        if (!response.ok) {
+          const error = new Error(`Login failed: ${response.status}`)
+          ;(error as any).status = response.status
+          throw error
+        }
+
+        const data = await response.json()
+        return data
+      },
+      {
+        maxRetries: 2, // Fewer retries for login attempts
+        retryDelay: 2000,
+        exponentialBackoff: true,
+        autoRetry: false, // Manual retry only for login
+        retryCondition: (error) => {
+          const authErr = categorizeAuthError(error)
+          // Only retry network errors and temporary server errors for login
+          return authErr.type === 'network' ||
+                 (authErr.type === 'server' && authErr.retryable)
+        }
+      }
+    )
+
     try {
-      await fetch('/api/auth/logout', {
+      const result = await loginRecovery.execute()
+      login(result.token, result.user)
+      return result
+    } catch (error) {
+      const authErr = categorizeAuthError(error)
+      setAuthError(authErr)
+      throw error
+    }
+  }, [categorizeAuthError])
+
+  // Basic login function (for direct token/user data)
+  const login = useCallback((token: string, userData: User) => {
+    setUser(userData)
+    setAuthError(null) // Clear any auth errors
+    authRecovery.reset() // Reset recovery state
+
+    // Token is handled by httpOnly cookies, no need to store it locally
+    // Set auth hint for future optimized auth checks
+    try {
+      localStorage.setItem('auth_hint', 'true')
+    } catch (e) {
+      // localStorage not available
+    }
+  }, [authRecovery])
+
+  // Enhanced logout function with better error handling
+  const logout = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include'
       })
+
+      // Even if logout fails on server, clear local state
+      if (!response.ok) {
+        console.warn('Logout request failed, but clearing local state')
+      }
     } catch (error) {
       console.error('Logout error:', error)
+      // Continue with local cleanup even if server request fails
     } finally {
+      // Always clear local state
       setUser(null)
+      setAuthError(null)
+      authRecovery.reset()
+
+      // Clear auth hint
+      try {
+        localStorage.removeItem('auth_hint')
+      } catch (e) {
+        // localStorage not available
+      }
+
       // Redirect to home page after logout
       window.location.href = '/'
     }
-  }
+  }, [authRecovery])
 
   // Get role display name for UI
   const getRoleDisplayName = (): string => {
@@ -384,9 +685,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isStaff,
     isCustomer,
     loading,
+    authError,
+    isRetrying: authRecovery.isRetrying,
+    retryCount: authRecovery.retryCount,
     login,
+    loginWithRetry,
     logout,
     checkAuth,
+    retryAuth,
+    clearAuthError,
     getRoleDisplayName,
     hasPermission,
     hasAnyPermission,
@@ -441,7 +748,7 @@ export function usePermission(permission: Permission): boolean {
 export function useRole(requiredRole: string): boolean {
   const { user } = useAuth()
   if (!user) return false
-  
+
   const roleHierarchy: Record<string, number> = {
     'customer': 1,
     'logistics': 2,
@@ -452,6 +759,74 @@ export function useRole(requiredRole: string): boolean {
 
   const userLevel = roleHierarchy[user.role] || 0
   const requiredLevel = roleHierarchy[requiredRole] || 0
-  
+
   return userLevel >= requiredLevel
+}
+
+/**
+ * Auth Error Hook
+ *
+ * Provides utilities for handling authentication errors in components.
+ * Includes retry mechanisms and user-friendly error messages.
+ *
+ * @example
+ * const { authError, canRetry, retryAuth, clearError } = useAuthError()
+ *
+ * if (authError) {
+ *   return (
+ *     <div>
+ *       <p>{authError.message}</p>
+ *       {canRetry && <button onClick={retryAuth}>Retry</button>}
+ *       <button onClick={clearError}>Dismiss</button>
+ *     </div>
+ *   )
+ * }
+ */
+export function useAuthError() {
+  const { authError, isRetrying, retryCount, retryAuth, clearAuthError } = useAuth()
+
+  const canRetry = authError?.retryable && !isRetrying && retryCount < 3
+
+  const getErrorSeverity = (): 'error' | 'warning' | 'info' => {
+    if (!authError) return 'info'
+
+    switch (authError.type) {
+      case 'expired':
+        return 'info'
+      case 'network':
+      case 'server':
+        return 'warning'
+      case 'forbidden':
+      case 'invalid':
+      case 'unknown':
+      default:
+        return 'error'
+    }
+  }
+
+  const getRetryMessage = (): string => {
+    if (!authError?.retryable) return ''
+
+    if (isRetrying) {
+      return `Retrying... (attempt ${retryCount + 1})`
+    }
+
+    if (retryCount > 0) {
+      return `Retry failed ${retryCount} time${retryCount > 1 ? 's' : ''}. Try again?`
+    }
+
+    return 'Click to retry'
+  }
+
+  return {
+    authError,
+    isRetrying,
+    retryCount,
+    canRetry,
+    retryAuth,
+    clearError: clearAuthError,
+    severity: getErrorSeverity(),
+    retryMessage: getRetryMessage(),
+    hasError: !!authError
+  }
 }

@@ -1,0 +1,276 @@
+name: Deployment Health Validation
+
+on:
+  # Run after successful deployment
+  workflow_run:
+    workflows: ["Deploy to Railway"]
+    types:
+      - completed
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to validate'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+      
+      validation_type:
+        description: 'Type of validation to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - quick
+          - full
+          - comprehensive
+      
+      fail_on_error:
+        description: 'Fail workflow if validation errors found'
+        required: false
+        default: true
+        type: boolean
+
+  # Scheduled validation
+  schedule:
+    # Run every 15 minutes during business hours (UTC)
+    - cron: '*/15 8-18 * * 1-5'
+    # Run every hour outside business hours
+    - cron: '0 * * * *'
+
+# Prevent concurrent validations
+concurrency:
+  group: deployment-validation-${{ github.event.inputs.environment || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  validate-deployment:
+    name: Validate Deployment Health
+    runs-on: ubuntu-latest
+    
+    # Only run if deployment was successful or manually triggered
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    
+    strategy:
+      matrix:
+        environment: 
+          - ${{ github.event.inputs.environment || 'production' }}
+    
+    environment:
+      name: ${{ matrix.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp pyyaml
+      
+      - name: Set environment variables
+        run: |
+          case "${{ matrix.environment }}" in
+            production)
+              echo "API_URL=https://mdv-api-production.up.railway.app" >> $GITHUB_ENV
+              echo "WEB_URL=https://mdv-web-production.up.railway.app" >> $GITHUB_ENV
+              ;;
+            staging)
+              echo "API_URL=https://mdv-api-staging.up.railway.app" >> $GITHUB_ENV
+              echo "WEB_URL=https://mdv-web-staging.up.railway.app" >> $GITHUB_ENV
+              ;;
+            development)
+              echo "API_URL=http://localhost:8000" >> $GITHUB_ENV
+              echo "WEB_URL=http://localhost:3000" >> $GITHUB_ENV
+              ;;
+          esac
+      
+      - name: Wait for deployment to stabilize
+        if: github.event_name == 'workflow_run'
+        run: |
+          echo "Waiting 60 seconds for deployment to stabilize..."
+          sleep 60
+      
+      - name: Run quick connectivity check
+        id: connectivity
+        run: |
+          echo "Testing basic connectivity..."
+          
+          # Test API connectivity
+          if curl -s --max-time 30 --retry 3 "$API_URL/health" > /dev/null; then
+            echo "✅ API is reachable at $API_URL"
+            echo "api_reachable=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ API is not reachable at $API_URL"
+            echo "api_reachable=false" >> $GITHUB_OUTPUT
+          fi
+          
+          # Test Web connectivity
+          if curl -s --max-time 30 --retry 3 "$WEB_URL" > /dev/null; then
+            echo "✅ Web is reachable at $WEB_URL"
+            echo "web_reachable=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Web is not reachable at $WEB_URL"
+            echo "web_reachable=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Run comprehensive deployment validation
+        id: validation
+        run: |
+          # Determine validation arguments
+          VALIDATION_ARGS=(
+            "--api-url" "$API_URL"
+            "--web-url" "$WEB_URL"
+            "--output" "validation-results.json"
+            "--verbose"
+          )
+          
+          # Add fail-on-error if specified
+          if [[ "${{ github.event.inputs.fail_on_error || 'true' }}" == "true" ]]; then
+            VALIDATION_ARGS+=("--fail-on-error")
+          fi
+          
+          # Run validation
+          python scripts/deployment/validate-deployment.py "${VALIDATION_ARGS[@]}"
+        continue-on-error: true
+      
+      - name: Parse validation results
+        id: results
+        if: always()
+        run: |
+          if [[ -f "validation-results.json" ]]; then
+            # Extract key metrics
+            OVERALL_STATUS=$(python -c "import json; data=json.load(open('validation-results.json')); print(data['overall_status'])")
+            SUCCESS_RATE=$(python -c "import json; data=json.load(open('validation-results.json')); print(f'{data[\"passed_checks\"]}/{data[\"total_checks\"]} ({data[\"passed_checks\"]/data[\"total_checks\"]*100:.1f}%)')")
+            FAILED_CHECKS=$(python -c "import json; data=json.load(open('validation-results.json')); print(data['failed_checks'])")
+            CRITICAL_ISSUES=$(python -c "import json; data=json.load(open('validation-results.json')); print(len(data['summary']['critical_issues']))")
+            
+            echo "overall_status=$OVERALL_STATUS" >> $GITHUB_OUTPUT
+            echo "success_rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+            echo "failed_checks=$FAILED_CHECKS" >> $GITHUB_OUTPUT
+            echo "critical_issues=$CRITICAL_ISSUES" >> $GITHUB_OUTPUT
+            
+            # Set status for job summary
+            if [[ "$OVERALL_STATUS" == "healthy" ]]; then
+              echo "status_emoji=✅" >> $GITHUB_OUTPUT
+            elif [[ "$OVERALL_STATUS" == "degraded" ]]; then
+              echo "status_emoji=⚠️" >> $GITHUB_OUTPUT
+            else
+              echo "status_emoji=❌" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "overall_status=error" >> $GITHUB_OUTPUT
+            echo "success_rate=0/0 (0%)" >> $GITHUB_OUTPUT
+            echo "failed_checks=unknown" >> $GITHUB_OUTPUT
+            echo "critical_issues=unknown" >> $GITHUB_OUTPUT
+            echo "status_emoji=💥" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Upload validation results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-validation-${{ matrix.environment }}-${{ github.run_number }}
+          path: |
+            validation-results.json
+            deployment-validation.log
+          retention-days: 30
+      
+      - name: Create job summary
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          # ${{ steps.results.outputs.status_emoji }} Deployment Validation Report
+          
+          **Environment:** ${{ matrix.environment }}  
+          **Overall Status:** ${{ steps.results.outputs.overall_status }}  
+          **Success Rate:** ${{ steps.results.outputs.success_rate }}  
+          **Failed Checks:** ${{ steps.results.outputs.failed_checks }}  
+          **Critical Issues:** ${{ steps.results.outputs.critical_issues }}  
+          
+          ## Service URLs
+          - **API:** $API_URL
+          - **Web:** $WEB_URL
+          
+          ## Connectivity Status
+          - **API Reachable:** ${{ steps.connectivity.outputs.api_reachable == 'true' && '✅ Yes' || '❌ No' }}
+          - **Web Reachable:** ${{ steps.connectivity.outputs.web_reachable == 'true' && '✅ Yes' || '❌ No' }}
+          
+          ## Validation Details
+          Detailed validation results are available in the uploaded artifacts.
+          
+          ---
+          *Validation completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')*
+          EOF
+      
+      - name: Notify on failure
+        if: failure() && (github.event_name == 'workflow_run' || github.event_name == 'schedule')
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#alerts'
+          text: |
+            🚨 Deployment validation failed for ${{ matrix.environment }}
+            
+            Status: ${{ steps.results.outputs.overall_status }}
+            Success Rate: ${{ steps.results.outputs.success_rate }}
+            Critical Issues: ${{ steps.results.outputs.critical_issues }}
+            
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+      
+      - name: Notify on success after failure
+        if: success() && github.event_name == 'schedule'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#general'
+          text: |
+            ✅ Deployment validation passed for ${{ matrix.environment }}
+            
+            Status: ${{ steps.results.outputs.overall_status }}
+            Success Rate: ${{ steps.results.outputs.success_rate }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+  # Aggregate results if multiple environments
+  aggregate-results:
+    name: Aggregate Validation Results
+    runs-on: ubuntu-latest
+    needs: validate-deployment
+    if: always()
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Aggregate results
+        run: |
+          echo "# 📊 Deployment Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment | Status | Success Rate | Critical Issues |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------|--------|--------------|-----------------|" >> $GITHUB_STEP_SUMMARY
+          
+          # This would aggregate results from multiple environments
+          # For now, we'll just reference the single environment result
+          echo "| ${{ github.event.inputs.environment || 'production' }} | See job above | See job above | See job above |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "*Validation completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')*" >> $GITHUB_STEP_SUMMARY

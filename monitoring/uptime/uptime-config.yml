@@ -1,0 +1,229 @@
+# Uptime Monitoring Configuration for MDV Platform
+# Configure external monitoring for critical endpoints
+
+# UptimeRobot Configuration
+uptimerobot:
+  monitors:
+    - name: "MDV API Health Check"
+      url: "https://mdv-api-production.up.railway.app/health"
+      type: "HTTP"
+      interval: 300  # 5 minutes
+      timeout: 30
+      expected_status: 200
+      alert_contacts:
+        - email: "alerts@mdv.com"
+        - slack: "critical-alerts"
+        - pagerduty: "mdv-oncall"
+      
+    - name: "MDV API Readiness"
+      url: "https://mdv-api-production.up.railway.app/health/ready"
+      type: "HTTP"
+      interval: 300
+      timeout: 30
+      expected_status: 200
+      alert_contacts:
+        - email: "alerts@mdv.com"
+        - slack: "critical-alerts"
+      
+    - name: "MDV Web Frontend"
+      url: "https://mdv-web-production.up.railway.app/"
+      type: "HTTP"
+      interval: 300
+      timeout: 30
+      expected_status: 200
+      alert_contacts:
+        - email: "alerts@mdv.com"
+        - slack: "alerts"
+      
+    - name: "MDV Products API"
+      url: "https://mdv-api-production.up.railway.app/api/products"
+      type: "HTTP"
+      interval: 600  # 10 minutes
+      timeout: 30
+      expected_status: 200
+      alert_contacts:
+        - email: "alerts@mdv.com"
+      
+    - name: "MDV Auth Login Endpoint"
+      url: "https://mdv-api-production.up.railway.app/api/auth/login"
+      type: "HTTP"
+      method: "POST"
+      interval: 600
+      timeout: 30
+      expected_status: 400  # Expect 400 for empty POST
+      headers:
+        Content-Type: "application/json"
+      body: "{}"
+      alert_contacts:
+        - email: "alerts@mdv.com"
+        - slack: "security-alerts"
+
+# Pingdom Configuration
+pingdom:
+  checks:
+    - name: "MDV API Performance"
+      url: "https://mdv-api-production.up.railway.app/health"
+      type: "http"
+      resolution: 1  # 1 minute
+      probe_filters:
+        - "region:NA"
+        - "region:EU"
+        - "region:APAC"
+      alert_policy:
+        - email: "performance@mdv.com"
+        - sms: "+1234567890"
+      
+    - name: "MDV Web Performance"
+      url: "https://mdv-web-production.up.railway.app/"
+      type: "http"
+      resolution: 5  # 5 minutes
+      probe_filters:
+        - "region:NA"
+        - "region:EU"
+      alert_policy:
+        - email: "performance@mdv.com"
+
+# StatusPage.io Configuration
+statuspage:
+  page_id: "your-statuspage-id"
+  components:
+    - name: "API Service"
+      description: "Core API backend service"
+      status: "operational"
+      group_id: "backend"
+      
+    - name: "Web Frontend"
+      description: "Customer-facing web application"
+      status: "operational"
+      group_id: "frontend"
+      
+    - name: "Database"
+      description: "PostgreSQL database service"
+      status: "operational"
+      group_id: "backend"
+      
+    - name: "Authentication"
+      description: "User authentication service"
+      status: "operational"
+      group_id: "backend"
+      
+    - name: "Payment Processing"
+      description: "Paystack payment integration"
+      status: "operational"
+      group_id: "integrations"
+      
+    - name: "File Storage"
+      description: "Cloudinary image storage"
+      status: "operational"
+      group_id: "integrations"
+  
+  metrics:
+    - name: "API Response Time"
+      metric_id: "api_response_time"
+      suffix: "ms"
+      y_axis_min: 0
+      y_axis_max: 5000
+      
+    - name: "API Uptime"
+      metric_id: "api_uptime"
+      suffix: "%"
+      y_axis_min: 95
+      y_axis_max: 100
+
+# Custom Health Check Script Configuration
+custom_monitoring:
+  endpoints:
+    - name: "Health Check"
+      url: "https://mdv-api-production.up.railway.app/health"
+      method: "GET"
+      timeout: 10
+      interval: 60
+      expected_status: 200
+      
+    - name: "Detailed Health"
+      url: "https://mdv-api-production.up.railway.app/health/detailed"
+      method: "GET"
+      timeout: 15
+      interval: 300
+      expected_status: 200
+      checks:
+        - path: "status"
+          expected: "healthy"
+        - path: "checks.database.status"
+          expected: "healthy"
+        - path: "checks.middleware.status"
+          expected: "healthy"
+      
+    - name: "Products API"
+      url: "https://mdv-api-production.up.railway.app/api/products"
+      method: "GET"
+      timeout: 10
+      interval: 300
+      expected_status: 200
+      
+    - name: "Categories API"
+      url: "https://mdv-api-production.up.railway.app/api/categories"
+      method: "GET"
+      timeout: 10
+      interval: 300
+      expected_status: 200
+
+# Notification Settings
+notifications:
+  email:
+    smtp_server: "smtp.gmail.com"
+    smtp_port: 587
+    username: "alerts@mdv.com"
+    password: "your-app-password"
+    from: "MDV Monitoring <alerts@mdv.com>"
+    to:
+      - "team@mdv.com"
+      - "oncall@mdv.com"
+  
+  slack:
+    webhook_url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+    channel: "#alerts"
+    username: "MDV Monitor"
+    
+  pagerduty:
+    integration_key: "your-pagerduty-integration-key"
+    
+  sms:
+    provider: "twilio"
+    account_sid: "your-twilio-sid"
+    auth_token: "your-twilio-token"
+    from_number: "+1234567890"
+    to_numbers:
+      - "+1234567891"  # On-call engineer
+
+# Reporting Configuration
+reporting:
+  uptime_sla: 99.9
+  response_time_sla: 2000  # 2 seconds
+  
+  daily_report:
+    enabled: true
+    time: "09:00"
+    timezone: "UTC"
+    recipients:
+      - "team@mdv.com"
+      - "management@mdv.com"
+  
+  weekly_report:
+    enabled: true
+    day: "monday"
+    time: "09:00"
+    timezone: "UTC"
+    recipients:
+      - "team@mdv.com"
+      - "management@mdv.com"
+  
+  monthly_report:
+    enabled: true
+    day: 1
+    time: "09:00"
+    timezone: "UTC"
+    recipients:
+      - "team@mdv.com"
+      - "management@mdv.com"
+      - "executives@mdv.com"

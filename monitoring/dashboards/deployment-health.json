@@ -1,0 +1,346 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "MDV Deployment Health Dashboard",
+    "tags": ["mdv", "deployment", "health", "monitoring"],
+    "timezone": "UTC",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Overall Deployment Status",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "deployment_health_status",
+            "legendFormat": "{{environment}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.5},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "Unhealthy"}}, "type": "value"},
+              {"options": {"0.5": {"text": "Degraded"}}, "type": "value"},
+              {"options": {"1": {"text": "Healthy"}}, "type": "value"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Service Availability",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "avg_over_time(deployment_health_availability[1h])",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Response Time Trends",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "deployment_health_response_time",
+            "legendFormat": "{{service}} - {{endpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Health Check Success Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(deployment_health_checks_total[5m])",
+            "legendFormat": "{{service}} - Total Checks"
+          },
+          {
+            "expr": "rate(deployment_health_checks_success_total[5m])",
+            "legendFormat": "{{service}} - Successful"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Critical Issues",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "deployment_health_critical_issues",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "list",
+              "filterable": true
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "severity"},
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "mode": "thresholds"
+                  }
+                },
+                {
+                  "id": "thresholds",
+                  "value": {
+                    "steps": [
+                      {"color": "green", "value": null},
+                      {"color": "yellow", "value": 1},
+                      {"color": "red", "value": 2}
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "title": "Database Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "deployment_health_database_status",
+            "legendFormat": "Database"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "Down"}}, "type": "value"},
+              {"options": {"1": {"text": "Up"}}, "type": "value"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Redis Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24},
+        "targets": [
+          {
+            "expr": "deployment_health_redis_status",
+            "legendFormat": "Redis"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "Down"}}, "type": "value"},
+              {"options": {"1": {"text": "Up"}}, "type": "value"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "API Endpoints Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "deployment_health_api_endpoints_up",
+            "legendFormat": "API Endpoints"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.8},
+                {"color": "green", "value": 0.95}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Frontend Pages Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24},
+        "targets": [
+          {
+            "expr": "deployment_health_frontend_pages_up",
+            "legendFormat": "Frontend Pages"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 0.8},
+                {"color": "green", "value": 0.95}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Deployment Timeline",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 28},
+        "targets": [
+          {
+            "expr": "deployment_events",
+            "legendFormat": "{{event_type}} - {{environment}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "drawStyle": "points",
+              "pointSize": 8
+            },
+            "color": {
+              "mode": "palette-classic"
+            }
+          }
+        }
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "query": "label_values(deployment_health_status, environment)",
+          "current": {
+            "value": "production",
+            "text": "production"
+          },
+          "options": [],
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "service",
+          "type": "query",
+          "query": "label_values(deployment_health_status{environment=~\"$environment\"}, service)",
+          "current": {
+            "value": "all",
+            "text": "All"
+          },
+          "options": [],
+          "refresh": 1,
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "prometheus",
+          "expr": "deployment_events{event_type=\"deployment\"}",
+          "titleFormat": "Deployment: {{environment}}",
+          "textFormat": "{{description}}",
+          "iconColor": "blue"
+        },
+        {
+          "name": "Incidents",
+          "datasource": "prometheus",
+          "expr": "deployment_events{event_type=\"incident\"}",
+          "titleFormat": "Incident: {{severity}}",
+          "textFormat": "{{description}}",
+          "iconColor": "red"
+        }
+      ]
+    }
+  }
+}

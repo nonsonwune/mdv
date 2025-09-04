@@ -3,17 +3,30 @@ import { API_BASE_INTERNAL } from "../../../../lib/api"
 import type { AuthLoginResponse } from "../../../../lib/types"
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now()
+  const requestId = Math.random().toString(36).substring(7)
+
   try {
     const body = await req.json()
 
+    // Log login attempt (without password)
+    console.log(`[AUTH-${requestId}] Login attempt for email: ${body.email}`)
+
     const resp = await fetch(`${API_BASE_INTERNAL}/api/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId
+      },
       body: JSON.stringify(body),
     })
 
+    const responseTime = Date.now() - startTime
+    console.log(`[AUTH-${requestId}] Backend response: ${resp.status} (${responseTime}ms)`)
+
     if (!resp.ok) {
       const text = await resp.text()
+      console.error(`[AUTH-${requestId}] Login failed: ${resp.status} - ${text}`)
       return new NextResponse(text || "Login failed", { status: resp.status })
     }
 
@@ -32,27 +45,32 @@ export async function POST(req: NextRequest) {
     }
 
     if (!token) {
+      console.error(`[AUTH-${requestId}] Missing token in auth response:`, data)
       return NextResponse.json({ error: "Missing token from auth response" }, { status: 500 })
     }
     const res = NextResponse.json({ ok: true })
     const prod = process.env.NODE_ENV === "production"
 
-    // Set cookies with more permissive settings for Railway deployment
+    // Enhanced cookie settings for Railway deployment and better persistence
     const cookieOptions = {
       httpOnly: true,
       secure: prod,
       sameSite: "lax" as const,
       path: "/",
-      maxAge: 7 * 24 * 60 * 60, // 7 days
+      maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
       // Remove domain restriction for Railway - let browser handle same-origin
-      domain: undefined
+      domain: undefined,
+      // Add priority for better persistence
+      priority: "high" as const
     }
 
     res.cookies.set("mdv_token", token, cookieOptions)
     res.cookies.set("mdv_role", role, cookieOptions)
 
+    console.log(`[AUTH-${requestId}] Login successful for ${body.email}, role: ${role}`)
     return res
   } catch (e) {
+    console.error(`[AUTH-${requestId}] Login error:`, e)
     return NextResponse.json({ error: "Invalid request" }, { status: 400 })
   }
 }

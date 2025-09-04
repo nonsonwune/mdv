@@ -15,7 +15,15 @@
       "deploy": {
         "startCommand": "python backend/start.py",
         "restartPolicyType": "ON_FAILURE",
-        "restartPolicyMaxRetries": 10
+        "restartPolicyMaxRetries": 10,
+        "healthcheckPath": "/health",
+        "healthcheckTimeout": 300,
+        "numReplicas": 1
+      },
+      "resources": {
+        "memoryLimit": 2048,
+        "cpuLimit": 1000,
+        "diskSizeGB": 10
       },
       "envs": [
         "ENV",
@@ -44,7 +52,13 @@
       "deploy": {
         "startCommand": "python backend/start_worker.py",
         "restartPolicyType": "ON_FAILURE",
-        "restartPolicyMaxRetries": 10
+        "restartPolicyMaxRetries": 10,
+        "numReplicas": 1
+      },
+      "resources": {
+        "memoryLimit": 1024,
+        "cpuLimit": 500,
+        "diskSizeGB": 5
       },
       "envs": [
         "ENV",
@@ -77,7 +91,15 @@
         "deploy": {
           "startCommand": "node server.js",
           "restartPolicyType": "ON_FAILURE",
-          "restartPolicyMaxRetries": 10
+          "restartPolicyMaxRetries": 10,
+          "healthcheckPath": "/",
+          "healthcheckTimeout": 300,
+          "numReplicas": 1
+        },
+        "resources": {
+          "memoryLimit": 1024,
+          "cpuLimit": 500,
+          "diskSizeGB": 5
         },
         "envs": [
           "NEXT_PUBLIC_API_URL",
