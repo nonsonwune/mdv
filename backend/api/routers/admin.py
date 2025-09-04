@@ -693,8 +693,8 @@ async def get_admin_analytics(
         )
     ).scalar_one() or 0
 
-    # Top products by revenue
-    top_products_rows = (
+    # Top products by revenue (highest total revenue)
+    top_revenue_products_rows = (
         await db.execute(
             select(
                 Product.id.label("product_id"),
@@ -713,7 +713,7 @@ async def get_admin_analytics(
         )
     ).all()
 
-    top_products = [
+    top_revenue_products = [
         {
             "product_id": r.product_id,
             "product_title": r.product_title,
@@ -721,7 +721,38 @@ async def get_admin_analytics(
             "revenue": float(r.revenue or 0),
             "average_price": float(r.avg_price or 0),
         }
-        for r in top_products_rows
+        for r in top_revenue_products_rows
+    ]
+
+    # Top products by quantity sold (highest units sold)
+    top_selling_products_rows = (
+        await db.execute(
+            select(
+                Product.id.label("product_id"),
+                Product.title.label("product_title"),
+                func.sum(OrderItem.qty).label("units_sold"),
+                func.sum(OrderItem.qty * OrderItem.unit_price).label("revenue"),
+                func.avg(OrderItem.unit_price).label("avg_price"),
+            )
+            .join(Variant, Variant.product_id == Product.id)
+            .join(OrderItem, OrderItem.variant_id == Variant.id)
+            .join(Order, OrderItem.order_id == Order.id)
+            .where(paid_filter)
+            .group_by(Product.id, Product.title)
+            .order_by(func.sum(OrderItem.qty).desc())
+            .limit(10)
+        )
+    ).all()
+
+    top_selling_products = [
+        {
+            "product_id": r.product_id,
+            "product_title": r.product_title,
+            "units_sold": int(r.units_sold or 0),
+            "revenue": float(r.revenue or 0),
+            "average_price": float(r.avg_price or 0),
+        }
+        for r in top_selling_products_rows
     ]
 
     # Customer metrics
@@ -862,7 +893,9 @@ async def get_admin_analytics(
             "total_items_sold": int(items_sold or 0),
             "conversion_rate": 0.0,
         },
-        "top_products": top_products,
+        "top_products": top_selling_products,  # For backward compatibility (quantity-based)
+        "top_revenue_products": top_revenue_products,  # New field for revenue-based ranking
+        "top_selling_products": top_selling_products,  # Explicit quantity-based ranking
         # Category performance is optional for the current UI; omit or extend later
         "customer_metrics": {
             "total_customers": int(total_customers),

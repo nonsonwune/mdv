@@ -51,6 +51,12 @@ interface AnalyticsData {
       quantity_sold: number
       revenue: number
     }[]
+    top_revenue: {
+      product_id: number
+      product_title: string
+      quantity_sold: number
+      revenue: number
+    }[]
   }
   geographic: {
     country: string
@@ -113,6 +119,9 @@ function validateAnalyticsResponse(raw: any) {
 
   if (!Array.isArray(raw.daily_trends)) errors.push('daily_trends must be an array')
   if (!Array.isArray(raw.top_products)) errors.push('top_products must be an array')
+  // Optional new fields for enhanced analytics
+  if (raw.top_revenue_products && !Array.isArray(raw.top_revenue_products)) errors.push('top_revenue_products must be an array')
+  if (raw.top_selling_products && !Array.isArray(raw.top_selling_products)) errors.push('top_selling_products must be an array')
 
   if (errors.length) {
     const err = new Error(`Analytics payload validation failed: ${errors.join(', ')}`)
@@ -127,6 +136,8 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
   const customer = raw?.customer_metrics || {}
   const daily = Array.isArray(raw?.daily_trends) ? raw.daily_trends : []
   const topProducts = Array.isArray(raw?.top_products) ? raw.top_products : []
+  const topRevenueProducts = Array.isArray(raw?.top_revenue_products) ? raw.top_revenue_products : []
+  const topSellingProducts = Array.isArray(raw?.top_selling_products) ? raw.top_selling_products : topProducts
   const prevRevenue = Number(raw?.revenue_prev || 0)
   const prevOrders = Number(raw?.orders_prev || 0)
   const prevCustomers = Number(raw?.customers_prev || 0)
@@ -167,7 +178,13 @@ function normalizeAnalyticsResponse(raw: any): AnalyticsData {
       total_products: Number(inventory.total_products || 0),
       out_of_stock: Number(inventory.out_of_stock || 0),
       low_stock: Number(inventory.low_stock || 0),
-      top_selling: topProducts.map((p: any) => ({
+      top_selling: topSellingProducts.map((p: any) => ({
+        product_id: p.product_id,
+        product_title: p.product_title,
+        quantity_sold: Number(p.units_sold || 0),
+        revenue: Number(p.revenue || 0),
+      })),
+      top_revenue: topRevenueProducts.map((p: any) => ({
         product_id: p.product_id,
         product_title: p.product_title,
         quantity_sold: Number(p.units_sold || 0),
@@ -464,7 +481,12 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Top Products */}
+
+        </div>
+
+        {/* Product Analytics - Side by Side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Top Selling Products (by quantity) */}
           <div className="bg-white rounded-lg shadow">
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-lg font-medium text-gray-900">Top Selling Products</h3>
@@ -478,7 +500,40 @@ export default function AnalyticsPage() {
                   {data.products.top_selling.map((product, index) => (
                     <div key={product.product_id} className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-6 h-6 bg-maroon-100 text-maroon-700 rounded-full text-xs font-medium">
+                        <div className="flex items-center justify-center w-6 h-6 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{product.product_title}</p>
+                          <p className="text-sm text-gray-500">{product.quantity_sold} units sold</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">{formatCurrency(product.revenue)}</p>
+                        <p className="text-xs text-gray-500">total revenue</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Top Revenue Products (by revenue) */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Top Revenue Products</h3>
+              <p className="text-sm text-gray-600">Best performers by total revenue</p>
+            </div>
+            <div className="p-6">
+              {data.products.top_revenue.length === 0 ? (
+                <div className="text-sm text-gray-500">No top revenue products for this period.</div>
+              ) : (
+                <div className="space-y-4">
+                  {data.products.top_revenue.map((product, index) => (
+                    <div key={product.product_id} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-6 h-6 bg-green-100 text-green-700 rounded-full text-xs font-medium">
                           {index + 1}
                         </div>
                         <div>
@@ -488,6 +543,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-medium text-gray-900">{formatCurrency(product.revenue)}</p>
+                        <p className="text-xs text-gray-500">total revenue</p>
                       </div>
                     </div>
                   ))}
