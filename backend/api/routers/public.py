@@ -966,11 +966,25 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     if not items:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
+    # Create or find customer user for this email
+    user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if not user:
+        # Create a customer user (operations role, no password)
+        user = User(
+            name=body.address.name,
+            email=body.email,
+            role=Role.operations,  # Customer role
+            active=True,
+            password_hash=None  # No password for guest checkout users
+        )
+        db.add(user)
+        await db.flush()
+
     # Build order and calculate totals
     subtotal = 0.0
     subtotal_eligible = 0.0
-    # Create order with enum value (will use model default)
-    order = Order(cart_id=cart.id)
+    # Create order with enum value (will use model default) and link to user
+    order = Order(cart_id=cart.id, user_id=user.id)
     db.add(order)
     await db.flush()
 

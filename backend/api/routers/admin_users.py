@@ -260,8 +260,51 @@ async def create_user(
 
     # Check if email already exists
     existing = await db.execute(select(User).where(User.email == request.email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already registered")
+    existing_user = existing.scalar_one_or_none()
+
+    if existing_user:
+        # If user exists but is a customer (operations role with no password), convert to staff
+        if existing_user.role == Role.operations and not existing_user.password_hash:
+            # Convert customer to staff
+            existing_user.role = request.role
+            existing_user.active = request.active
+            if request.password:
+                existing_user.password_hash = hash_password(request.password)
+
+            # Audit log for conversion
+            await audit(
+                db, actor_id, "user.convert_to_staff", "User", existing_user.id,
+                before={
+                    "role": "operations",
+                    "active": existing_user.active,
+                    "has_password": False
+                },
+                after={
+                    "name": existing_user.name,
+                    "email": existing_user.email,
+                    "role": existing_user.role.value,
+                    "active": existing_user.active,
+                    "has_password": bool(existing_user.password_hash)
+                }
+            )
+
+            await db.commit()
+
+            return UserResponse(
+                id=existing_user.id,
+                name=existing_user.name,
+                email=existing_user.email,
+                role=existing_user.role.value,
+                active=existing_user.active,
+                created_at=existing_user.created_at,
+                has_password=bool(existing_user.password_hash)
+            )
+        else:
+            # User already exists as staff or customer with password
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email already registered as {existing_user.role.value}"
+            )
 
     # Create user
     user = User(
@@ -317,8 +360,50 @@ async def create_supervisor(
     
     # Check if email already exists
     existing = await db.execute(select(User).where(User.email == request.email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email already registered")
+    existing_user = existing.scalar_one_or_none()
+
+    if existing_user:
+        # If user exists but is a customer (operations role with no password), convert to supervisor
+        if existing_user.role == Role.operations and not existing_user.password_hash:
+            # Convert customer to supervisor
+            existing_user.role = Role.supervisor
+            existing_user.active = True
+            existing_user.password_hash = hash_password(request.password)
+
+            # Audit log for conversion
+            await audit(
+                db, actor_id, "user.convert_to_supervisor", "User", existing_user.id,
+                before={
+                    "role": "operations",
+                    "active": existing_user.active,
+                    "has_password": False
+                },
+                after={
+                    "name": existing_user.name,
+                    "email": existing_user.email,
+                    "role": "supervisor",
+                    "active": True,
+                    "has_password": True
+                }
+            )
+
+            await db.commit()
+
+            return UserResponse(
+                id=existing_user.id,
+                name=existing_user.name,
+                email=existing_user.email,
+                role=existing_user.role.value,
+                active=existing_user.active,
+                created_at=existing_user.created_at,
+                has_password=True
+            )
+        else:
+            # User already exists as staff or customer with password
+            raise HTTPException(
+                status_code=400,
+                detail=f"Email already registered as {existing_user.role.value}"
+            )
     
     # Create supervisor user
     user = User(

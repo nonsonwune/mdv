@@ -9,6 +9,7 @@ import { formatNaira } from "../../lib/format";
 import CheckoutSkeleton from "../_components/CheckoutSkeleton";
 import CheckoutSteps from "../_components/CheckoutSteps";
 import { useToast } from "../_components/ToastProvider";
+import { useAuth } from "../../lib/auth-context";
 
 async function ensureCartId(): Promise<number> {
   const raw = localStorage.getItem("mdv_cart_id");
@@ -17,6 +18,16 @@ async function ensureCartId(): Promise<number> {
   const data = await res.json();
   localStorage.setItem("mdv_cart_id", String(data.id));
   return data.id;
+}
+
+interface UserAddress {
+  id: number;
+  name: string;
+  phone: string;
+  state: string;
+  city: string;
+  street: string;
+  is_default: boolean;
 }
 
 export default function CheckoutPage() {
@@ -29,9 +40,13 @@ export default function CheckoutPage() {
   } | null>(null);
   const [estimate, setEstimate] = useState<ShippingEstimateResponse | null>(null);
   const [estimating, setEstimating] = useState(false);
+  const [userAddresses, setUserAddresses] = useState<UserAddress[]>([]);
+  const [loadingUserData, setLoadingUserData] = useState(false);
   const toast = useToast();
   const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
 
+  // Load cart data
   useEffect(() => {
     (async () => {
       const cart_id = await ensureCartId();
@@ -45,6 +60,53 @@ export default function CheckoutPage() {
       }
     })();
   }, []);
+
+  // Load user data and addresses for authenticated users
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+
+    const loadUserData = async () => {
+      setLoadingUserData(true);
+      try {
+        // Pre-fill user name and email
+        setForm(prev => ({
+          ...prev,
+          name: user.name || prev.name,
+          email: user.email || prev.email
+        }));
+
+        // Load user's saved addresses
+        const addressRes = await fetch('/api/users/addresses', {
+          credentials: 'include'
+        });
+
+        if (addressRes.ok) {
+          const addresses: UserAddress[] = await addressRes.json();
+          setUserAddresses(addresses);
+
+          // Pre-fill with default address if available
+          const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+          if (defaultAddress) {
+            setForm(prev => ({
+              ...prev,
+              name: defaultAddress.name || prev.name,
+              phone: defaultAddress.phone || prev.phone,
+              state: defaultAddress.state || prev.state,
+              city: defaultAddress.city || prev.city,
+              street: defaultAddress.street || prev.street
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user data:', error);
+        // Don't show error to user, just continue with empty form
+      } finally {
+        setLoadingUserData(false);
+      }
+    };
+
+    loadUserData();
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     (async () => {
@@ -206,11 +268,70 @@ export default function CheckoutPage() {
       {!cart ? (
         <CheckoutSkeleton />
       ) : (
-      <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input className="border p-2 rounded" placeholder="Full name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
-          <input className="border p-2 rounded" placeholder="Phone" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} required />
-        </div>
+      <>
+        {/* Saved Addresses for Authenticated Users */}
+        {isAuthenticated && userAddresses.length > 0 && (
+          <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-900 mb-3">Use a saved address:</h3>
+            <div className="space-y-2">
+              {userAddresses.map((address) => (
+                <button
+                  key={address.id}
+                  type="button"
+                  onClick={() => {
+                    setForm(prev => ({
+                      ...prev,
+                      name: address.name,
+                      phone: address.phone,
+                      state: address.state,
+                      city: address.city,
+                      street: address.street
+                    }));
+                  }}
+                  className="w-full text-left p-3 bg-white rounded border hover:border-blue-300 transition-colors"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-gray-900">{address.name}</p>
+                      <p className="text-sm text-gray-600">{address.phone}</p>
+                      <p className="text-sm text-gray-600">
+                        {address.street}, {address.city}, {address.state}
+                      </p>
+                    </div>
+                    {address.is_default && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+          {loadingUserData && (
+            <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded">
+              Loading your information...
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              className="border p-2 rounded"
+              placeholder="Full name"
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              required
+            />
+            <input
+              className="border p-2 rounded"
+              placeholder="Phone"
+              value={form.phone}
+              onChange={e => setForm({ ...form, phone: e.target.value })}
+              required
+            />
+          </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input className="border p-2 rounded" placeholder="State" value={form.state} onChange={e => setForm({ ...form, state: e.target.value })} required />
           <input className="border p-2 rounded" placeholder="City" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} required />
@@ -229,6 +350,7 @@ export default function CheckoutPage() {
           {loading ? "Processing…" : (!cart || cart.items.length === 0) ? "Cart is Empty" : "Pay with Paystack"}
         </button>
       </form>
+      </>
       )}
     </div>
   );
