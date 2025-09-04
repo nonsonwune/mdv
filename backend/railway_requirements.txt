@@ -1,0 +1,2 @@
+# Additional requirements for Railway database reset script
+asyncpg>=0.29.0  # PostgreSQL async driver for Python
