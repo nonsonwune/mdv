@@ -9,7 +9,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'next/navigation'
 import { AuthProvider } from './auth-context'
-import { ToastProvider } from '../components/ui/toast'
+import ToastProvider from '../app/_components/ToastProvider'
 
 // Mock user data for testing
 export const mockUsers = {

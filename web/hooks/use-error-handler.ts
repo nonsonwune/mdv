@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
-import { useToast } from '../components/ui/toast'
+import { useToast } from '../app/_components/ToastProvider'
 import { getErrorMessage, getContextualErrorMessage, type ErrorMessage } from '../lib/error-messages'
 
 interface ErrorState {
@@ -52,7 +52,7 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}): UseErrorH
     context = 'general'
   } = options
 
-  const { addToast } = useToast()
+  const toast = useToast()
   const retryTimeoutRef = useRef<NodeJS.Timeout>()
   
   const [errorState, setErrorState] = useState<ErrorState>({
@@ -140,14 +140,15 @@ export function useErrorHandler(options: UseErrorHandlerOptions = {}): UseErrorH
     // Show toast notification if enabled
     if (shouldShowToast) {
       const severity = getErrorSeverity(error)
-      addToast({
-        type: severity === 'info' ? 'info' : severity === 'warning' ? 'warning' : 'error',
-        title: errorMessage.title,
-        message: errorMessage.message,
-        duration: severity === 'error' ? 8000 : 5000
-      })
+      if (severity === 'error') {
+        toast.error(errorMessage.title, errorMessage.message)
+      } else if (severity === 'warning') {
+        toast.info(errorMessage.title, errorMessage.message)
+      } else {
+        toast.info(errorMessage.title, errorMessage.message)
+      }
     }
-  }, [context, showToast, logErrors, addToast, getErrorSeverity])
+  }, [context, showToast, logErrors, toast, getErrorSeverity])
 
   // Clear error
   const clearError = useCallback(() => {
