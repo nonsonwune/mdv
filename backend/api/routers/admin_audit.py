@@ -15,10 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 
-from mdv.auth import get_current_user
-from mdv.rbac import require_permission, Permission
+from mdv.auth import require_roles
+from mdv.models import Role
 from mdv.models import AuditLog, AuditAction, AuditEntity, AuditStatus, User
-from mdv.db import get_db
+from mdv.db import get_async_db
 
 router = APIRouter(prefix="/admin/audit", tags=["Admin Audit"])
 
@@ -41,7 +41,7 @@ class AuditLogResponse(BaseModel):
     request_id: Optional[str]
     status: str
     error_message: Optional[str]
-    metadata: Optional[Dict[str, Any]]
+    audit_metadata: Optional[Dict[str, Any]]
     created_at: datetime
     
     # Actor details
@@ -97,13 +97,10 @@ async def get_audit_logs(
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(require_roles(Role.admin)),
+    db: AsyncSession = Depends(get_async_db)
 ):
-    """Get audit logs with filtering and pagination."""
-    
-    # Check permissions
-    require_permission(current_user, Permission.VIEW_AUDIT_LOGS)
+    """Get audit logs with filtering and pagination. Admin access only."""
     
     # Build query
     query = select(AuditLog).options(selectinload(AuditLog.actor))
@@ -141,7 +138,7 @@ async def get_audit_logs(
             AuditLog.actor_email.ilike(f"%{search}%"),
             AuditLog.error_message.ilike(f"%{search}%"),
             AuditLog.ip_address.ilike(f"%{search}%"),
-            func.cast(AuditLog.metadata, str).ilike(f"%{search}%")
+            func.cast(AuditLog.audit_metadata, str).ilike(f"%{search}%")
         ]
         filters.append(or_(*search_filters))
     
@@ -187,7 +184,7 @@ async def get_audit_logs(
             "request_id": log.request_id,
             "status": log.status.value,
             "error_message": log.error_message,
-            "metadata": log.metadata,
+            "audit_metadata": log.audit_metadata,
             "created_at": log.created_at,
             "actor_name": log.actor.name if log.actor else None
         }
@@ -207,12 +204,10 @@ async def get_audit_logs(
 @router.get("/logs/{log_id}", response_model=AuditLogResponse)
 async def get_audit_log(
     log_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(require_roles(Role.admin)),
+    db: AsyncSession = Depends(get_async_db)
 ):
-    """Get a specific audit log entry."""
-    
-    require_permission(current_user, Permission.VIEW_AUDIT_LOGS)
+    """Get a specific audit log entry. Admin access only."""
     
     query = select(AuditLog).options(selectinload(AuditLog.actor)).where(AuditLog.id == log_id)
     result = await db.execute(query)
@@ -241,7 +236,7 @@ async def get_audit_log(
         "request_id": log.request_id,
         "status": log.status.value,
         "error_message": log.error_message,
-        "metadata": log.metadata,
+        "audit_metadata": log.audit_metadata,
         "created_at": log.created_at,
         "actor_name": log.actor.name if log.actor else None
     }
@@ -251,12 +246,10 @@ async def get_audit_log(
 
 @router.get("/stats", response_model=AuditStatsResponse)
 async def get_audit_stats(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(require_roles(Role.admin)),
+    db: AsyncSession = Depends(get_async_db)
 ):
-    """Get audit log statistics."""
-    
-    require_permission(current_user, Permission.VIEW_AUDIT_LOGS)
+    """Get audit log statistics. Admin access only."""
     
     now = datetime.utcnow()
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -334,7 +327,7 @@ async def get_audit_stats(
 @router.post("/events")
 async def receive_frontend_events(
     events: Dict[str, List[Dict[str, Any]]],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """Receive audit events from frontend."""
 
@@ -387,21 +380,17 @@ async def receive_frontend_events(
 
 @router.get("/actions")
 async def get_audit_actions(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(Role.admin))
 ):
-    """Get list of available audit actions for filtering."""
-    
-    require_permission(current_user, Permission.VIEW_AUDIT_LOGS)
+    """Get list of available audit actions for filtering. Admin access only."""
     
     return [{"value": action.value, "label": action.value} for action in AuditAction]
 
 
 @router.get("/entities")
 async def get_audit_entities(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_roles(Role.admin))
 ):
-    """Get list of available audit entities for filtering."""
-    
-    require_permission(current_user, Permission.VIEW_AUDIT_LOGS)
+    """Get list of available audit entities for filtering. Admin access only."""
     
     return [{"value": entity.value, "label": entity.value} for entity in AuditEntity]

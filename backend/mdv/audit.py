@@ -133,7 +133,7 @@ class AuditService:
                 "request_id": audit_context.request_id,
                 "status": status,
                 "error_message": error_message,
-                "metadata": metadata,
+                "audit_metadata": metadata,
                 "created_at": datetime.now(timezone.utc)
             }
             

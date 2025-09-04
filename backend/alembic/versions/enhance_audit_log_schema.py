@@ -45,8 +45,11 @@ def upgrade() -> None:
     audit_entity_enum.create(bind, checkfirst=True)
     audit_status_enum.create(bind, checkfirst=True)
     
-    # Drop existing audit_logs table to recreate with new schema
-    op.drop_table('audit_logs')
+    # Drop existing audit_logs table if it exists
+    try:
+        op.drop_table('audit_logs')
+    except Exception:
+        pass  # Table doesn't exist, continue
     
     # Create enhanced audit_logs table
     op.create_table('audit_logs',
@@ -76,7 +79,7 @@ def upgrade() -> None:
         # Status and Metadata
         sa.Column('status', audit_status_enum, nullable=False, server_default='SUCCESS'),
         sa.Column('error_message', sa.Text(), nullable=True),
-        sa.Column('metadata', sa.JSON(), nullable=True),
+        sa.Column('audit_metadata', sa.JSON(), nullable=True),
         
         # Timing
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

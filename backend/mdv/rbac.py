@@ -145,8 +145,7 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         # Analytics
         Permission.ANALYTICS_VIEW,
         Permission.ANALYTICS_EXPORT,
-        # Audit - view access
-        Permission.VIEW_AUDIT_LOGS,
+        # Note: Audit logs are admin-only for security compliance
     },
     
     Role.operations: {

@@ -172,7 +172,7 @@ class AuditLog(Base):
     # Status and Metadata
     status: Mapped[AuditStatus] = mapped_column(SAEnum(AuditStatus, name="audit_status", values_callable=lambda x: [e.value for e in x]), default=AuditStatus.SUCCESS, index=True)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Additional context data
+    audit_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # Additional context data
 
     # Timing
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

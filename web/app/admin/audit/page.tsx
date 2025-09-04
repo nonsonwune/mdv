@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import AdminRouteGuard from '@/components/AdminRouteGuard';
 
 interface AuditLog {
   id: number;
@@ -21,7 +22,7 @@ interface AuditLog {
   request_id?: string;
   status: string;
   error_message?: string;
-  metadata?: any;
+  audit_metadata?: any;
   created_at: string;
 }
 
@@ -212,7 +213,8 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <AdminRouteGuard>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -541,11 +543,11 @@ export default function AuditLogsPage() {
                   </div>
                 )}
                 
-                {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+                {selectedLog.audit_metadata && Object.keys(selectedLog.audit_metadata).length > 0 && (
                   <div>
                     <h3 className="font-medium text-gray-900">Metadata</h3>
                     <pre className="mt-2 text-sm bg-gray-50 p-3 rounded-lg overflow-x-auto">
-                      {JSON.stringify(selectedLog.metadata, null, 2)}
+                      {JSON.stringify(selectedLog.audit_metadata, null, 2)}
                     </pre>
                   </div>
                 )}
@@ -554,6 +556,7 @@ export default function AuditLogsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminRouteGuard>
   );
 }

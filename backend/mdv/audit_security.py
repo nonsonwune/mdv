@@ -263,7 +263,7 @@ class AuditSecurityManager:
                 "before": log.before,
                 "after": log.after,
                 "changes": log.changes,
-                "metadata": log.metadata,
+                "audit_metadata": log.audit_metadata,
             })
         else:
             # Sanitize sensitive data for non-admin users
@@ -271,7 +271,7 @@ class AuditSecurityManager:
                 "before": self.sanitize_audit_data(log.before or {}, classification),
                 "after": self.sanitize_audit_data(log.after or {}, classification),
                 "changes": self.sanitize_audit_data(log.changes or {}, classification),
-                "metadata": self.sanitize_audit_data(log.metadata or {}, classification),
+                "audit_metadata": self.sanitize_audit_data(log.audit_metadata or {}, classification),
             })
         
         return log_data
