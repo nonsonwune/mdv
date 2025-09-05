@@ -264,16 +264,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Computed values
   const isAuthenticated = user !== null
-  const isStaff = user ? STAFF_ROLES.includes(user.role) : false
-  const isCustomer = user ? !STAFF_ROLES.includes(user.role) : false
 
-  // Temporary debugging - remove after fixing
+  // Robust role checking with case-insensitive comparison and whitespace trimming
+  const isStaff = user ? STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()) : false
+  const isCustomer = user ? !STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()) : false
+
+  // Enhanced debugging - remove after fixing
   if (user && !isStaff) {
     console.log('[AUTH CONTEXT] User role check failed:', {
       userRole: user.role,
+      userRoleNormalized: user.role?.toLowerCase()?.trim(),
       userRoleType: typeof user.role,
       staffRoles: STAFF_ROLES,
       includes: STAFF_ROLES.includes(user.role),
+      includesNormalized: STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()),
       userEmail: user.email
     })
   }
