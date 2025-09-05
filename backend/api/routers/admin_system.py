@@ -4,12 +4,13 @@ Admin system management endpoints for database operations.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import text, select, func
+from sqlalchemy import text, select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mdv.auth import require_roles
 from mdv.rbac import ADMINS
-from mdv.models import Product, User
+from mdv.models import Product, User, Role
+from mdv.password import hash_password
 from mdv.utils import parse_actor_id, audit
 from ..deps import get_db
 
@@ -157,3 +158,104 @@ async def get_database_status(
             "user_count": counts.get("users", 0)
         }
     }
+
+
+@router.post("/system/reset-users")
+async def reset_all_users(
+    confirm: bool = Query(False, description="Must be true to proceed"),
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_roles(*ADMINS))
+):
+    """Reset all users and recreate admin user. Requires admin role and confirmation."""
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Must set confirm=true to proceed with user reset"
+        )
+
+    actor_id = parse_actor_id(claims)
+
+    try:
+        # Step 1: Count existing users
+        result = await db.execute(select(User))
+        existing_users = result.scalars().all()
+        user_count = len(existing_users)
+
+        existing_user_list = []
+        if user_count > 0:
+            for user in existing_users:
+                existing_user_list.append({
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.name,
+                    "role": user.role.value,
+                    "active": user.active
+                })
+
+        # Step 2: Delete all users
+        if user_count > 0:
+            await db.execute(delete(User))
+            await db.commit()
+
+        # Step 3: Recreate admin user
+        admin_user = User(
+            name="Admin User",
+            email="admin@mdv.ng",
+            role=Role.admin,
+            active=True,
+            password_hash=hash_password("admin123")
+        )
+
+        db.add(admin_user)
+        await db.commit()
+
+        # Step 4: Verify the reset
+        verify_result = await db.execute(select(User))
+        final_users = verify_result.scalars().all()
+
+        final_user_list = []
+        for user in final_users:
+            final_user_list.append({
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "role": user.role.value,
+                "active": user.active
+            })
+
+        # Audit the operation
+        await audit(
+            db=db,
+            actor_id=actor_id,
+            action="RESET_ALL_USERS",
+            resource_type="User",
+            resource_id=None,
+            details={
+                "deleted_users_count": user_count,
+                "deleted_users": existing_user_list,
+                "recreated_admin": True,
+                "final_user_count": len(final_users)
+            }
+        )
+
+        return {
+            "success": True,
+            "message": "User reset completed successfully",
+            "details": {
+                "deleted_users_count": user_count,
+                "deleted_users": existing_user_list,
+                "final_users": final_user_list,
+                "admin_credentials": {
+                    "email": "admin@mdv.ng",
+                    "password": "admin123",
+                    "note": "Change this password immediately after login"
+                }
+            }
+        }
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reset users: {str(e)}"
+        )
