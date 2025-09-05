@@ -158,7 +158,7 @@ export default function StaffLoginPage() {
 
           // Make a test API call to verify user data is available
           try {
-            const response = await fetch('/api/auth/me', {
+            const response = await fetch('/api/auth/check', {
               method: 'GET',
               credentials: 'include'
             })
