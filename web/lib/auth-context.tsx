@@ -270,6 +270,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isCustomer = user ? !STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()) : false
 
   // Enhanced debugging - remove after fixing
+  console.log('[AUTH CONTEXT] Current state:', {
+    user: user ? { email: user.email, role: user.role } : null,
+    loading,
+    isStaff,
+    isAuthenticated
+  })
+
   if (user && !isStaff) {
     console.log('[AUTH CONTEXT] User role check failed:', {
       userRole: user.role,
