@@ -56,6 +56,11 @@ RUN echo "=== RAILWAY BUILD ENVIRONMENT VALIDATION ===" && \
     echo "=== CRITICAL VALIDATION CHECKS ===" && \
     ([ -n "$NEXT_PUBLIC_API_URL" ] && echo "✅ NEXT_PUBLIC_API_URL is set" || echo "❌ NEXT_PUBLIC_API_URL is missing") && \
     ([ -n "$NEXT_PUBLIC_APP_URL" ] && echo "✅ NEXT_PUBLIC_APP_URL is set" || echo "❌ NEXT_PUBLIC_APP_URL is missing") && \
+    echo "" && \
+    echo "=== SERVICE DEPENDENCY VALIDATION ===" && \
+    echo "🔍 Testing API connectivity during build..." && \
+    (timeout 10 wget -q --spider "${NEXT_PUBLIC_API_URL}/health" 2>/dev/null && echo "✅ API service is reachable during build" || echo "⚠️  API service not reachable (expected during concurrent deployment)") && \
+    echo "📝 Build will continue with fallback handling for API dependencies" && \
     echo "================================================"
 
 # Verify critical files and dependencies

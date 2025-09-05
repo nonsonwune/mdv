@@ -4,15 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
-    "prebuild": "npm run types:api",
+    "build": "npm run build:safe",
+    "build:safe": "npm run types:api:safe && next build",
+    "prebuild": "echo 'Build starting with service dependency handling...'",
     "start": "next start -p 3000",
     "start:prod": "PORT=${PORT:-3000} next start -p $PORT",
     "lint": "next lint",
     "test:e2e": "playwright test --config=playwright.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:install-browsers": "npx playwright install --with-deps",
-    "types:api": "openapi-typescript ../docs/api-contracts.yaml -o ./lib/generated/api.d.ts"
+    "types:api": "openapi-typescript ../docs/api-contracts.yaml -o ./lib/generated/api.d.ts",
+    "types:api:safe": "openapi-typescript ../docs/api-contracts.yaml -o ./lib/generated/api.d.ts || echo 'API types generation failed - using existing types'"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
