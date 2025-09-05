@@ -93,6 +93,8 @@ export default function CustomerLoginPage() {
 
     try {
       console.log("[Customer Login] Starting login attempt for:", email.trim())
+      console.log("[Customer Login] Password length:", password.length)
+      console.log("[Customer Login] Credentials object:", { email: email.trim(), passwordLength: password.length })
 
       // Use the auth context's loginWithRetry function
       const result = await loginWithRetry({ email: email.trim(), password })
@@ -106,6 +108,15 @@ export default function CustomerLoginPage() {
       toast.success("Welcome back!", "You have successfully signed in. Redirecting to your account...")
 
     } catch (loginError: any) {
+      // Enhanced error logging
+      console.error("[Customer Login] Login error details:", {
+        error: loginError,
+        message: loginError.message,
+        status: loginError.status,
+        stack: loginError.stack,
+        name: loginError.name
+      })
+
       // Handle the error
       const parsedError = await parseApiError({
         ok: false,
@@ -113,6 +124,7 @@ export default function CustomerLoginPage() {
         text: async () => loginError.message || "Login failed"
       } as Response)
 
+      console.error("[Customer Login] Parsed error:", parsedError)
       setError(parsedError)
       setRetryCount(prev => prev + 1)
 
