@@ -88,7 +88,12 @@
           "builder": "DOCKERFILE",
           "dockerfilePath": "Dockerfile.web",
           "buildCommand": null,
-          "watchPatterns": ["web/**", "docs/api-contracts.yaml", "Dockerfile.web"]
+          "watchPatterns": ["web/**", "docs/api-contracts.yaml", "Dockerfile.web"],
+          "buildArgs": {
+            "NEXT_PUBLIC_API_URL": "$NEXT_PUBLIC_API_URL",
+            "NEXT_PUBLIC_APP_URL": "$NEXT_PUBLIC_APP_URL",
+            "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY": "$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"
+          }
         },
         "deploy": {
           "startCommand": "node server.js",
