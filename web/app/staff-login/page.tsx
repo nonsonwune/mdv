@@ -141,43 +141,10 @@ export default function StaffLoginPage() {
         return
       }
 
-      // Enhanced delay to ensure cookies are properly set and available for middleware
-      // This fixes the race condition where middleware runs before cookies are available
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      // Wait for auth context to be fully updated by checking auth_hint and making a test API call
-      let retries = 0
-      const maxRetries = 15
-      while (retries < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, 300))
-
-        // Check if auth_hint is set (indicates login was successful)
-        const authHint = localStorage.getItem('auth_hint')
-        if (authHint === 'true') {
-          console.log('[Login] Auth hint found, making test API call to verify user data')
-
-          // Make a test API call to verify user data is available
-          try {
-            const response = await fetch('/api/auth/check', {
-              method: 'GET',
-              credentials: 'include'
-            })
-
-            if (response.ok) {
-              const userData = await response.json()
-              if (userData.user && ['admin', 'supervisor', 'operations', 'logistics'].includes(userData.user.role?.toLowerCase()?.trim())) {
-                console.log('[Login] User data verified, recognized as staff:', userData.user.role)
-                break
-              }
-            }
-          } catch (error) {
-            console.log('[Login] API call failed, retrying...', error)
-          }
-        }
-
-        retries++
-        console.log(`[Login] Waiting for auth context update, retry ${retries}/${maxRetries}`)
-      }
+      // Simple extended delay to ensure auth context is fully loaded
+      // This gives time for cookies to be set and auth context to initialize
+      console.log('[Login] Waiting for auth context to fully load...')
+      await new Promise(resolve => setTimeout(resolve, 5000))
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
