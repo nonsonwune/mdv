@@ -5,7 +5,15 @@ export async function GET(request: NextRequest) {
   try {
     const token = cookies().get('mdv_token')?.value
     const role = cookies().get('mdv_role')?.value
-    
+
+    // Debug logging for operations user issue
+    console.log('[AUTH CHECK] Cookie values:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      role: role,
+      roleType: typeof role
+    })
+
     if (!token) {
       // Return 401 with proper headers to reduce browser console noise
       const response = NextResponse.json({ authenticated: false }, { status: 401 })

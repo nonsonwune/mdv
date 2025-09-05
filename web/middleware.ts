@@ -30,9 +30,9 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('mdv_token')?.value
   const role = request.cookies.get('mdv_role')?.value
 
-  // Temporary debugging - remove after fixing
+  // Enhanced debugging for operations user issue
   if (pathname.startsWith('/admin')) {
-    console.log(`[MIDDLEWARE] Admin access attempt - Token: ${!!token}, Role: ${role}`)
+    console.log(`[MIDDLEWARE] Admin access attempt - Token: ${!!token}, Role: ${role}, RoleType: ${typeof role}`)
   }
 
   // If no token, redirect to appropriate login
@@ -51,9 +51,20 @@ export function middleware(request: NextRequest) {
   // Check basic role permissions for the protected path
   const requiredRoles = PROTECTED_PATHS[protectedPath as keyof typeof PROTECTED_PATHS]
 
-  // Temporary debugging - remove after fixing
+  // Enhanced debugging for operations user issue
   if (pathname.startsWith('/admin')) {
-    console.log(`[MIDDLEWARE] Role check - Required: [${requiredRoles.join(', ')}], User: ${role}, Match: ${role ? requiredRoles.includes(role as any) : false}`)
+    console.log(`[MIDDLEWARE] Role check - Required: [${requiredRoles.join(', ')}], User: ${role}, UserType: ${typeof role}, Match: ${role ? requiredRoles.includes(role as any) : false}`)
+
+    // Specific debugging for operations role
+    if (role === 'operations') {
+      console.log(`[MIDDLEWARE] Operations user detailed check:`, {
+        role,
+        requiredRoles,
+        includesCheck: requiredRoles.includes(role),
+        includesCheckAsAny: requiredRoles.includes(role as any),
+        arrayContainsOperations: requiredRoles.includes('operations')
+      })
+    }
   }
 
   if (role && !requiredRoles.includes(role as any)) {
