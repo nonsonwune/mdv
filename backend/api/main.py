@@ -14,6 +14,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from mdv.config import settings
 from mdv.rate_limit import limiter
@@ -295,6 +296,9 @@ def get_allowed_origins():
 
 allowed_origins = get_allowed_origins()
 print(f"CORS: Allowed origins: {allowed_origins}")
+
+# Add SlowAPI rate limiting middleware
+app.add_middleware(SlowAPIMiddleware)
 
 # Add response standardization middleware
 app.add_middleware(ResponseStandardizationMiddleware)
