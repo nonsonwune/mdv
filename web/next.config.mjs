@@ -6,9 +6,6 @@ const imageDomains = (process.env.NEXT_PUBLIC_IMAGE_DOMAINS || "picsum.photos,im
 
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    typedRoutes: true,
-  },
   // Note: API route configuration moved to individual API routes as needed
   // The 'api' key is not valid in next.config.mjs for Next.js 14+
   typescript: {
@@ -22,6 +19,20 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   output: 'standalone',
+
+  // Fix for Railway deployment cache permission issues
+  cacheHandler: process.env.NODE_ENV === 'production' && !process.env.DISABLE_CACHE ? require.resolve('./cache-handler.js') : undefined,
+  cacheMaxMemorySize: process.env.DISABLE_CACHE ? 0 : undefined, // Disable in-memory cache if DISABLE_CACHE is set
+
+  // Additional cache-related configurations for Railway deployment
+  generateEtags: false, // Disable ETags to reduce cache complexity
+  poweredByHeader: false, // Remove X-Powered-By header
+
+  // Experimental features with cache fixes
+  experimental: {
+    typedRoutes: true,
+    isrMemoryCacheSize: 0, // Disable ISR memory cache
+  },
   images: {
     remotePatterns: imageDomains.map(hostname => ({
       protocol: 'https',
