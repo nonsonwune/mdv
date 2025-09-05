@@ -29,28 +29,77 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY web ./
 # Copy the docs directory so the prebuild script can find api-contracts.yaml
 COPY docs /docs
-# Debug: Print all environment variables during build for Railway troubleshooting
-RUN echo "=== BUILD ENVIRONMENT DEBUG ===" && \
-    echo "NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" && \
-    echo "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" && \
-    echo "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}" && \
-    echo "NODE_OPTIONS=${NODE_OPTIONS}" && \
-    echo "================================"
+# === COMPREHENSIVE BUILD ENVIRONMENT DEBUGGING ===
+RUN echo "=== RAILWAY BUILD ENVIRONMENT DEBUG ===" && \
+    echo "Timestamp: $(date)" && \
+    echo "Build Stage: Next.js Compilation" && \
+    echo "Working Directory: $(pwd)" && \
+    echo "User: $(whoami)" && \
+    echo "Node Version: $(node --version)" && \
+    echo "NPM Version: $(npm --version)" && \
+    echo "Available Memory: $(free -h 2>/dev/null | head -2 || echo 'Memory info not available')" && \
+    echo "Available Disk: $(df -h . | tail -1)" && \
+    echo "Environment Variables:" && \
+    echo "  NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" && \
+    echo "  NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" && \
+    echo "  NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}" && \
+    echo "  NODE_OPTIONS=${NODE_OPTIONS}" && \
+    echo "  NODE_ENV=${NODE_ENV}" && \
+    echo "  RAILWAY_ENVIRONMENT=${RAILWAY_ENVIRONMENT:-'not set'}" && \
+    echo "=============================================="
 
-# Verify API contracts file exists before build
-RUN ls -la /docs/api-contracts.yaml || echo "Warning: API contracts file not found"
+# Verify critical files and dependencies
+RUN echo "=== PRE-BUILD VALIDATION ===" && \
+    echo "Checking critical files..." && \
+    ls -la /docs/api-contracts.yaml && echo "✅ API contracts found" || (echo "❌ API contracts missing" && exit 1) && \
+    ls -la package.json && echo "✅ package.json found" || (echo "❌ package.json missing" && exit 1) && \
+    ls -la package-lock.json && echo "✅ package-lock.json found" || (echo "❌ package-lock.json missing" && exit 1) && \
+    echo "Checking package.json scripts..." && \
+    grep -q '"build"' package.json && echo "✅ build script found" || (echo "❌ build script missing" && exit 1) && \
+    grep -q '"types:api"' package.json && echo "✅ types:api script found" || (echo "❌ types:api script missing" && exit 1) && \
+    echo "✅ Pre-build validation passed" && \
+    echo "==============================="
 
-# Build with comprehensive error handling and debugging
+# Build with comprehensive error handling, logging, and recovery
 RUN set -e && \
-    echo "Starting Next.js build..." && \
-    npm run build 2>&1 | tee build.log || \
-    (echo "=== BUILD FAILED - DEBUGGING INFO ===" && \
-     echo "Build log:" && cat build.log 2>/dev/null || echo "No build log found" && \
-     echo "Next.js trace:" && cat .next/trace 2>/dev/null || echo "No trace found" && \
-     echo "Package.json scripts:" && cat package.json | grep -A 10 '"scripts"' && \
-     echo "Environment check:" && env | grep NEXT_PUBLIC || echo "No NEXT_PUBLIC vars found" && \
-     echo "===================================" && \
-     exit 1)
+    echo "=== STARTING NEXT.JS BUILD ===" && \
+    echo "Build command: npm run build" && \
+    echo "Build timeout: 20 minutes" && \
+    echo "Memory limit: 2GB" && \
+    echo "===============================" && \
+    timeout 1200 npm run build 2>&1 | tee build.log || \
+    (echo "=== BUILD FAILED - COMPREHENSIVE DEBUGGING ===" && \
+     echo "Exit code: $?" && \
+     echo "Timestamp: $(date)" && \
+     echo "" && \
+     echo "📋 Build Log (last 50 lines):" && \
+     tail -50 build.log 2>/dev/null || echo "No build log available" && \
+     echo "" && \
+     echo "📋 Next.js Build Trace:" && \
+     cat .next/trace 2>/dev/null || echo "No Next.js trace available" && \
+     echo "" && \
+     echo "📋 Package.json Scripts:" && \
+     cat package.json | grep -A 15 '"scripts"' 2>/dev/null || echo "Cannot read package.json scripts" && \
+     echo "" && \
+     echo "📋 Environment Variables:" && \
+     env | grep -E "(NEXT_PUBLIC|NODE|RAILWAY)" | sort || echo "No environment variables found" && \
+     echo "" && \
+     echo "📋 File System State:" && \
+     ls -la . && \
+     echo "" && \
+     echo "📋 Node Modules State:" && \
+     ls -la node_modules 2>/dev/null | head -10 || echo "No node_modules directory" && \
+     echo "" && \
+     echo "📋 Memory Usage:" && \
+     free -h 2>/dev/null || echo "Memory info not available" && \
+     echo "" && \
+     echo "📋 Disk Usage:" && \
+     df -h . 2>/dev/null || echo "Disk info not available" && \
+     echo "================================================" && \
+     exit 1) && \
+    echo "✅ Next.js build completed successfully" && \
+    echo "Build output size: $(du -sh .next 2>/dev/null || echo 'Unknown')" && \
+    echo "=================================="
 
 # ---------- runner: minimal production image ----------
 FROM node:20-alpine AS runner

@@ -93,7 +93,8 @@
             "NEXT_PUBLIC_API_URL": "$NEXT_PUBLIC_API_URL",
             "NEXT_PUBLIC_APP_URL": "$NEXT_PUBLIC_APP_URL",
             "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY": "$NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY"
-          }
+          },
+          "buildTimeout": 1200
         },
         "deploy": {
           "startCommand": "node server.js",
