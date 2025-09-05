@@ -34,6 +34,13 @@ export default function StaffLoginPage() {
 
   // Primary redirect logic: if already authenticated as staff, go to admin immediately
   useEffect(() => {
+    console.log('[STAFF-LOGIN] Redirect check:', {
+      authLoading,
+      user: user ? { email: user.email, role: user.role } : null,
+      isStaff,
+      shouldRedirect: !authLoading && user && isStaff
+    })
+
     if (!authLoading && user && isStaff) {
       console.log('[STAFF-LOGIN] User already authenticated as staff, redirecting to admin:', {
         email: user.email,
@@ -41,6 +48,7 @@ export default function StaffLoginPage() {
         isStaff
       })
       const next = searchParams.get("next") || "/admin"
+      console.log('[STAFF-LOGIN] Redirecting to:', next)
       router.replace(next as any)
       return
     }
@@ -81,6 +89,22 @@ export default function StaffLoginPage() {
       }
     }
   }, [authLoading, user, isStaff, searchParams, router])
+
+  // Additional fallback redirect logic for post-login scenarios
+  useEffect(() => {
+    // Only trigger this if we're on staff-login page and user just became authenticated
+    if (!authLoading && user && isStaff && !formLoading) {
+      const currentPath = window.location.pathname
+      if (currentPath === '/staff-login') {
+        console.log('[STAFF-LOGIN] Fallback redirect triggered for authenticated staff user')
+        const next = searchParams.get("next") || "/admin"
+        // Small delay to ensure auth context is fully updated
+        setTimeout(() => {
+          router.push(next as any)
+        }, 100)
+      }
+    }
+  }, [authLoading, user, isStaff, formLoading, searchParams, router])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -183,8 +207,15 @@ export default function StaffLoginPage() {
 
       console.log('[Login] Auth context synced, navigating to admin dashboard:', next)
 
-      // Go straight to admin; layout will handle final auth guard
-      router.replace(next as any)
+      // Clear any error query parameters and redirect to admin
+      const url = new URL(window.location.href)
+      url.searchParams.delete('error')
+      const cleanPath = next
+
+      console.log('[Login] Redirecting to clean path:', cleanPath)
+
+      // Use router.push instead of replace to ensure navigation happens
+      router.push(cleanPath as any)
 
     } catch (networkError) {
       // Handle network errors
