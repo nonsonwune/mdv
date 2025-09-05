@@ -29,7 +29,7 @@ export default function StaffLoginPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { checkAuth, login } = useAuth()
+  const { checkAuth, login, user, loading, isStaff } = useAuth()
   const toast = useToast()
 
   // Enhanced URL error parameter handling
@@ -49,6 +49,14 @@ export default function StaffLoginPage() {
       }
     }
   }, [searchParams])
+
+  // Redirect if already authenticated as staff (don't pre-judge during loading)
+  useEffect(() => {
+    if (!loading && user && isStaff) {
+      const next = searchParams.get("next") || "/admin"
+      router.replace(next as any)
+    }
+  }, [loading, user, isStaff, router, searchParams])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -141,18 +149,17 @@ export default function StaffLoginPage() {
         return
       }
 
-      // Simple extended delay to ensure auth context is fully loaded
-      // This gives time for cookies to be set and auth context to initialize
-      console.log('[Login] Waiting for auth context to fully load...')
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      // Wait for auth context to sync with server session
+      console.log('[Login] Refreshing auth context to sync with server...')
+      await checkAuth()
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
 
-      console.log('[Login] User has valid staff role, navigating to admin dashboard:', next)
+      console.log('[Login] Auth context synced, navigating to admin dashboard:', next)
 
-      // Try router.push with additional delay to ensure cookies are properly set
-      router.push(next as any)
+      // Go straight to admin; layout will handle final auth guard
+      router.replace(next as any)
 
     } catch (networkError) {
       // Handle network errors

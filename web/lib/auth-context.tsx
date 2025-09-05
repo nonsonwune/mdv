@@ -649,23 +649,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  // Permission checking methods
+  // Permission checking methods with normalized role keys
   const hasPermission = (permission: Permission): boolean => {
     if (!user) return false
-    const rolePerms = ROLE_PERMISSIONS[user.role]
-    return rolePerms?.has(permission) || false
+    const roleKey = user.role?.toLowerCase()?.trim() ?? ''
+    const rolePerms = ROLE_PERMISSIONS[roleKey]
+    return rolePerms?.has(permission) ?? false
   }
 
   const hasAnyPermission = (...permissions: Permission[]): boolean => {
     if (!user) return false
-    const rolePerms = ROLE_PERMISSIONS[user.role]
-    return permissions.some(perm => rolePerms?.has(perm))
+    const roleKey = user.role?.toLowerCase()?.trim() ?? ''
+    const rolePerms = ROLE_PERMISSIONS[roleKey]
+    return permissions.some(perm => rolePerms?.has(perm) ?? false)
   }
 
   const hasAllPermissions = (...permissions: Permission[]): boolean => {
     if (!user) return false
-    const rolePerms = ROLE_PERMISSIONS[user.role]
-    return permissions.every(perm => rolePerms?.has(perm))
+    const roleKey = user.role?.toLowerCase()?.trim() ?? ''
+    const rolePerms = ROLE_PERMISSIONS[roleKey]
+    return permissions.every(perm => rolePerms?.has(perm) ?? false)
   }
 
   const isRole = (role: string): boolean => {

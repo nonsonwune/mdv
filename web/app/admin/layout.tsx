@@ -47,20 +47,24 @@ export default function AdminLayout({
 
   useEffect(() => {
     // Wait for auth to fully load before making decisions
-    if (!loading) {
-      if (!user) {
-        // No user authenticated, redirect to login
-        console.log('[Admin Layout] No user found, redirecting to login')
-        router.push('/staff-login')
-      } else if (!isStaff) {
-        // User is authenticated but not staff, show permission error
-        console.log('[Admin Layout] User not staff, redirecting with error. User:', user.email, 'Role:', user.role, 'isStaff:', isStaff)
-        router.push('/staff-login?error=insufficient_permissions')
-      } else {
-        console.log('[Admin Layout] Auth check passed for user:', user.email, 'Role:', user.role)
-      }
+    if (loading) return
+
+    if (!user) {
+      // No user authenticated, redirect to login
+      console.log('[Admin Layout] No user found, redirecting to login')
+      router.replace('/staff-login')
+      return
     }
-  }, [loading, isStaff, user, router])
+
+    if (!isStaff) {
+      // User is authenticated but not staff, show permission error
+      console.log('[Admin Layout] User not staff, redirecting with error. User:', user.email, 'Role:', user.role, 'isStaff:', isStaff)
+      router.replace('/staff-login?error=insufficient_permissions')
+      return
+    }
+
+    console.log('[Admin Layout] Auth check passed for user:', user.email, 'Role:', user.role)
+  }, [loading, user, isStaff, router])
 
   const handleLogout = async () => {
     await logout()
@@ -235,7 +239,19 @@ export default function AdminLayout({
     )
   }
 
-  // Don't render anything if user is not authenticated or not staff
+  // Show loading spinner while auth context is loading
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-maroon-700 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show verification screen if user is not authenticated or not staff
   // The useEffect will handle redirects
   if (!user || !isStaff) {
     return (
