@@ -243,6 +243,14 @@ export default function AdminLayout({
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-maroon-700 mx-auto mb-4"></div>
           <p className="text-gray-600">Verifying access...</p>
+          {/* Debugging for operations user issue */}
+          <div className="mt-4 p-4 bg-yellow-100 rounded-lg text-left text-sm">
+            <p><strong>Debug Info:</strong></p>
+            <p>User: {user ? `${user.email} (${user.role})` : 'null'}</p>
+            <p>Loading: {loading.toString()}</p>
+            <p>isStaff: {isStaff.toString()}</p>
+            <p>isAuthenticated: {isAuthenticated.toString()}</p>
+          </div>
         </div>
       </div>
     )
