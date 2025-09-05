@@ -47,8 +47,17 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
         # Special handling for MVP mode - auto-create users
         # Remove this block in production
         if body.email.endswith("@mdv.ng"):
-            # Create staff user with provided password
-            role = Role.admin if body.email == "admin@mdv.ng" else Role.operations
+            # Create staff user with provided password - assign role based on email prefix
+            if body.email == "admin@mdv.ng":
+                role = Role.admin
+            elif body.email.startswith("supervisor"):
+                role = Role.supervisor
+            elif body.email.startswith("logistics"):
+                role = Role.logistics
+            elif body.email.startswith("operations"):
+                role = Role.operations
+            else:
+                role = Role.operations  # Default fallback
             user = User(
                 name=body.email.split("@")[0],
                 email=body.email,
