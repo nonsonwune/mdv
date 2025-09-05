@@ -92,14 +92,24 @@ export default function StaffLoginPage() {
 
   // Additional fallback redirect logic for post-login scenarios
   useEffect(() => {
+    console.log('[STAFF-LOGIN] Fallback redirect useEffect triggered:', {
+      authLoading,
+      user: user ? { email: user.email, role: user.role } : null,
+      isStaff,
+      formLoading,
+      currentPath: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
+    })
+
     // Only trigger this if we're on staff-login page and user just became authenticated
     if (!authLoading && user && isStaff && !formLoading) {
       const currentPath = window.location.pathname
       if (currentPath === '/staff-login') {
         console.log('[STAFF-LOGIN] Fallback redirect triggered for authenticated staff user')
         const next = searchParams.get("next") || "/admin"
+        console.log('[STAFF-LOGIN] Fallback redirect will navigate to:', next)
         // Small delay to ensure auth context is fully updated
         setTimeout(() => {
+          console.log('[STAFF-LOGIN] Executing fallback redirect via router.push')
           router.push(next as any)
         }, 100)
       }
@@ -108,6 +118,7 @@ export default function StaffLoginPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    console.log('[STAFF-LOGIN] Form submission started')
 
     // Clear previous errors
     setError(null)
@@ -116,18 +127,21 @@ export default function StaffLoginPage() {
     // Validate form
     const errors = validateLoginForm(email, password)
     if (Object.keys(errors).length > 0) {
+      console.log('[STAFF-LOGIN] Validation errors:', errors)
       setValidationErrors(errors)
       return
     }
 
     // Check rate limiting
     if (shouldRateLimit(lastAttemptTime)) {
+      console.log('[STAFF-LOGIN] Rate limited')
       setError(createRateLimitError())
       return
     }
 
     setFormLoading(true)
     setLastAttemptTime(Date.now())
+    console.log('[STAFF-LOGIN] Starting login API call')
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -139,7 +153,10 @@ export default function StaffLoginPage() {
         body: JSON.stringify({ email: email.trim(), password }),
       })
 
+      console.log('[STAFF-LOGIN] API response status:', res.status)
+
       if (!res.ok) {
+        console.log('[STAFF-LOGIN] Login failed with status:', res.status)
         const loginError = await parseApiError(res)
         setError(loginError)
         setRetryCount(prev => prev + 1)
@@ -156,9 +173,16 @@ export default function StaffLoginPage() {
       }
 
       const data = await res.json()
+      console.log('[STAFF-LOGIN] Login API success, data:', {
+        hasUser: !!data.user,
+        hasToken: !!data.token,
+        userRole: data.user?.role,
+        forcePasswordChange: data.force_password_change
+      })
 
       // Handle force password change scenario
       if (data.force_password_change) {
+        console.log('[STAFF-LOGIN] Force password change required')
         const changePasswordUrl = `/change-password?user_id=${data.user_id}&message=${encodeURIComponent(data.message || 'Password change required')}`
         router.replace(changePasswordUrl as any)
         return
@@ -168,17 +192,21 @@ export default function StaffLoginPage() {
       setRetryCount(0)
 
       // Show success toast
+      console.log('[STAFF-LOGIN] Showing success toast')
       toast.success("Welcome back!", data.user?.name ? `Hello ${data.user.name}, you're now signed in.` : "You have successfully signed in.")
 
       // CRITICAL FIX: Login endpoint now returns complete user data
       // Update auth context immediately with the user data from login response
       if (data.user && data.token) {
+        console.log('[STAFF-LOGIN] Updating auth context with user data')
         login(data.token, data.user)
         console.log('[Login] Auth context updated with user:', data.user.email, 'role:', data.user.role)
 
         // Check if user has staff permissions before redirecting with normalized role
         const staffRoles = ['admin', 'supervisor', 'operations', 'logistics']
         const role = (data.user.role || '').toLowerCase().trim()
+        console.log('[STAFF-LOGIN] Checking staff permissions for role:', role)
+
         if (!staffRoles.includes(role)) {
           console.error('[Login] User does not have staff permissions:', data.user.role)
           setError({
@@ -188,6 +216,8 @@ export default function StaffLoginPage() {
           })
           return
         }
+
+        console.log('[STAFF-LOGIN] User has staff permissions, proceeding with redirect')
       } else {
         console.error('[Login] Missing user data in login response:', data)
         setError({
@@ -201,21 +231,34 @@ export default function StaffLoginPage() {
       // Wait for auth context to sync with server session
       console.log('[Login] Refreshing auth context to sync with server...')
       await checkAuth()
+      console.log('[STAFF-LOGIN] Auth context sync completed')
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
-
       console.log('[Login] Auth context synced, navigating to admin dashboard:', next)
 
       // Force immediate redirect using window.location for reliability
       console.log('[Login] Forcing immediate redirect to admin dashboard')
-      window.location.href = next
+      console.log('[STAFF-LOGIN] About to execute window.location.href =', next)
+
+      // Try multiple redirect approaches for maximum reliability
+      try {
+        window.location.href = next
+        console.log('[STAFF-LOGIN] window.location.href redirect executed')
+      } catch (redirectError) {
+        console.error('[STAFF-LOGIN] window.location.href failed:', redirectError)
+        // Fallback to router.push
+        console.log('[STAFF-LOGIN] Falling back to router.push')
+        router.push(next as any)
+      }
 
     } catch (networkError) {
+      console.error('[STAFF-LOGIN] Network error during login:', networkError)
       // Handle network errors
       setError(createNetworkError())
       setRetryCount(prev => prev + 1)
     } finally {
+      console.log('[STAFF-LOGIN] Setting formLoading to false')
       setFormLoading(false)
     }
   }
