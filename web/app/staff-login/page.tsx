@@ -207,15 +207,9 @@ export default function StaffLoginPage() {
 
       console.log('[Login] Auth context synced, navigating to admin dashboard:', next)
 
-      // Clear any error query parameters and redirect to admin
-      const url = new URL(window.location.href)
-      url.searchParams.delete('error')
-      const cleanPath = next
-
-      console.log('[Login] Redirecting to clean path:', cleanPath)
-
-      // Use router.push instead of replace to ensure navigation happens
-      router.push(cleanPath as any)
+      // Force immediate redirect using window.location for reliability
+      console.log('[Login] Forcing immediate redirect to admin dashboard')
+      window.location.href = next
 
     } catch (networkError) {
       // Handle network errors
