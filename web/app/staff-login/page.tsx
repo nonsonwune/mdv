@@ -143,15 +143,15 @@ export default function StaffLoginPage() {
 
       // Enhanced delay to ensure cookies are properly set and available for middleware
       // This fixes the race condition where middleware runs before cookies are available
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
 
       console.log('[Login] User has valid staff role, navigating to admin dashboard:', next)
 
-      // Use window.location.href for a full page navigation to ensure cookies are sent
-      window.location.href = next
+      // Try router.push with additional delay to ensure cookies are properly set
+      router.push(next as any)
 
     } catch (networkError) {
       // Handle network errors
