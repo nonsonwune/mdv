@@ -27,7 +27,16 @@ This document provides a comprehensive analysis of all backend API endpoints and
   "access_token": "string",
   "token": "string",  // Duplicate for compatibility
   "token_type": "bearer",
-  "role": "string"
+  "role": "string",
+  "user": {
+    "id": "string",
+    "name": "string",
+    "email": "string",
+    "role": "string",
+    "active": boolean,
+    "created_at": "string",
+    "phone": "string" // optional
+  }
 }
 ```
 **Notes**: 

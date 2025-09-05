@@ -7,7 +7,7 @@ from mdv.auth import create_access_token, get_current_claims
 from mdv.models import User, Role
 from mdv.password import hash_password, verify_password, needs_rehash
 from mdv.rate_limit import limiter, RATE_LIMITS, record_auth_failure, create_rate_limited_endpoint
-from mdv.schemas import AuthLoginRequest, AuthLoginResponse
+from mdv.schemas import AuthLoginRequest, AuthLoginResponse, UserResponse
 from mdv.audit import audit_context, audit_login, audit_logout, AuditService, AuditAction, AuditEntity
 from ..deps import get_db
 
@@ -140,12 +140,24 @@ async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Dep
         }
     )
 
-    # Return both access_token and token for client compatibility
+    # Create user response data that matches frontend User interface
+    user_data = UserResponse(
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        active=user.active,
+        created_at=user.created_at.isoformat(),
+        phone=getattr(user, 'phone', None)
+    )
+
+    # Return both access_token and token for client compatibility, plus complete user data
     return AuthLoginResponse(
         access_token=token,
         token=token,
         role=user.role.value,
-        token_type="bearer"
+        token_type="bearer",
+        user=user_data
     )
 
 
@@ -187,11 +199,23 @@ async def change_password_forced(
     # Create access token now that password is changed
     token = create_access_token(subject=str(user.id), role=user.role)
 
+    # Create user response data that matches frontend User interface
+    user_data = UserResponse(
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        active=user.active,
+        created_at=user.created_at.isoformat(),
+        phone=getattr(user, 'phone', None)
+    )
+
     return AuthLoginResponse(
         access_token=token,
         token=token,
         role=user.role.value,
-        token_type="bearer"
+        token_type="bearer",
+        user=user_data
     )
 
 

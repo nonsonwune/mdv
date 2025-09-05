@@ -99,6 +99,17 @@ class AuthLoginRequest(BaseModel):
     password: str
 
 
+class UserResponse(BaseModel):
+    """User data response schema that matches frontend User interface."""
+    id: str
+    name: str
+    email: str
+    role: str
+    active: bool
+    created_at: str
+    phone: Optional[str] = None
+
+
 class AuthLoginResponse(BaseModel):
     access_token: Optional[str] = None
     token: Optional[str] = None  # For backward compatibility
@@ -107,4 +118,5 @@ class AuthLoginResponse(BaseModel):
     force_password_change: Optional[bool] = None
     user_id: Optional[int] = None
     message: Optional[str] = None
+    user: Optional[UserResponse] = None  # Complete user data for immediate frontend context
 

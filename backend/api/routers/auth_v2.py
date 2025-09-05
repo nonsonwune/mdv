@@ -15,7 +15,7 @@ from mdv.emailer import send_email
 from mdv.email_templates import welcome_email
 from mdv.config import settings
 from ..deps import get_db
-from mdv.schemas import AuthLoginRequest, AuthLoginResponse
+from mdv.schemas import AuthLoginRequest, AuthLoginResponse, UserResponse
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -80,13 +80,25 @@ async def login(body: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
     
     # Create access token
     token = create_access_token(subject=str(user.id), role=user.role)
-    
-    # Return both access_token and token for client compatibility
+
+    # Create user response data that matches frontend User interface
+    user_data = UserResponse(
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        active=user.active,
+        created_at=user.created_at.isoformat(),
+        phone=getattr(user, 'phone', None)
+    )
+
+    # Return both access_token and token for client compatibility, plus complete user data
     return AuthLoginResponse(
         access_token=token,
         token=token,
         role=user.role.value,
-        token_type="bearer"
+        token_type="bearer",
+        user=user_data
     )
 
 
@@ -135,10 +147,22 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     
     # Create access token
     token = create_access_token(subject=str(user.id), role=user.role)
-    
+
+    # Create user response data that matches frontend User interface
+    user_data = UserResponse(
+        id=str(user.id),
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        active=user.active,
+        created_at=user.created_at.isoformat(),
+        phone=getattr(user, 'phone', None)
+    )
+
     return AuthLoginResponse(
         access_token=token,
         token=token,
         role=user.role.value,
-        token_type="bearer"
+        token_type="bearer",
+        user=user_data
     )

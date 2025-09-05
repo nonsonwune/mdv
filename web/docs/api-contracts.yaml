@@ -492,6 +492,17 @@ paths:
         force_password_change: { type: boolean, nullable: true }
         user_id: { type: integer, nullable: true }
         message: { type: string, nullable: true }
+        user:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string }
+            name: { type: string }
+            email: { type: string }
+            role: { type: string }
+            active: { type: boolean }
+            created_at: { type: string }
+            phone: { type: string, nullable: true }
     Error:
       type: object
       required: [message]
