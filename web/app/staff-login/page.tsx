@@ -145,18 +145,34 @@ export default function StaffLoginPage() {
       // This fixes the race condition where middleware runs before cookies are available
       await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Wait for auth context to be fully updated by checking isStaff status
+      // Wait for auth context to be fully updated by checking auth_hint and making a test API call
       let retries = 0
-      const maxRetries = 10
+      const maxRetries = 15
       while (retries < maxRetries) {
-        // Force a re-render to check latest auth state
-        await new Promise(resolve => setTimeout(resolve, 200))
+        await new Promise(resolve => setTimeout(resolve, 300))
 
-        // Check if user is now recognized as staff (this will trigger a re-render)
-        const currentUser = JSON.parse(localStorage.getItem('mdv_user') || 'null')
-        if (currentUser && ['admin', 'supervisor', 'operations', 'logistics'].includes(currentUser.role?.toLowerCase()?.trim())) {
-          console.log('[Login] Auth context updated, user recognized as staff:', currentUser.role)
-          break
+        // Check if auth_hint is set (indicates login was successful)
+        const authHint = localStorage.getItem('auth_hint')
+        if (authHint === 'true') {
+          console.log('[Login] Auth hint found, making test API call to verify user data')
+
+          // Make a test API call to verify user data is available
+          try {
+            const response = await fetch('/api/auth/me', {
+              method: 'GET',
+              credentials: 'include'
+            })
+
+            if (response.ok) {
+              const userData = await response.json()
+              if (userData.user && ['admin', 'supervisor', 'operations', 'logistics'].includes(userData.user.role?.toLowerCase()?.trim())) {
+                console.log('[Login] User data verified, recognized as staff:', userData.user.role)
+                break
+              }
+            }
+          } catch (error) {
+            console.log('[Login] API call failed, retrying...', error)
+          }
         }
 
         retries++
