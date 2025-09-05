@@ -245,11 +245,11 @@ export default function AdminLayout({
           <p className="text-gray-600">Verifying access...</p>
           {/* Debugging for operations user issue */}
           <div className="mt-4 p-4 bg-yellow-100 rounded-lg text-left text-sm">
-            <p><strong>Debug Info:</strong></p>
+            <p><b>Debug Info:</b></p>
             <p>User: {user ? `${user.email} (${user.role})` : 'null'}</p>
-            <p>Loading: {loading.toString()}</p>
-            <p>isStaff: {isStaff.toString()}</p>
-            <p>isAuthenticated: {isAuthenticated.toString()}</p>
+            <p>Loading: {String(loading)}</p>
+            <p>isStaff: {String(isStaff)}</p>
+            <p>isAuthenticated(derived): {String(!!user)}</p>
           </div>
         </div>
       </div>

@@ -141,17 +141,18 @@ interface AuthProviderProps {
 
 /**
  * Staff Roles Definition
- * 
+ *
  * All roles listed here have access to the admin dashboard with different permission levels:
  * - admin: Full system access, user management
  * - supervisor: Product and order management, analytics
  * - operations: Order management, inventory, fulfillment
  * - logistics: Inventory management, shipping, fulfillment
- * 
+ *
  * IMPORTANT: This list must match the role checking in /app/admin/layout.tsx
  * Any changes here should be reflected in the admin layout authentication.
  */
-const STAFF_ROLES = ['admin', 'supervisor', 'operations', 'logistics']
+type StaffRole = 'admin' | 'supervisor' | 'operations' | 'logistics'
+const STAFF_ROLES: StaffRole[] = ['admin', 'supervisor', 'operations', 'logistics']
 
 // Role-Permission mapping (matching backend ROLE_PERMISSIONS)
 const ROLE_PERMISSIONS: Record<string, Set<Permission>> = {
@@ -266,8 +267,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isAuthenticated = user !== null
 
   // Robust role checking with case-insensitive comparison and whitespace trimming
-  const isStaff = user ? STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()) : false
-  const isCustomer = user ? !STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()) : false
+  const isStaff = user ? STAFF_ROLES.includes(user.role?.toLowerCase()?.trim() as StaffRole) : false
+  const isCustomer = user ? !STAFF_ROLES.includes(user.role?.toLowerCase()?.trim() as StaffRole) : false
 
   // Debugging for operations user issue - remove after fixing
   if (user && user.role === 'operations' && !isStaff) {
