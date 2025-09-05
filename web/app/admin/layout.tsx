@@ -46,25 +46,20 @@ export default function AdminLayout({
   const { user, loading, isStaff, logout, hasPermission, isRole } = useAuth()
 
   useEffect(() => {
-    // Add a small delay to allow for any pending auth state updates
-    const timeoutId = setTimeout(() => {
-      // Wait for auth to fully load before making decisions
-      if (!loading) {
-        if (!user) {
-          // No user authenticated, redirect to login
-          console.log('[Admin Layout] No user found, redirecting to login')
-          router.push('/staff-login')
-        } else if (!isStaff) {
-          // User is authenticated but not staff, show permission error
-          console.log('[Admin Layout] User not staff, redirecting with error. User:', user.email, 'Role:', user.role, 'isStaff:', isStaff)
-          router.push('/staff-login?error=insufficient_permissions')
-        } else {
-          console.log('[Admin Layout] Auth check passed for user:', user.email, 'Role:', user.role)
-        }
+    // Wait for auth to fully load before making decisions
+    if (!loading) {
+      if (!user) {
+        // No user authenticated, redirect to login
+        console.log('[Admin Layout] No user found, redirecting to login')
+        router.push('/staff-login')
+      } else if (!isStaff) {
+        // User is authenticated but not staff, show permission error
+        console.log('[Admin Layout] User not staff, redirecting with error. User:', user.email, 'Role:', user.role, 'isStaff:', isStaff)
+        router.push('/staff-login?error=insufficient_permissions')
+      } else {
+        console.log('[Admin Layout] Auth check passed for user:', user.email, 'Role:', user.role)
       }
-    }, 100) // Small delay to allow for auth state updates
-
-    return () => clearTimeout(timeoutId)
+    }
   }, [loading, isStaff, user, router])
 
   const handleLogout = async () => {
@@ -241,27 +236,13 @@ export default function AdminLayout({
   }
 
   // Don't render anything if user is not authenticated or not staff
-  // The useEffect will handle redirects, but check for login in progress first
+  // The useEffect will handle redirects
   if (!user || !isStaff) {
-    // Check if login is in progress to show appropriate message
-    const isLoginInProgress = (() => {
-      try {
-        return sessionStorage.getItem('mdv_login_in_progress') === 'true'
-      } catch (e) {
-        return false
-      }
-    })()
-
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-maroon-700 mx-auto mb-4"></div>
-          <p className="text-gray-600">
-            {isLoginInProgress ? 'Completing login...' : 'Verifying access...'}
-          </p>
-          {isLoginInProgress && (
-            <p className="text-sm text-gray-500 mt-2">Please wait while we set up your admin session</p>
-          )}
+          <p className="text-gray-600">Verifying access...</p>
         </div>
       </div>
     )

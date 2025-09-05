@@ -48,7 +48,15 @@ export async function POST(req: NextRequest) {
       console.error(`[AUTH-${requestId}] Missing token in auth response:`, data)
       return NextResponse.json({ error: "Missing token from auth response" }, { status: 500 })
     }
-    const res = NextResponse.json({ ok: true })
+
+    // CRITICAL FIX: Return complete user data that frontend expects
+    // This resolves the authentication race condition by providing immediate user context
+    const res = NextResponse.json({
+      ok: true,
+      token: token,
+      user: data.user,
+      role: role
+    })
     const prod = process.env.NODE_ENV === "production"
 
     // Enhanced cookie settings for Railway deployment and better persistence

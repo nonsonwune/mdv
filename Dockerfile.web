@@ -19,18 +19,23 @@ ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
 ARG NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
-# Set environment variables with fallback defaults for Railway deployment reliability
+# DEPLOYMENT RELIABILITY FIX: Robust environment variable handling
+# Set environment variables with comprehensive fallback strategy for Railway
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://mdv-api-production.up.railway.app}
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://mdv-web-production.up.railway.app}
 ENV NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY:-}
+
+# Additional Railway-specific environment variables for build context
+ENV RAILWAY_ENVIRONMENT=${RAILWAY_ENVIRONMENT:-production}
+ENV NODE_ENV=${NODE_ENV:-production}
 # Node modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 # App source
 COPY web ./
 # Copy the docs directory so the prebuild script can find api-contracts.yaml
 COPY docs /docs
-# === COMPREHENSIVE BUILD ENVIRONMENT DEBUGGING ===
-RUN echo "=== RAILWAY BUILD ENVIRONMENT DEBUG ===" && \
+# === COMPREHENSIVE BUILD ENVIRONMENT VALIDATION ===
+RUN echo "=== RAILWAY BUILD ENVIRONMENT VALIDATION ===" && \
     echo "Timestamp: $(date)" && \
     echo "Build Stage: Next.js Compilation" && \
     echo "Working Directory: $(pwd)" && \
@@ -39,14 +44,19 @@ RUN echo "=== RAILWAY BUILD ENVIRONMENT DEBUG ===" && \
     echo "NPM Version: $(npm --version)" && \
     echo "Available Memory: $(free -h 2>/dev/null | head -2 || echo 'Memory info not available')" && \
     echo "Available Disk: $(df -h . | tail -1)" && \
-    echo "Environment Variables:" && \
-    echo "  NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}" && \
-    echo "  NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" && \
-    echo "  NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}" && \
-    echo "  NODE_OPTIONS=${NODE_OPTIONS}" && \
-    echo "  NODE_ENV=${NODE_ENV}" && \
-    echo "  RAILWAY_ENVIRONMENT=${RAILWAY_ENVIRONMENT:-'not set'}" && \
-    echo "=============================================="
+    echo "" && \
+    echo "=== ENVIRONMENT VARIABLES VALIDATION ===" && \
+    echo "NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}" && \
+    echo "NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}" && \
+    echo "NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY: ${NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY}" && \
+    echo "NODE_OPTIONS: ${NODE_OPTIONS}" && \
+    echo "NODE_ENV: ${NODE_ENV}" && \
+    echo "RAILWAY_ENVIRONMENT: ${RAILWAY_ENVIRONMENT:-'not set'}" && \
+    echo "" && \
+    echo "=== CRITICAL VALIDATION CHECKS ===" && \
+    ([ -n "$NEXT_PUBLIC_API_URL" ] && echo "✅ NEXT_PUBLIC_API_URL is set" || echo "❌ NEXT_PUBLIC_API_URL is missing") && \
+    ([ -n "$NEXT_PUBLIC_APP_URL" ] && echo "✅ NEXT_PUBLIC_APP_URL is set" || echo "❌ NEXT_PUBLIC_APP_URL is missing") && \
+    echo "================================================"
 
 # Verify critical files and dependencies
 RUN echo "=== PRE-BUILD VALIDATION ===" && \

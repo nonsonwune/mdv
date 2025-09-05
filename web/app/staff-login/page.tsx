@@ -114,33 +114,29 @@ export default function StaffLoginPage() {
       // Show success toast
       toast.success("Welcome back!", data.user?.name ? `Hello ${data.user.name}, you're now signed in.` : "You have successfully signed in.")
 
-      // CRITICAL: Update auth context immediately and wait for it to propagate
-      // This ensures isStaff is true before any navigation occurs
-      if (data.user) {
+      // CRITICAL FIX: Login endpoint now returns complete user data
+      // Update auth context immediately with the user data from login response
+      if (data.user && data.token) {
         login(data.token, data.user)
+        console.log('[Login] Auth context updated with user:', data.user.email, 'role:', data.user.role)
+      } else {
+        console.error('[Login] Missing user data in login response:', data)
+        setError({
+          type: 'server',
+          message: 'Login succeeded but user data is incomplete. Please try again.',
+          retryable: true
+        })
+        return
       }
 
-      // Force a complete auth state refresh and wait for it to complete
-      // This ensures the auth context is fully updated before navigation
-      try {
-        await checkAuth()
-        console.log('[Login] Auth state refreshed successfully')
-      } catch (error) {
-        console.error('[Login] Auth refresh failed:', error)
-        // Continue anyway as login() should have set the state
-      }
-
-      // Additional delay to ensure React state propagation and re-renders complete
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Verify auth state before navigation
-      console.log('[Login] Navigating to admin dashboard...')
+      // Small delay to ensure React state propagation
+      await new Promise(resolve => setTimeout(resolve, 200))
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
 
-      // Use window.location for immediate navigation to bypass React Router timing
-      window.location.href = next
+      console.log('[Login] Navigating to admin dashboard:', next)
+      router.replace(next as any)
 
     } catch (networkError) {
       // Handle network errors
