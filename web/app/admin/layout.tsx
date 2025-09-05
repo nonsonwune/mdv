@@ -46,14 +46,49 @@ export default function AdminLayout({
   const { user, loading, isStaff, logout, hasPermission, isRole } = useAuth()
 
   useEffect(() => {
+    // Check if we're in the middle of a login flow to prevent redirect loops
+    const isLoginInProgress = () => {
+      try {
+        const loginFlag = sessionStorage.getItem('mdv_login_in_progress')
+        const loginTimestamp = sessionStorage.getItem('mdv_login_timestamp')
+
+        if (loginFlag === 'true' && loginTimestamp) {
+          const timeSinceLogin = Date.now() - parseInt(loginTimestamp)
+          // Consider login in progress for up to 10 seconds
+          return timeSinceLogin < 10000
+        }
+        return false
+      } catch (e) {
+        return false
+      }
+    }
+
     // Wait for auth to fully load before making decisions
     if (!loading) {
+      // Skip redirects if login is in progress to prevent race conditions
+      if (isLoginInProgress()) {
+        console.log('[Admin Layout] Login in progress, skipping auth checks')
+        return
+      }
+
       if (!user) {
         // No user authenticated, redirect to login
+        console.log('[Admin Layout] No user found, redirecting to login')
         router.push('/staff-login')
       } else if (!isStaff) {
         // User is authenticated but not staff, show permission error
+        console.log('[Admin Layout] User not staff, redirecting with error:', user.role)
         router.push('/staff-login?error=insufficient_permissions')
+      } else {
+        // User is authenticated and is staff, clear any login flags
+        try {
+          sessionStorage.removeItem('mdv_login_in_progress')
+          sessionStorage.removeItem('mdv_login_timestamp')
+          sessionStorage.removeItem('mdv_login_user_role')
+        } catch (e) {
+          // sessionStorage not available
+        }
+        console.log('[Admin Layout] Auth check passed for user:', user.role)
       }
     }
   }, [loading, isStaff, user, router])
@@ -232,13 +267,27 @@ export default function AdminLayout({
   }
 
   // Don't render anything if user is not authenticated or not staff
-  // The useEffect will handle redirects
+  // The useEffect will handle redirects, but check for login in progress first
   if (!user || !isStaff) {
+    // Check if login is in progress to show appropriate message
+    const isLoginInProgress = (() => {
+      try {
+        return sessionStorage.getItem('mdv_login_in_progress') === 'true'
+      } catch (e) {
+        return false
+      }
+    })()
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-maroon-700 mx-auto mb-4"></div>
-          <p className="text-gray-600">Verifying access...</p>
+          <p className="text-gray-600">
+            {isLoginInProgress ? 'Completing login...' : 'Verifying access...'}
+          </p>
+          {isLoginInProgress && (
+            <p className="text-sm text-gray-500 mt-2">Please wait while we set up your admin session</p>
+          )}
         </div>
       </div>
     )

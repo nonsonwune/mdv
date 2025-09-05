@@ -120,11 +120,28 @@ export default function StaffLoginPage() {
         login(data.token, data.user)
       }
 
+      // Set login-in-progress flag to prevent admin layout redirects during transition
+      // This prevents the admin layout from redirecting during the auth state transition
+      try {
+        sessionStorage.setItem('mdv_login_in_progress', 'true')
+        sessionStorage.setItem('mdv_login_timestamp', Date.now().toString())
+        sessionStorage.setItem('mdv_login_user_role', data.user?.role || 'unknown')
+
+        // Auto-cleanup after 10 seconds as safety measure
+        setTimeout(() => {
+          sessionStorage.removeItem('mdv_login_in_progress')
+          sessionStorage.removeItem('mdv_login_timestamp')
+          sessionStorage.removeItem('mdv_login_user_role')
+        }, 10000)
+      } catch (e) {
+        console.warn('SessionStorage not available for login flow protection:', e)
+      }
+
       // Also refresh auth state for consistency (but don't wait for it)
       checkAuth().catch(console.error)
 
-      // Small delay to ensure auth context updates before navigation
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Longer delay to ensure auth context fully updates before navigation
+      await new Promise(resolve => setTimeout(resolve, 500))
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
