@@ -169,14 +169,21 @@ async def seed_basic_categories(db):
     ]
 
     created_count = 0
+    updated_count = 0
     for cat_data in categories_to_create:
         # Check if category already exists
         existing = await db.execute(
             select(Category).where(Category.slug == cat_data["slug"])
         )
+        category = existing.scalar_one_or_none()
 
-        if existing.scalar_one_or_none():
-            print(f"✓ Category exists: {cat_data['name']} ({cat_data['slug']})")
+        if category:
+            # Update existing category to ensure navigation settings
+            category.show_in_navigation = cat_data.get("show_in_navigation", True)
+            category.sort_order = cat_data.get("sort_order", 0)
+            category.is_active = True
+            updated_count += 1
+            print(f"✓ Updated category: {cat_data['name']} ({cat_data['slug']}) - show_in_navigation={category.show_in_navigation}")
         else:
             # Create new category
             category = Category(
@@ -190,7 +197,7 @@ async def seed_basic_categories(db):
             created_count += 1
             print(f"✓ Created category: {cat_data['name']} ({cat_data['slug']})")
 
-    return created_count
+    return created_count + updated_count
 
 
 @app.on_event("startup")
@@ -242,7 +249,7 @@ async def startup_seed_reference():
                 print("✓ Reference zones seeded successfully")
 
             await db.commit()
-            print(f"✓ Seeding complete: {user_count} users, {category_count} categories created")
+            print(f"✓ Seeding complete: {user_count} users processed, {category_count} categories processed")
 
     except Exception as e:
         print(f"Warning: Failed to seed reference data: {e}")
