@@ -67,15 +67,15 @@ export async function POST(req: NextRequest) {
       path: "/",
       maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
       // Remove domain restriction for Railway - let browser handle same-origin
-      domain: undefined,
-      // Add priority for better persistence
-      priority: "high" as const
+      domain: undefined
     }
 
     res.cookies.set("mdv_token", token, cookieOptions)
     res.cookies.set("mdv_role", role, cookieOptions)
 
     console.log(`[AUTH-${requestId}] Login successful for ${body.email}, role: ${role}`)
+    console.log(`[AUTH-${requestId}] Setting cookies - token: ${token ? 'present' : 'missing'}, role: ${role}`)
+    console.log(`[AUTH-${requestId}] Cookie options:`, cookieOptions)
     return res
   } catch (e) {
     console.error(`[AUTH-${requestId}] Login error:`, e)
