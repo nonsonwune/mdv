@@ -237,20 +237,25 @@ export default function StaffLoginPage() {
       const next = searchParams.get("next") || "/admin"
       console.log('[Login] Auth context synced, navigating to admin dashboard:', next)
 
-      // Force immediate redirect using window.location for reliability
+      // Force immediate redirect using multiple approaches for maximum reliability
       console.log('[Login] Forcing immediate redirect to admin dashboard')
-      console.log('[STAFF-LOGIN] About to execute window.location.href =', next)
+      console.log('[STAFF-LOGIN] About to execute redirect to:', next)
 
-      // Try multiple redirect approaches for maximum reliability
-      try {
+      // Approach 1: Meta refresh (most reliable)
+      const metaRefresh = document.createElement('meta')
+      metaRefresh.httpEquiv = 'refresh'
+      metaRefresh.content = `0; url=${next}`
+      document.head.appendChild(metaRefresh)
+
+      // Approach 2: window.location.href
+      setTimeout(() => {
         window.location.href = next
-        console.log('[STAFF-LOGIN] window.location.href redirect executed')
-      } catch (redirectError) {
-        console.error('[STAFF-LOGIN] window.location.href failed:', redirectError)
-        // Fallback to router.push
-        console.log('[STAFF-LOGIN] Falling back to router.push')
+      }, 100)
+
+      // Approach 3: router.push as fallback
+      setTimeout(() => {
         router.push(next as any)
-      }
+      }, 200)
 
     } catch (networkError) {
       console.error('[STAFF-LOGIN] Network error during login:', networkError)
