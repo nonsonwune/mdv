@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { ChevronDownIcon } from '@heroicons/react/24/outline'
+import { api } from '@/lib/api-client'
 
 interface NavigationCategory {
   id: number
@@ -30,11 +31,8 @@ export default function DynamicNavigation() {
 
   const fetchNavigationData = async () => {
     try {
-      const response = await fetch('/api/navigation/categories')
-      if (response.ok) {
-        const data = await response.json()
-        setNavigationData(data)
-      }
+      const data = await api<NavigationData>('/api/navigation/categories')
+      setNavigationData(data)
     } catch (error) {
       console.error('Failed to fetch navigation data:', error)
     } finally {
