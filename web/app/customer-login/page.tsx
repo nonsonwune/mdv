@@ -20,7 +20,6 @@ import {
 } from "../../lib/login-error-handler"
 
 export default function CustomerLoginPage() {
-  console.log("[Customer Login] Component loading/rendering")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -33,20 +32,23 @@ export default function CustomerLoginPage() {
   const searchParams = useSearchParams()
   const { checkAuth, loginWithRetry, isAuthenticated, user } = useAuth()
   const toast = useToast()
-  console.log("[Customer Login] Component state initialized")
 
-  // Simple redirect watcher - monitors authentication state changes
+  // Enhanced redirect watcher with loading animation
+  const [isRedirecting, setIsRedirecting] = useState(false)
+
   useEffect(() => {
-    if (isAuthenticated && user && !loading) {
+    if (isAuthenticated && user && !loading && !isRedirecting) {
       const next = searchParams.get("next") || "/account"
-      console.log("[Customer Login] User authenticated, redirecting to:", next)
 
-      // Use a short delay to ensure the authentication state is stable
+      // Start redirect animation
+      setIsRedirecting(true)
+
+      // Show loading animation for 2 seconds, then redirect
       setTimeout(() => {
         window.location.href = next
-      }, 1000)
+      }, 2000)
     }
-  }, [isAuthenticated, user, loading, searchParams])
+  }, [isAuthenticated, user, loading, searchParams, isRedirecting])
 
 
 
@@ -92,31 +94,16 @@ export default function CustomerLoginPage() {
     setLastAttemptTime(Date.now())
 
     try {
-      console.log("[Customer Login] Starting login attempt for:", email.trim())
-      console.log("[Customer Login] Password length:", password.length)
-      console.log("[Customer Login] Credentials object:", { email: email.trim(), passwordLength: password.length })
-
       // Use the auth context's loginWithRetry function
       const result = await loginWithRetry({ email: email.trim(), password })
-      console.log("[Customer Login] Login result:", result)
 
       // Reset retry count on successful login
       setRetryCount(0)
 
       // Show success toast - the useEffect will handle redirect automatically
-      console.log("[Customer Login] Login successful, useEffect will handle redirect")
       toast.success("Welcome back!", "You have successfully signed in. Redirecting to your account...")
 
     } catch (loginError: any) {
-      // Enhanced error logging
-      console.error("[Customer Login] Login error details:", {
-        error: loginError,
-        message: loginError.message,
-        status: loginError.status,
-        stack: loginError.stack,
-        name: loginError.name
-      })
-
       // Handle the error
       const parsedError = await parseApiError({
         ok: false,
@@ -124,7 +111,6 @@ export default function CustomerLoginPage() {
         text: async () => loginError.message || "Login failed"
       } as Response)
 
-      console.error("[Customer Login] Parsed error:", parsedError)
       setError(parsedError)
       setRetryCount(prev => prev + 1)
 
@@ -139,6 +125,43 @@ export default function CustomerLoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading animation when redirecting
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
+        <div className="text-center">
+          {/* Loading Spinner */}
+          <div className="mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 border-4 border-maroon-200 border-t-maroon-600 rounded-full animate-spin"></div>
+          </div>
+
+          {/* Loading Text */}
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome back!</h2>
+          <p className="text-gray-600 mb-4">Taking you to your account...</p>
+
+          {/* Progress Bar */}
+          <div className="w-64 bg-gray-200 rounded-full h-2 mx-auto">
+            <div className="bg-maroon-600 h-2 rounded-full" style={{
+              width: '100%',
+              animation: 'progress 2s ease-in-out forwards'
+            }}></div>
+          </div>
+
+          {/* Success Message */}
+          <p className="text-sm text-maroon-600 mt-4 font-medium">✓ Successfully signed in</p>
+        </div>
+
+        {/* CSS Animation */}
+        <style jsx>{`
+          @keyframes progress {
+            0% { width: 0%; }
+            100% { width: 100%; }
+          }
+        `}</style>
+      </div>
+    )
   }
 
   return (

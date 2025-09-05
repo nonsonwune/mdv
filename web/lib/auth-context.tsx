@@ -536,10 +536,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Enhanced login function with retry support
   const loginWithRetry = useCallback(async (credentials: { email: string; password: string }) => {
-    console.log("[AUTH-CONTEXT] loginWithRetry called with:", { email: credentials.email, passwordLength: credentials.password.length })
-
     try {
-      console.log("[AUTH-CONTEXT] Making fetch request to /api/auth/login")
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -549,26 +546,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         body: JSON.stringify(credentials)
       })
 
-      console.log("[AUTH-CONTEXT] Response status:", response.status)
-      console.log("[AUTH-CONTEXT] Response ok:", response.ok)
-
       if (!response.ok) {
-        const responseText = await response.text()
-        console.error("[AUTH-CONTEXT] Login failed response:", responseText)
         const error = new Error(`Login failed: ${response.status}`)
         ;(error as any).status = response.status
-        ;(error as any).responseText = responseText
         throw error
       }
 
       const data = await response.json()
-      console.log("[AUTH-CONTEXT] Login success data:", { hasUser: !!data.user, hasToken: !!data.token, userRole: data.user?.role })
 
       // Update auth context with user data
       login(data.token, data.user)
       return data
     } catch (error) {
-      console.error("[AUTH-CONTEXT] Login error:", error)
       const authErr = categorizeAuthError(error)
       setAuthError(authErr)
       throw error
