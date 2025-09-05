@@ -46,51 +46,25 @@ export default function AdminLayout({
   const { user, loading, isStaff, logout, hasPermission, isRole } = useAuth()
 
   useEffect(() => {
-    // Check if we're in the middle of a login flow to prevent redirect loops
-    const isLoginInProgress = () => {
-      try {
-        const loginFlag = sessionStorage.getItem('mdv_login_in_progress')
-        const loginTimestamp = sessionStorage.getItem('mdv_login_timestamp')
-
-        if (loginFlag === 'true' && loginTimestamp) {
-          const timeSinceLogin = Date.now() - parseInt(loginTimestamp)
-          // Consider login in progress for up to 10 seconds
-          return timeSinceLogin < 10000
+    // Add a small delay to allow for any pending auth state updates
+    const timeoutId = setTimeout(() => {
+      // Wait for auth to fully load before making decisions
+      if (!loading) {
+        if (!user) {
+          // No user authenticated, redirect to login
+          console.log('[Admin Layout] No user found, redirecting to login')
+          router.push('/staff-login')
+        } else if (!isStaff) {
+          // User is authenticated but not staff, show permission error
+          console.log('[Admin Layout] User not staff, redirecting with error. User:', user.email, 'Role:', user.role, 'isStaff:', isStaff)
+          router.push('/staff-login?error=insufficient_permissions')
+        } else {
+          console.log('[Admin Layout] Auth check passed for user:', user.email, 'Role:', user.role)
         }
-        return false
-      } catch (e) {
-        return false
       }
-    }
+    }, 100) // Small delay to allow for auth state updates
 
-    // Wait for auth to fully load before making decisions
-    if (!loading) {
-      // Skip redirects if login is in progress to prevent race conditions
-      if (isLoginInProgress()) {
-        console.log('[Admin Layout] Login in progress, skipping auth checks')
-        return
-      }
-
-      if (!user) {
-        // No user authenticated, redirect to login
-        console.log('[Admin Layout] No user found, redirecting to login')
-        router.push('/staff-login')
-      } else if (!isStaff) {
-        // User is authenticated but not staff, show permission error
-        console.log('[Admin Layout] User not staff, redirecting with error:', user.role)
-        router.push('/staff-login?error=insufficient_permissions')
-      } else {
-        // User is authenticated and is staff, clear any login flags
-        try {
-          sessionStorage.removeItem('mdv_login_in_progress')
-          sessionStorage.removeItem('mdv_login_timestamp')
-          sessionStorage.removeItem('mdv_login_user_role')
-        } catch (e) {
-          // sessionStorage not available
-        }
-        console.log('[Admin Layout] Auth check passed for user:', user.role)
-      }
-    }
+    return () => clearTimeout(timeoutId)
   }, [loading, isStaff, user, router])
 
   const handleLogout = async () => {

@@ -114,38 +114,33 @@ export default function StaffLoginPage() {
       // Show success toast
       toast.success("Welcome back!", data.user?.name ? `Hello ${data.user.name}, you're now signed in.` : "You have successfully signed in.")
 
-      // CRITICAL: Update auth context immediately to prevent race condition
-      // This ensures isStaff is true before the admin layout checks it
+      // CRITICAL: Update auth context immediately and wait for it to propagate
+      // This ensures isStaff is true before any navigation occurs
       if (data.user) {
         login(data.token, data.user)
       }
 
-      // Set login-in-progress flag to prevent admin layout redirects during transition
-      // This prevents the admin layout from redirecting during the auth state transition
+      // Force a complete auth state refresh and wait for it to complete
+      // This ensures the auth context is fully updated before navigation
       try {
-        sessionStorage.setItem('mdv_login_in_progress', 'true')
-        sessionStorage.setItem('mdv_login_timestamp', Date.now().toString())
-        sessionStorage.setItem('mdv_login_user_role', data.user?.role || 'unknown')
-
-        // Auto-cleanup after 10 seconds as safety measure
-        setTimeout(() => {
-          sessionStorage.removeItem('mdv_login_in_progress')
-          sessionStorage.removeItem('mdv_login_timestamp')
-          sessionStorage.removeItem('mdv_login_user_role')
-        }, 10000)
-      } catch (e) {
-        console.warn('SessionStorage not available for login flow protection:', e)
+        await checkAuth()
+        console.log('[Login] Auth state refreshed successfully')
+      } catch (error) {
+        console.error('[Login] Auth refresh failed:', error)
+        // Continue anyway as login() should have set the state
       }
 
-      // Also refresh auth state for consistency (but don't wait for it)
-      checkAuth().catch(console.error)
+      // Additional delay to ensure React state propagation and re-renders complete
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
-      // Longer delay to ensure auth context fully updates before navigation
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Verify auth state before navigation
+      console.log('[Login] Navigating to admin dashboard...')
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
-      router.replace(next as any)
+
+      // Use window.location for immediate navigation to bypass React Router timing
+      window.location.href = next
 
     } catch (networkError) {
       // Handle network errors
