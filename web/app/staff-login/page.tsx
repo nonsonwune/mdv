@@ -145,6 +145,24 @@ export default function StaffLoginPage() {
       // This fixes the race condition where middleware runs before cookies are available
       await new Promise(resolve => setTimeout(resolve, 2000))
 
+      // Wait for auth context to be fully updated by checking isStaff status
+      let retries = 0
+      const maxRetries = 10
+      while (retries < maxRetries) {
+        // Force a re-render to check latest auth state
+        await new Promise(resolve => setTimeout(resolve, 200))
+
+        // Check if user is now recognized as staff (this will trigger a re-render)
+        const currentUser = JSON.parse(localStorage.getItem('mdv_user') || 'null')
+        if (currentUser && ['admin', 'supervisor', 'operations', 'logistics'].includes(currentUser.role?.toLowerCase()?.trim())) {
+          console.log('[Login] Auth context updated, user recognized as staff:', currentUser.role)
+          break
+        }
+
+        retries++
+        console.log(`[Login] Waiting for auth context update, retry ${retries}/${maxRetries}`)
+      }
+
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
 
