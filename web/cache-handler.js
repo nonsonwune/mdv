@@ -6,10 +6,10 @@
  * of filesystem caching to avoid permission issues.
  */
 
-const LRU = require('lru-cache')
+const { LRUCache } = require('lru-cache')
 
 // In-memory cache with size limits to prevent memory leaks
-const cache = new LRU({
+const cache = new LRUCache({
   max: 500, // Maximum number of items
   maxSize: 50 * 1024 * 1024, // 50MB max total size
   sizeCalculation: (value) => {
