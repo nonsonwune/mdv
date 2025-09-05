@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { useAuth } from "../../lib/auth-context"
+import { useAuth } from "@/lib/auth-context"
 import { LoadingButton } from "../../components/ui/loading-spinner"
 import { useToast } from "../_components/ToastProvider"
 import {
@@ -22,14 +22,14 @@ import {
 export default function StaffLoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
   const [error, setError] = useState<LoginError | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const [lastAttemptTime, setLastAttemptTime] = useState<number | null>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { checkAuth, login, user, loading, isStaff } = useAuth()
+  const { checkAuth, login, user, loading: authLoading, isStaff } = useAuth()
   const toast = useToast()
 
   // Enhanced URL error parameter handling
@@ -50,13 +50,24 @@ export default function StaffLoginPage() {
     }
   }, [searchParams])
 
+  // Clear stale error parameters on mount to prevent showing old errors after successful login
+  useEffect(() => {
+    const err = searchParams.get('error')
+    if (err) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('error')
+      router.replace((url.pathname + (url.search || '')) as any)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Redirect if already authenticated as staff (don't pre-judge during loading)
   useEffect(() => {
-    if (!loading && user && isStaff) {
+    if (!authLoading && user && isStaff) {
       const next = searchParams.get("next") || "/admin"
       router.replace(next as any)
     }
-  }, [loading, user, isStaff, router, searchParams])
+  }, [authLoading, user, isStaff, router, searchParams])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -78,7 +89,7 @@ export default function StaffLoginPage() {
       return
     }
 
-    setLoading(true)
+    setFormLoading(true)
     setLastAttemptTime(Date.now())
 
     try {
@@ -128,12 +139,13 @@ export default function StaffLoginPage() {
         login(data.token, data.user)
         console.log('[Login] Auth context updated with user:', data.user.email, 'role:', data.user.role)
 
-        // Check if user has staff permissions before redirecting
+        // Check if user has staff permissions before redirecting with normalized role
         const staffRoles = ['admin', 'supervisor', 'operations', 'logistics']
-        if (!staffRoles.includes(data.user.role)) {
+        const role = (data.user.role || '').toLowerCase().trim()
+        if (!staffRoles.includes(role)) {
           console.error('[Login] User does not have staff permissions:', data.user.role)
           setError({
-            type: 'permission',
+            type: 'authorization',
             message: 'Access denied. Your account does not have staff permissions.',
             retryable: false
           })
@@ -166,7 +178,7 @@ export default function StaffLoginPage() {
       setError(createNetworkError())
       setRetryCount(prev => prev + 1)
     } finally {
-      setLoading(false)
+      setFormLoading(false)
     }
   }
 
@@ -307,7 +319,7 @@ export default function StaffLoginPage() {
             <LoadingButton
               type="submit"
               data-testid="login-button"
-              loading={loading}
+              loading={formLoading}
               loadingText="Signing in..."
               disabled={error && !isRetryableAfterTime(error, lastAttemptTime)}
               className="w-full"

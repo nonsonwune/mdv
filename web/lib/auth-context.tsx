@@ -278,7 +278,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       userRoleType: typeof user.role,
       staffRoles: STAFF_ROLES,
       includes: STAFF_ROLES.includes(user.role),
-      includesNormalized: STAFF_ROLES.includes(user.role?.toLowerCase()?.trim()),
+      includesNormalized: STAFF_ROLES.includes(user.role?.toLowerCase()?.trim() as StaffRole),
       userEmail: user.email
     })
   }
@@ -485,8 +485,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
 
           if (isProtectedPage()) {
-            // Redirect to login for protected pages
-            window.location.href = '/login?expired=true'
+            // Redirect to staff login for protected pages (admin/staff areas)
+            window.location.href = '/staff-login?expired=true'
             return
           }
           break
