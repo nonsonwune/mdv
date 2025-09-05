@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 
 interface AdminRouteGuardProps {
   children: React.ReactNode;
@@ -22,52 +23,30 @@ interface User {
   name: string;
 }
 
-export const AdminRouteGuard: React.FC<AdminRouteGuardProps> = ({ 
-  children, 
-  fallback 
+export const AdminRouteGuard: React.FC<AdminRouteGuardProps> = ({
+  children,
+  fallback
 }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, loading, isAuthenticated } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    checkUserAccess();
-  }, []);
-
-  const checkUserAccess = async () => {
-    try {
-      // Check if user is authenticated and get user info
-      const response = await fetch('/api/auth/me', {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          // User not authenticated, redirect to login
-          router.push('/staff-login?redirect=' + encodeURIComponent(window.location.pathname));
-          return;
-        }
-        throw new Error('Failed to verify authentication');
+    if (!loading) {
+      if (!isAuthenticated || !user) {
+        // User not authenticated, redirect to login
+        router.push('/staff-login?redirect=' + encodeURIComponent(window.location.pathname));
+        return;
       }
-
-      const userData = await response.json();
-      setUser(userData);
 
       // Check if user has admin role
-      if (userData.role !== 'admin') {
+      if (user.role !== 'admin') {
         setError('Access denied. This page requires administrator privileges.');
+      } else {
+        setError(null); // Clear any previous errors
       }
-    } catch (err) {
-      console.error('Authentication check failed:', err);
-      setError('Failed to verify authentication. Please try logging in again.');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [user, loading, isAuthenticated, router]);
 
   if (loading) {
     return (
@@ -136,11 +115,11 @@ export const AdminRouteGuard: React.FC<AdminRouteGuardProps> = ({
   }
 
   // User is authenticated and has admin role
-  if (user && user.role === 'admin') {
+  if (isAuthenticated && user && user.role === 'admin' && !error) {
     return <>{children}</>;
   }
 
-  // Fallback - should not reach here
+  // Fallback - should not reach here if auth context is working properly
   return null;
 };
 
