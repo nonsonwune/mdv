@@ -74,8 +74,6 @@ export async function POST(req: NextRequest) {
     res.cookies.set("mdv_role", role, cookieOptions)
 
     console.log(`[AUTH-${requestId}] Login successful for ${body.email}, role: ${role}`)
-    console.log(`[AUTH-${requestId}] Setting cookies - token: ${token ? 'present' : 'missing'}, role: ${role}`)
-    console.log(`[AUTH-${requestId}] Cookie options:`, cookieOptions)
     return res
   } catch (e) {
     console.error(`[AUTH-${requestId}] Login error:`, e)

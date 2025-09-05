@@ -30,12 +30,6 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('mdv_token')?.value
   const role = request.cookies.get('mdv_role')?.value
 
-  // Debug logging for authentication issues
-  console.log(`[MIDDLEWARE] Path: ${pathname}`)
-  console.log(`[MIDDLEWARE] Token present: ${!!token}`)
-  console.log(`[MIDDLEWARE] Role: ${role}`)
-  console.log(`[MIDDLEWARE] All cookies:`, request.cookies.getAll().map(c => `${c.name}=${c.value}`))
-
   // If no token, redirect to appropriate login
   if (!token) {
     if (pathname.startsWith('/admin')) {
@@ -51,10 +45,6 @@ export function middleware(request: NextRequest) {
 
   // Check basic role permissions for the protected path
   const requiredRoles = PROTECTED_PATHS[protectedPath as keyof typeof PROTECTED_PATHS]
-  console.log(`[MIDDLEWARE] Required roles for ${protectedPath}:`, requiredRoles)
-  console.log(`[MIDDLEWARE] User role: ${role}`)
-  console.log(`[MIDDLEWARE] Role check result:`, role ? requiredRoles.includes(role as any) : 'No role')
-
   if (role && !requiredRoles.includes(role as any)) {
     // If customer tries to access admin, redirect to staff login
     if (pathname.startsWith('/admin') && role === 'customer') {
