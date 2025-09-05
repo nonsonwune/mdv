@@ -28,7 +28,6 @@ export default function CustomerLoginPage() {
   const [retryCount, setRetryCount] = useState(0)
   const [lastAttemptTime, setLastAttemptTime] = useState<number | null>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
-  const [shouldRedirect, setShouldRedirect] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -36,18 +35,18 @@ export default function CustomerLoginPage() {
   const toast = useToast()
   console.log("[Customer Login] Component state initialized")
 
-  // Handle redirect after successful authentication
+  // Simple redirect watcher - monitors authentication state changes
   useEffect(() => {
-    if (shouldRedirect && isAuthenticated && user) {
+    if (isAuthenticated && user && !loading) {
       const next = searchParams.get("next") || "/account"
-      console.log("[Customer Login] Authentication confirmed, redirecting to:", next)
+      console.log("[Customer Login] User authenticated, redirecting to:", next)
 
-      // Use a reliable redirect method
+      // Use a short delay to ensure the authentication state is stable
       setTimeout(() => {
         window.location.href = next
-      }, 1000) // Short delay to ensure state is stable
+      }, 1000)
     }
-  }, [shouldRedirect, isAuthenticated, user, searchParams])
+  }, [isAuthenticated, user, loading, searchParams])
 
 
 
@@ -93,18 +92,18 @@ export default function CustomerLoginPage() {
     setLastAttemptTime(Date.now())
 
     try {
+      console.log("[Customer Login] Starting login attempt for:", email.trim())
+
       // Use the auth context's loginWithRetry function
-      await loginWithRetry({ email: email.trim(), password })
+      const result = await loginWithRetry({ email: email.trim(), password })
+      console.log("[Customer Login] Login result:", result)
 
       // Reset retry count on successful login
       setRetryCount(0)
 
-      // Show success toast with redirect instruction
-      const next = searchParams.get("next") || "/account"
+      // Show success toast - the useEffect will handle redirect automatically
+      console.log("[Customer Login] Login successful, useEffect will handle redirect")
       toast.success("Welcome back!", "You have successfully signed in. Redirecting to your account...")
-
-      // Trigger redirect state - the useEffect will handle the actual redirect
-      setShouldRedirect(true)
 
     } catch (loginError: any) {
       // Handle the error
