@@ -129,14 +129,17 @@ export default function StaffLoginPage() {
         return
       }
 
-      // Small delay to ensure React state propagation
-      await new Promise(resolve => setTimeout(resolve, 200))
+      // Enhanced delay to ensure cookies are properly set and available for middleware
+      // This fixes the race condition where middleware runs before cookies are available
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
 
       console.log('[Login] Navigating to admin dashboard:', next)
-      router.replace(next as any)
+
+      // Use window.location.href for a full page navigation to ensure cookies are sent
+      window.location.href = next
 
     } catch (networkError) {
       // Handle network errors
