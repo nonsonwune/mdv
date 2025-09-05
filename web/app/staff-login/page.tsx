@@ -29,7 +29,7 @@ export default function StaffLoginPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { checkAuth } = useAuth()
+  const { checkAuth, login } = useAuth()
   const toast = useToast()
 
   // Enhanced URL error parameter handling
@@ -114,8 +114,17 @@ export default function StaffLoginPage() {
       // Show success toast
       toast.success("Welcome back!", data.user?.name ? `Hello ${data.user.name}, you're now signed in.` : "You have successfully signed in.")
 
-      // Refresh auth state to update navigation
-      await checkAuth()
+      // CRITICAL: Update auth context immediately to prevent race condition
+      // This ensures isStaff is true before the admin layout checks it
+      if (data.user) {
+        login(data.token, data.user)
+      }
+
+      // Also refresh auth state for consistency (but don't wait for it)
+      checkAuth().catch(console.error)
+
+      // Small delay to ensure auth context updates before navigation
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
