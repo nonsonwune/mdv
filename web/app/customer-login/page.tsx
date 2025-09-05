@@ -28,12 +28,26 @@ export default function CustomerLoginPage() {
   const [retryCount, setRetryCount] = useState(0)
   const [lastAttemptTime, setLastAttemptTime] = useState<number | null>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
+  const [shouldRedirect, setShouldRedirect] = useState(false)
 
   const router = useRouter()
   const searchParams = useSearchParams()
   const { checkAuth, loginWithRetry, isAuthenticated, user } = useAuth()
   const toast = useToast()
   console.log("[Customer Login] Component state initialized")
+
+  // Handle redirect after successful authentication
+  useEffect(() => {
+    if (shouldRedirect && isAuthenticated && user) {
+      const next = searchParams.get("next") || "/account"
+      console.log("[Customer Login] Authentication confirmed, redirecting to:", next)
+
+      // Use a reliable redirect method
+      setTimeout(() => {
+        window.location.href = next
+      }, 1000) // Short delay to ensure state is stable
+    }
+  }, [shouldRedirect, isAuthenticated, user, searchParams])
 
 
 
@@ -89,10 +103,8 @@ export default function CustomerLoginPage() {
       const next = searchParams.get("next") || "/account"
       toast.success("Welcome back!", "You have successfully signed in. Redirecting to your account...")
 
-      // Immediate redirect using window.location.replace (most reliable)
-      setTimeout(() => {
-        window.location.replace(next)
-      }, 1500) // Give time for user to see the success message
+      // Trigger redirect state - the useEffect will handle the actual redirect
+      setShouldRedirect(true)
 
     } catch (loginError: any) {
       // Handle the error
