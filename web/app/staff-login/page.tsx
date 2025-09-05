@@ -119,6 +119,18 @@ export default function StaffLoginPage() {
       if (data.user && data.token) {
         login(data.token, data.user)
         console.log('[Login] Auth context updated with user:', data.user.email, 'role:', data.user.role)
+
+        // Check if user has staff permissions before redirecting
+        const staffRoles = ['admin', 'supervisor', 'operations', 'logistics']
+        if (!staffRoles.includes(data.user.role)) {
+          console.error('[Login] User does not have staff permissions:', data.user.role)
+          setError({
+            type: 'permission',
+            message: 'Access denied. Your account does not have staff permissions.',
+            retryable: false
+          })
+          return
+        }
       } else {
         console.error('[Login] Missing user data in login response:', data)
         setError({
@@ -136,7 +148,7 @@ export default function StaffLoginPage() {
       // For staff, redirect to admin dashboard by default
       const next = searchParams.get("next") || "/admin"
 
-      console.log('[Login] Navigating to admin dashboard:', next)
+      console.log('[Login] User has valid staff role, navigating to admin dashboard:', next)
 
       // Use window.location.href for a full page navigation to ensure cookies are sent
       window.location.href = next
