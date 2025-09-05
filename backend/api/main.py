@@ -19,7 +19,7 @@ from mdv.config import settings
 from mdv.rate_limit import limiter
 from mdv.observability import init_observability
 from mdv.db import get_session_factory
-from mdv.models import Zone, StateZone
+from mdv.models import Zone, StateZone, User, Category, Role
 from mdv.errors import APIError, create_error_response, ErrorCode, ErrorCategory
 from mdv.response_middleware import ResponseStandardizationMiddleware, RequestContextMiddleware, get_request_id, get_processing_time
 from mdv.response_schemas import health, success
@@ -118,6 +118,81 @@ async def api_error_handler(request: Request, exc: APIError):
     return response
 
 
+async def seed_basic_users(db):
+    """Seed basic admin users required for the platform."""
+    from mdv.models import User, Role
+    from mdv.password import hash_password
+
+    # Define the basic users that should exist
+    users_to_create = [
+        {"name": "Admin User", "email": "admin@mdv.ng", "role": Role.admin, "password": "admin123"},
+        {"name": "Supervisor User", "email": "supervisor@mdv.ng", "role": Role.supervisor, "password": "supervisor123"},
+        {"name": "Operations User", "email": "operations@mdv.ng", "role": Role.operations, "password": "operations123"},
+        {"name": "Logistics User", "email": "logistics@mdv.ng", "role": Role.logistics, "password": "logistics123"},
+    ]
+
+    created_count = 0
+    for user_data in users_to_create:
+        # Check if user already exists
+        existing = await db.execute(
+            select(User).where(User.email == user_data["email"])
+        )
+
+        if existing.scalar_one_or_none():
+            print(f"✓ User exists: {user_data['name']} ({user_data['email']})")
+        else:
+            # Create new user
+            user = User(
+                name=user_data["name"],
+                email=user_data["email"],
+                role=user_data["role"],
+                active=True,
+                password_hash=hash_password(user_data["password"])
+            )
+            db.add(user)
+            created_count += 1
+            print(f"✓ Created user: {user_data['name']} ({user_data['email']}) - Role: {user_data['role'].value}")
+
+    return created_count
+
+
+async def seed_basic_categories(db):
+    """Seed basic categories required for the platform."""
+    from mdv.models import Category
+
+    # Define the categories that match frontend expectations
+    categories_to_create = [
+        {"name": "Men's Collection", "slug": "men", "show_in_navigation": True, "sort_order": 1},
+        {"name": "Women's Collection", "slug": "women", "show_in_navigation": True, "sort_order": 2},
+        {"name": "Essentials", "slug": "essentials", "show_in_navigation": True, "sort_order": 3},
+        {"name": "Sale & Clearance", "slug": "sale", "show_in_navigation": True, "sort_order": 4},
+    ]
+
+    created_count = 0
+    for cat_data in categories_to_create:
+        # Check if category already exists
+        existing = await db.execute(
+            select(Category).where(Category.slug == cat_data["slug"])
+        )
+
+        if existing.scalar_one_or_none():
+            print(f"✓ Category exists: {cat_data['name']} ({cat_data['slug']})")
+        else:
+            # Create new category
+            category = Category(
+                name=cat_data["name"],
+                slug=cat_data["slug"],
+                is_active=True,
+                show_in_navigation=cat_data.get("show_in_navigation", True),
+                sort_order=cat_data.get("sort_order", 0)
+            )
+            db.add(category)
+            created_count += 1
+            print(f"✓ Created category: {cat_data['name']} ({cat_data['slug']})")
+
+    return created_count
+
+
 @app.on_event("startup")
 async def startup_seed_reference():
     """Seed reference data on startup - non-blocking with error handling"""
@@ -140,11 +215,23 @@ async def startup_seed_reference():
         print("=" * 60)
 
     try:
-        # Seed Zones and a minimal state mapping if empty
         Session = get_session_factory()
         async with Session() as db:
-            existing = (await db.execute(select(Zone))).scalars().first()
-            if not existing:
+            # Seed users first
+            print("=" * 50)
+            print("Seeding basic users...")
+            print("=" * 50)
+            user_count = await seed_basic_users(db)
+
+            # Seed categories
+            print("=" * 50)
+            print("Seeding basic categories...")
+            print("=" * 50)
+            category_count = await seed_basic_categories(db)
+
+            # Seed Zones and state mapping if empty
+            existing_zones = (await db.execute(select(Zone))).scalars().first()
+            if not existing_zones:
                 lagos = Zone(name="Lagos", fee=1000)
                 north = Zone(name="North", fee=2000)
                 other = Zone(name="Other Zone", fee=1500)
@@ -152,8 +239,11 @@ async def startup_seed_reference():
                 await db.flush()
                 # Map Lagos state -> Lagos zone (basic seed)
                 db.add(StateZone(state="Lagos", zone_id=lagos.id))
-                await db.commit()
-                print("✓ Reference data seeded successfully")
+                print("✓ Reference zones seeded successfully")
+
+            await db.commit()
+            print(f"✓ Seeding complete: {user_count} users, {category_count} categories created")
+
     except Exception as e:
         print(f"Warning: Failed to seed reference data: {e}")
         print("Continuing without seeding - database might not be ready yet")

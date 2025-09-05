@@ -323,10 +323,7 @@ if __name__ == "__main__":
     # Run migrations (non-blocking)
     run_migrations()
 
-    # Seed basic data (async)
-    import asyncio
-    asyncio.run(seed_basic_users())
-    asyncio.run(seed_basic_categories())
+    # Note: Seeding is now handled by FastAPI startup events in api/main.py
 
     # Start server (blocking)
     start_server()
