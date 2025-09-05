@@ -267,6 +267,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isStaff = user ? STAFF_ROLES.includes(user.role) : false
   const isCustomer = user ? !STAFF_ROLES.includes(user.role) : false
 
+  // Temporary debugging - remove after fixing
+  if (user && !isStaff) {
+    console.log('[AUTH CONTEXT] User role check failed:', {
+      userRole: user.role,
+      userRoleType: typeof user.role,
+      staffRoles: STAFF_ROLES,
+      includes: STAFF_ROLES.includes(user.role),
+      userEmail: user.email
+    })
+  }
+
   // Helper to detect if we're on a protected page that likely needs auth
   const isProtectedPage = () => {
     if (typeof window === 'undefined') return false
