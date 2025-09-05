@@ -38,7 +38,7 @@ export default function AccountPage() {
     // Only load user data if authenticated
     if (!authLoading) {
       if (!isAuthenticated) {
-        router.push('/login?next=/account')
+        router.push('/customer-login?next=/account')
         return
       }
       loadUserData()

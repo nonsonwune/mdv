@@ -20,6 +20,7 @@ import {
 } from "../../lib/login-error-handler"
 
 export default function CustomerLoginPage() {
+  console.log("[Customer Login] Component loading/rendering")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -27,10 +28,14 @@ export default function CustomerLoginPage() {
   const [retryCount, setRetryCount] = useState(0)
   const [lastAttemptTime, setLastAttemptTime] = useState<number | null>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
+
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { checkAuth } = useAuth()
+  const { checkAuth, loginWithRetry, isAuthenticated, user } = useAuth()
   const toast = useToast()
+  console.log("[Customer Login] Component state initialized")
+
+
 
   // Enhanced URL error parameter handling
   useEffect(() => {
@@ -74,57 +79,40 @@ export default function CustomerLoginPage() {
     setLastAttemptTime(Date.now())
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Request-ID": `customer-login-${Date.now()}-${Math.random().toString(36).substring(7)}`
-        },
-        body: JSON.stringify({ email: email.trim(), password }),
-      })
-
-      if (!res.ok) {
-        const loginError = await parseApiError(res)
-        setError(loginError)
-        setRetryCount(prev => prev + 1)
-
-        // Track failed attempts for additional security
-        if (retryCount >= 2) {
-          setError({
-            ...loginError,
-            message: 'Multiple failed attempts detected',
-            details: 'Please double-check your credentials or contact support if you continue having issues.'
-          })
-        }
-        return
-      }
-
-      const data = await res.json()
-
-      // Handle force password change scenario
-      if (data.force_password_change) {
-        const changePasswordUrl = `/change-password?user_id=${data.user_id}&message=${encodeURIComponent(data.message || 'Password change required')}`
-        router.replace(changePasswordUrl as any)
-        return
-      }
+      // Use the auth context's loginWithRetry function
+      await loginWithRetry({ email: email.trim(), password })
 
       // Reset retry count on successful login
       setRetryCount(0)
 
-      // Show success toast
-      toast.success("Welcome back!", data.user?.name ? `Hello ${data.user.name}, you're now signed in.` : "You have successfully signed in.")
-
-      // Refresh auth state to update navigation
-      await checkAuth()
-
-      // For customers, redirect to account page by default
+      // Show success toast with redirect instruction
       const next = searchParams.get("next") || "/account"
-      router.replace(next as any)
+      toast.success("Welcome back!", "You have successfully signed in. Redirecting to your account...")
 
-    } catch (networkError) {
-      // Handle network errors
-      setError(createNetworkError())
+      // Immediate redirect using window.location.replace (most reliable)
+      setTimeout(() => {
+        window.location.replace(next)
+      }, 1500) // Give time for user to see the success message
+
+    } catch (loginError: any) {
+      // Handle the error
+      const parsedError = await parseApiError({
+        ok: false,
+        status: loginError.status || 401,
+        text: async () => loginError.message || "Login failed"
+      } as Response)
+
+      setError(parsedError)
       setRetryCount(prev => prev + 1)
+
+      // Track failed attempts for additional security
+      if (retryCount >= 2) {
+        setError({
+          ...parsedError,
+          message: 'Multiple failed attempts detected',
+          details: 'Please double-check your credentials or contact support if you continue having issues.'
+        })
+      }
     } finally {
       setLoading(false)
     }
