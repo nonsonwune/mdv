@@ -46,11 +46,17 @@ export default function AdminLayout({
   const { user, loading, isStaff, logout, hasPermission, isRole } = useAuth()
 
   useEffect(() => {
-    // Redirect non-staff users
-    if (!loading && !isStaff) {
-      router.push('/staff-login?error=insufficient_permissions')
+    // Wait for auth to fully load before making decisions
+    if (!loading) {
+      if (!user) {
+        // No user authenticated, redirect to login
+        router.push('/staff-login')
+      } else if (!isStaff) {
+        // User is authenticated but not staff, show permission error
+        router.push('/staff-login?error=insufficient_permissions')
+      }
     }
-  }, [loading, isStaff, router])
+  }, [loading, isStaff, user, router])
 
   const handleLogout = async () => {
     await logout()
@@ -213,16 +219,29 @@ export default function AdminLayout({
     }
   }
 
+  // Show loading state while auth is being determined
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-maroon-700"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-maroon-700 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading admin dashboard...</p>
+        </div>
       </div>
     )
   }
 
-  if (!user) {
-    return null
+  // Don't render anything if user is not authenticated or not staff
+  // The useEffect will handle redirects
+  if (!user || !isStaff) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-maroon-700 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verifying access...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
