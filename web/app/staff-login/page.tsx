@@ -32,8 +32,27 @@ export default function StaffLoginPage() {
   const { checkAuth, login, user, loading: authLoading, isStaff } = useAuth()
   const toast = useToast()
 
-  // Enhanced URL error parameter handling
+  // Primary redirect logic: if already authenticated as staff, go to admin immediately
   useEffect(() => {
+    if (!authLoading && user && isStaff) {
+      console.log('[STAFF-LOGIN] User already authenticated as staff, redirecting to admin:', {
+        email: user.email,
+        role: user.role,
+        isStaff
+      })
+      const next = searchParams.get("next") || "/admin"
+      router.replace(next as any)
+      return
+    }
+  }, [authLoading, user, isStaff, router, searchParams])
+
+  // Enhanced URL error parameter handling - but only if not already authenticated as staff
+  useEffect(() => {
+    // If user is already authenticated as staff, don't show error messages
+    if (!authLoading && user && isStaff) {
+      return
+    }
+
     const urlError = searchParams.get('error')
     const parsedError = parseUrlError(urlError)
     if (parsedError) {
@@ -48,26 +67,20 @@ export default function StaffLoginPage() {
         setError(parsedError)
       }
     }
-  }, [searchParams])
+  }, [searchParams, authLoading, user, isStaff])
 
-  // Clear stale error parameters on mount to prevent showing old errors after successful login
-  useEffect(() => {
-    const err = searchParams.get('error')
-    if (err) {
-      const url = new URL(window.location.href)
-      url.searchParams.delete('error')
-      router.replace((url.pathname + (url.search || '')) as any)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Redirect if already authenticated as staff (don't pre-judge during loading)
+  // Clear stale error parameters when user becomes authenticated as staff
   useEffect(() => {
     if (!authLoading && user && isStaff) {
-      const next = searchParams.get("next") || "/admin"
-      router.replace(next as any)
+      const urlError = searchParams.get('error')
+      if (urlError) {
+        console.log('[STAFF-LOGIN] Clearing stale error parameter for authenticated staff user')
+        const url = new URL(window.location.href)
+        url.searchParams.delete('error')
+        router.replace((url.pathname + (url.search || '')) as any)
+      }
     }
-  }, [authLoading, user, isStaff, router, searchParams])
+  }, [authLoading, user, isStaff, searchParams, router])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -254,7 +267,7 @@ export default function StaffLoginPage() {
             )}
           </div>
 
-          {error && (
+          {error && !(!authLoading && user && isStaff) && (
             <div className={`border rounded-md p-4 ${
               error.type === 'rate_limit' ? 'bg-yellow-50 border-yellow-200' :
               error.type === 'network' ? 'bg-blue-50 border-blue-200' :
@@ -321,7 +334,12 @@ export default function StaffLoginPage() {
               data-testid="login-button"
               loading={formLoading}
               loadingText="Signing in..."
-              disabled={error && !isRetryableAfterTime(error, lastAttemptTime)}
+              disabled={
+                // Don't disable if user is already authenticated as staff (they'll be redirected)
+                (!authLoading && user && isStaff) ? false :
+                // Otherwise, disable based on error state and retry timing
+                (error && !isRetryableAfterTime(error, lastAttemptTime)) || false
+              }
               className="w-full"
               style={{ backgroundColor: '#800000', color: '#ffffff' }}
             >
