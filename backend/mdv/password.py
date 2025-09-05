@@ -3,6 +3,11 @@ Password hashing and verification utilities using bcrypt.
 """
 import bcrypt
 import hashlib
+from passlib.context import CryptContext
+
+# Create a minimal password context for verification only
+# This handles existing passlib-generated hashes
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
@@ -32,16 +37,21 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
+    if not hashed_password or not plain_password:
+        return False
+
     # Handle legacy SHA256 hashes for backward compatibility
-    if hashed_password and len(hashed_password) == 64 and not hashed_password.startswith('$'):
+    if len(hashed_password) == 64 and not hashed_password.startswith('$'):
         # This looks like a SHA256 hash (64 hex characters)
         sha256_hash = hashlib.sha256(plain_password.encode()).hexdigest()
         return sha256_hash == hashed_password
 
-    # Use bcrypt for new hashes
+    # Use passlib for verification to handle existing hashes
+    # This avoids the bcrypt version compatibility issues
     try:
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except (ValueError, TypeError):
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        print(f"Password verification error: {e}")
         return False
 
 
@@ -59,9 +69,11 @@ def needs_rehash(hashed_password: str) -> bool:
     if hashed_password and len(hashed_password) == 64 and not hashed_password.startswith('$'):
         return True
 
-    # For bcrypt, we'll consider all existing hashes as valid for now
-    # In the future, we could check the cost factor and update if needed
-    return False
+    # Use passlib to check if bcrypt hash needs update
+    try:
+        return pwd_context.needs_update(hashed_password)
+    except Exception:
+        return False
 
 
 def migrate_password_hash(plain_password: str, old_hash: str) -> str:
