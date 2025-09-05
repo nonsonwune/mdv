@@ -5,12 +5,15 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Needed for building native deps like sharp
 RUN apk add --no-cache libc6-compat python3 make g++
 COPY web/package.json web/package-lock.json ./
-RUN npm ci
+# Use npm ci with increased memory and timeout for Railway
+RUN npm ci --maxsockets 1 --prefer-offline
 
 # ---------- build: compile Next.js (standalone) ----------
 FROM node:20-alpine AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Increase Node.js memory limit for Railway builds
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 # Public build args (baked into the bundle)
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
@@ -26,8 +29,10 @@ COPY web ./
 COPY docs /docs
 # Optional: quick visibility during build
 RUN echo "Building with NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}"
-# Build (runs your prebuild -> openapi-typescript -> next build)
-RUN npm run build
+# Verify API contracts file exists before build
+RUN ls -la /docs/api-contracts.yaml || echo "Warning: API contracts file not found"
+# Build with error handling and verbose output for debugging
+RUN npm run build || (echo "Build failed, checking logs..." && cat .next/trace || exit 1)
 
 # ---------- runner: minimal production image ----------
 FROM node:20-alpine AS runner

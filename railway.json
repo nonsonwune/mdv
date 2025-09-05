@@ -86,7 +86,9 @@
         },
         "build": {
           "builder": "DOCKERFILE",
-          "dockerfilePath": "Dockerfile.web"
+          "dockerfilePath": "Dockerfile.web",
+          "buildCommand": null,
+          "watchPatterns": ["web/**", "docs/api-contracts.yaml", "Dockerfile.web"]
         },
         "deploy": {
           "startCommand": "node server.js",
@@ -97,9 +99,9 @@
           "numReplicas": 1
         },
         "resources": {
-          "memoryLimit": 1024,
-          "cpuLimit": 500,
-          "diskSizeGB": 5
+          "memoryLimit": 2048,
+          "cpuLimit": 1000,
+          "diskSizeGB": 10
         },
         "envs": [
           "NEXT_PUBLIC_API_URL",
