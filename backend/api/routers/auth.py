@@ -19,7 +19,7 @@ class AuthCheckResponse(BaseModel):
 
 
 @router.post("/login", response_model=AuthLoginResponse)
-# @create_rate_limited_endpoint("login")  # Temporarily disabled for debugging
+@limiter.limit("10 per minute")  # Simple rate limiting without custom decorator
 async def login(request: Request, body: AuthLoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Authenticate user with email and password.
