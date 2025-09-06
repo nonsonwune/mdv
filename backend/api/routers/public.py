@@ -759,8 +759,50 @@ async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
         product = res.scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    # Load variants with inventory data
     vres = await db.execute(select(Variant).where(Variant.product_id == product.id))
-    variants = [VariantOut(id=v.id, sku=v.sku, size=v.size, color=v.color, price=float(v.price)) for v in vres.scalars().all()]
+    variants_with_inventory = []
+    total_stock = 0
+    low_stock_count = 0
+    out_of_stock_count = 0
+
+    for v in vres.scalars().all():
+        # Get inventory for this variant
+        inv_res = await db.execute(select(Inventory).where(Inventory.variant_id == v.id))
+        inventory = inv_res.scalar_one_or_none()
+
+        stock_quantity = inventory.quantity if inventory else 0
+        safety_stock = inventory.safety_stock if inventory else 0
+        total_stock += stock_quantity
+
+        # Determine stock status
+        if stock_quantity == 0:
+            stock_status = "out_of_stock"
+            out_of_stock_count += 1
+        elif stock_quantity <= safety_stock:
+            stock_status = "low_stock"
+            low_stock_count += 1
+        else:
+            stock_status = "in_stock"
+
+        variant_data = {
+            "id": v.id,
+            "sku": v.sku,
+            "size": v.size,
+            "color": v.color,
+            "price": float(v.price),
+            "stock_quantity": stock_quantity,
+            "stock_status": stock_status
+        }
+        variants_with_inventory.append(variant_data)
+
+    # Calculate overall product stock status
+    if out_of_stock_count == len(variants_with_inventory):
+        product_stock_status = "out_of_stock"
+    elif low_stock_count > 0 or out_of_stock_count > 0:
+        product_stock_status = "low_stock"
+    else:
+        product_stock_status = "in_stock"
     # Explicitly load images for this product
     imgs = []
     ires = await db.execute(
@@ -794,8 +836,10 @@ async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
         "slug": product.slug,
         "description": product.description,
         "compare_at_price": float(product.compare_at_price) if product.compare_at_price else None,
-        "variants": [v.model_dump() if hasattr(v, 'model_dump') else v.__dict__ for v in variants],
+        "variants": variants_with_inventory,
         "images": imgs,
+        "total_stock": total_stock,
+        "stock_status": product_stock_status,
         "average_rating": float(stats.avg_rating) if stats.avg_rating else None,
         "review_count": int(stats.review_count) if stats.review_count else 0,
     }
