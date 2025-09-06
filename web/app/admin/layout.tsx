@@ -284,7 +284,7 @@ export default function AdminLayout({
 
       {/* Sidebar */}
       <div className={`
-        fixed top-0 left-0 z-50 h-full w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out
+        fixed top-0 left-0 z-50 h-full w-80 md:w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out safe-area-inset
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
       `}>
@@ -323,7 +323,7 @@ export default function AdminLayout({
                         key={item.name}
                         href={item.href as any}
                         className={`
-                          flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group
+                          flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px]
                           ${isActive
                             ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
                             : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
@@ -367,14 +367,30 @@ export default function AdminLayout({
       {/* Main content area */}
       <div className="lg:pl-64">
         {/* Mobile header */}
-        <div className="sticky top-0 z-30 flex items-center gap-4 h-16 px-4 bg-white border-b border-gray-200 lg:hidden">
-          <button
-            onClick={() => setIsSidebarOpen(true)}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            <Bars3Icon className="h-6 w-6" />
-          </button>
-          <span className="text-lg font-semibold text-gray-900">MDV Admin</span>
+        <div className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200 lg:hidden safe-area-inset">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsSidebarOpen(true)}
+              className="text-gray-500 hover:text-gray-700 p-2 -ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Open navigation menu"
+            >
+              <Bars3Icon className="h-6 w-6" />
+            </button>
+            <span className="text-lg font-semibold text-gray-900">MDV Admin</span>
+          </div>
+
+          {/* Mobile user info */}
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-sm font-medium text-gray-900 truncate max-w-[120px]">{user?.name}</p>
+              <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+            </div>
+            <div className="w-8 h-8 bg-maroon-100 rounded-full flex items-center justify-center">
+              <span className="text-sm font-semibold text-maroon-700">
+                {user?.name?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Page content */}

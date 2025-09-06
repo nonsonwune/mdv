@@ -83,8 +83,8 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
   const currentImage = product.images?.[imageIndex] || product.images?.[0]
   
   return (
-    <div 
-      className="group relative"
+    <div
+      className="group relative touch-manipulation"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false)
@@ -92,7 +92,7 @@ export default function ProductCard({ product, priority = false }: ProductCardPr
       }}
     >
       <Link href={`/product/${product.slug}`} className="block">
-        <div className="relative overflow-hidden rounded-lg bg-neutral-100">
+        <div className="relative overflow-hidden rounded-lg bg-neutral-100 transition-transform duration-200 active:scale-95 md:active:scale-100">
           {/* Sale Badge */}
           {isOnSale && (
             <Badge
