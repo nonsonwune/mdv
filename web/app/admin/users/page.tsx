@@ -174,22 +174,13 @@ function UserManagementContent() {
 
   // Helper functions for user categorization
   const isCustomerUser = (user: User): boolean => {
-    // Customer users have the 'customer' role
-    // Fallback: during migration period, operations users with password are likely customers
-    if (user.role === 'customer') {
-      return true
-    }
-    // Temporary fallback logic for migration period
-    return user.role === 'operations' && user.has_password === true
+    // Only users with the 'customer' role are customers
+    return user.role === 'customer'
   }
 
   const isStaffUser = (user: User): boolean => {
-    // Staff users have admin roles
-    if (['admin', 'supervisor', 'logistics'].includes(user.role)) {
-      return true
-    }
-    // Operations users without password are likely staff (admin-created)
-    return user.role === 'operations' && user.has_password === false
+    // All staff roles are considered staff users
+    return ['admin', 'supervisor', 'operations', 'logistics'].includes(user.role)
   }
 
   const getFilteredUsers = (): User[] => {
