@@ -6,6 +6,8 @@ export type ProductImage = {
   height?: number | null
   sort_order: number
   is_primary: boolean
+  variant_id?: number | null  // For variant-specific images
+  responsive_urls?: Record<string, string>  // Cloudinary responsive URLs
 }
 
 export type Variant = {
@@ -16,6 +18,7 @@ export type Variant = {
   price: number
   stock_quantity?: number
   stock_status?: "in_stock" | "low_stock" | "out_of_stock"
+  images?: ProductImage[]  // Variant-specific images
 }
 
 export type Product = {

@@ -14,6 +14,8 @@ import {
   CheckIcon,
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline'
+import ProductImageManager from '@/components/admin/ProductImageManager'
+import VariantImageManager from '@/components/admin/VariantImageManager'
 
 interface Category {
   id: number
@@ -30,6 +32,7 @@ interface ProductVariant {
   stock_quantity: number
   safety_stock: number
   is_active: boolean
+  images?: ProductImage[]
 }
 
 interface ProductImage {
@@ -37,6 +40,10 @@ interface ProductImage {
   url: string
   alt_text?: string
   display_order: number
+  sort_order: number
+  is_primary: boolean
+  variant_id?: number | null
+  responsive_urls?: Record<string, string>
 }
 
 interface Product {
@@ -165,13 +172,33 @@ export default function ProductEditPage() {
     const updatedImages = [...images]
     const [movedImage] = updatedImages.splice(fromIndex, 1)
     updatedImages.splice(toIndex, 0, movedImage)
-    
+
     // Update display_order
     updatedImages.forEach((img, index) => {
       img.display_order = index + 1
     })
-    
+
     setImages(updatedImages)
+  }
+
+  // Variant image handlers
+  const handleVariantImagesUpdate = (variantId: number, variantImages: ProductImage[]) => {
+    // Update the variant with new images
+    const updatedVariants = variants.map(variant =>
+      variant.id === variantId
+        ? { ...variant, images: variantImages }
+        : variant
+    )
+    setVariants(updatedVariants)
+
+    // Update the global images state
+    const otherImages = images.filter(img => img.variant_id !== variantId)
+    const allImages = [...otherImages, ...variantImages]
+    setImages(allImages)
+  }
+
+  const handleProductImagesUpdate = (productImages: ProductImage[]) => {
+    setImages(productImages)
   }
 
   const validateForm = () => {
@@ -584,6 +611,25 @@ const handlePreview = () => {
                           Variant is active
                         </label>
                       </div>
+
+                      {/* Variant Images */}
+                      <div className="mt-6 pt-6 border-t border-gray-200">
+                        <VariantImageManager
+                          variant={{
+                            id: variant.id,
+                            sku: variant.sku,
+                            size: variant.size,
+                            color: variant.color,
+                            price: variant.price,
+                            stock_quantity: variant.stock_quantity,
+                            stock_status: variant.stock_quantity > 0 ? 'in_stock' : 'out_of_stock',
+                            images: variant.images || []
+                          }}
+                          productId={product?.id || 0}
+                          onImagesUpdate={handleVariantImagesUpdate}
+                          disabled={saving}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -596,84 +642,13 @@ const handlePreview = () => {
         <div className="space-y-6">
           {/* Product Images */}
           <div className="bg-white rounded-lg shadow">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">Product Images</h3>
-              <p className="text-sm text-gray-600">Drag to reorder images</p>
-            </div>
-            <div className="p-6 space-y-4">
-              {/* Existing Images */}
-              {images.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700">Current Images</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    {images.map((image, index) => (
-                      <div key={image.id} className="relative group">
-                        <img
-                          src={image.url}
-                          alt={image.alt_text || `Product image ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg border border-gray-200"
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity rounded-lg"></div>
-                        <button
-                          onClick={() => handleDeleteExistingImage(image.id)}
-                          className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <XMarkIcon className="h-3 w-3" />
-                        </button>
-                        <div className="absolute bottom-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                          #{index + 1}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* New Images Preview */}
-              {newImages.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700">New Images</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    {newImages.map((file, index) => (
-                      <div key={index} className="relative group">
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`New image ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg border border-gray-200"
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-opacity rounded-lg"></div>
-                        <button
-                          onClick={() => handleRemoveNewImage(index)}
-                          className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <XMarkIcon className="h-3 w-3" />
-                        </button>
-                        <div className="absolute bottom-1 left-1 bg-green-600 text-white text-xs px-2 py-1 rounded">
-                          NEW
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Upload Button */}
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                <PhotoIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <label className="cursor-pointer">
-                  <span className="text-sm font-medium text-maroon-600 hover:text-maroon-500">
-                    Upload images
-                  </span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                </label>
-                <p className="text-xs text-gray-500 mt-1">PNG, JPG, GIF up to 10MB each</p>
-              </div>
+            <div className="p-6">
+              <ProductImageManager
+                productId={product?.id || 0}
+                images={images}
+                onImagesUpdate={handleProductImagesUpdate}
+                disabled={saving}
+              />
             </div>
           </div>
 
