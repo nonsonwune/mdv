@@ -152,16 +152,33 @@ async def get_order_details(
             )
             product = product_result.scalar_one_or_none()
 
-            # Get product image URL
+            # Get variant-specific image URL with fallback to product image
             image_url = None
             if product:
-                image_result = await db.execute(
+                # First, try to get variant-specific image
+                variant_image_result = await db.execute(
                     select(ProductImage.url)
-                    .where(ProductImage.product_id == product.id)
+                    .where(and_(
+                        ProductImage.product_id == product.id,
+                        ProductImage.variant_id == item.variant_id
+                    ))
                     .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
                     .limit(1)
                 )
-                image_url = image_result.scalar_one_or_none()
+                image_url = variant_image_result.scalar_one_or_none()
+
+                # If no variant-specific image, fallback to primary product image
+                if not image_url:
+                    product_image_result = await db.execute(
+                        select(ProductImage.url)
+                        .where(and_(
+                            ProductImage.product_id == product.id,
+                            ProductImage.variant_id.is_(None)
+                        ))
+                        .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order.asc())
+                        .limit(1)
+                    )
+                    image_url = product_image_result.scalar_one_or_none()
 
             items_response.append(OrderItemResponse(
                 id=item.id,
