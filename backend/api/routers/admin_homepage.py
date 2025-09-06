@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -177,3 +177,56 @@ async def get_featured_product_candidates(
         ))
     
     return candidates
+
+
+@router.post("/create-table")
+async def create_homepage_config_table(
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(get_current_claims)
+):
+    """
+    Emergency endpoint to create homepage_config table if it doesn't exist.
+    This is a temporary fix for migration issues.
+    """
+    # Require admin permission
+    require_permission(claims, Permission.SYSTEM_SETTINGS)
+
+    try:
+        # Check if table exists
+        result = await db.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_name = 'homepage_config'
+            );
+        """))
+        table_exists = result.scalar()
+
+        if table_exists:
+            return {"message": "Table already exists", "created": False}
+
+        # Create the table
+        await db.execute(text("""
+            CREATE TABLE homepage_config (
+                id SERIAL PRIMARY KEY,
+                hero_title VARCHAR(255),
+                hero_subtitle VARCHAR(500),
+                hero_cta_text VARCHAR(100),
+                hero_image_url VARCHAR(500),
+                featured_product_ids JSON,
+                categories_enabled BOOLEAN,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """))
+
+        await db.commit()
+
+        return {"message": "Table created successfully", "created": True}
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create table: {str(e)}"
+        )
