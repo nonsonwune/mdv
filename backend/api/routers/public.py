@@ -750,6 +750,7 @@ async def get_sale_products(
 
 @router.get("/api/products/{id_or_slug}", response_model=ProductOut)
 async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
+    """Get single product with inventory data."""
     product = None
     if id_or_slug.isdigit():
         res = await db.execute(select(Product).where(Product.id == int(id_or_slug)))
