@@ -337,21 +337,21 @@ export default function CheckoutCallbackPage() {
         <div className="flex flex-wrap justify-center gap-4 mb-8 print:hidden">
           <button
             onClick={handlePrint}
-            className="flex items-center px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
+            className="receipt-action-button flex items-center px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
           >
             <PrinterIcon className="h-5 w-5 mr-2" />
             Print Receipt
           </button>
           <button
             onClick={handleEmailReceipt}
-            className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="receipt-secondary-button flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <EnvelopeIcon className="h-5 w-5 mr-2" />
             Email Receipt
           </button>
           <Link
             href="/products"
-            className="flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="receipt-secondary-button flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <ShoppingBagIcon className="h-5 w-5 mr-2" />
             Continue Shopping
@@ -545,7 +545,7 @@ export default function CheckoutCallbackPage() {
         <div className="mt-8 text-center print:hidden">
           <Link
             href="/account/orders"
-            className="inline-flex items-center px-6 py-3 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
+            className="receipt-action-button inline-flex items-center px-6 py-3 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
           >
             View All Orders
           </Link>

@@ -92,11 +92,28 @@
     border-radius: 0 !important;
   }
 
-  /* Ensure text is black */
+  /* Ensure text is black for printing */
   .text-gray-600,
   .text-gray-500,
-  .text-gray-400 {
-    color: #333 !important;
+  .text-gray-400,
+  .text-gray-700,
+  .text-gray-800,
+  .text-gray-900 {
+    color: #000 !important;
+  }
+
+  /* Force white background for all receipt elements */
+  .receipt-container,
+  .receipt-container * {
+    background-color: white !important;
+    color: #000 !important;
+  }
+
+  /* Exception for header which should remain maroon */
+  .receipt-header,
+  .receipt-header * {
+    background-color: #8B1538 !important;
+    color: white !important;
   }
 
   /* Make sure important text stands out */
@@ -218,25 +235,113 @@
   }
 }
 
-/* Dark mode support (for future enhancement) */
-@media (prefers-color-scheme: dark) {
-  @media screen {
-    .receipt-container {
-      background: #1f2937;
-      color: #f9fafb;
-    }
-
-    .receipt-header {
-      background: #7c2d12 !important;
-    }
-
-    table th {
-      background: #374151 !important;
-      color: #f9fafb;
-    }
-
-    table td {
-      border-color: #4b5563;
-    }
+/* Force light mode for receipts - always print-friendly */
+@media screen {
+  .receipt-container {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+    border: 1px solid #e5e7eb;
   }
+
+  .receipt-header {
+    background: #8B1538 !important;
+    color: #ffffff !important;
+  }
+
+  table th {
+    background: #f9fafb !important;
+    color: #1f2937 !important;
+    border: 1px solid #e5e7eb;
+  }
+
+  table td {
+    background: #ffffff !important;
+    color: #1f2937 !important;
+    border: 1px solid #e5e7eb;
+  }
+
+  /* Ensure all text elements are dark for readability */
+  .receipt-container .text-gray-600,
+  .receipt-container .text-gray-500,
+  .receipt-container .text-gray-400,
+  .receipt-container .text-gray-700,
+  .receipt-container .text-gray-800,
+  .receipt-container .text-gray-900 {
+    color: #374151 !important;
+  }
+
+  /* Ensure proper contrast for all receipt content */
+  .receipt-container * {
+    color: inherit;
+  }
+
+  .receipt-container .text-green-600 {
+    color: #059669 !important;
+  }
+
+  .receipt-container .text-red-600 {
+    color: #dc2626 !important;
+  }
+
+  .receipt-container .text-blue-800 {
+    color: #1e40af !important;
+  }
+
+  .receipt-container .text-blue-900 {
+    color: #1e3a8a !important;
+  }
+
+  .receipt-container .text-yellow-800 {
+    color: #92400e !important;
+  }
+}
+
+/* Button visibility fixes - ensure buttons are always visible */
+.receipt-action-button {
+  background-color: #800000 !important; /* maroon-700 */
+  color: #ffffff !important;
+  border: 1px solid #800000 !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.5rem !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 44px !important;
+  cursor: pointer !important;
+}
+
+.receipt-action-button:hover {
+  background-color: #5d0b20 !important; /* maroon-800 */
+  border-color: #5d0b20 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.receipt-action-button:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.receipt-secondary-button {
+  background-color: #ffffff !important;
+  color: #374151 !important;
+  border: 1px solid #d1d5db !important;
+  padding: 0.5rem 1rem !important;
+  border-radius: 0.5rem !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 44px !important;
+  cursor: pointer !important;
+}
+
+.receipt-secondary-button:hover {
+  background-color: #f9fafb !important;
+  border-color: #9ca3af !important;
 }
