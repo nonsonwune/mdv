@@ -59,8 +59,39 @@ async def log_admin_action(
     after: Optional[dict] = None
 ):
     """Log admin actions for audit trail (JSON-safe)."""
-    # Delegate to centralized audit utility which JSON-serializes Decimals/datetimes/etc.
-    await audit(db, actor_id, action, entity, entity_id, before, after)
+    # This function is deprecated - use AuditService.log_event directly
+    # Keeping for backward compatibility but should be migrated
+    from mdv.audit import AuditService
+    from mdv.models import AuditAction, AuditEntity
+
+    # Map string actions to enum values
+    action_mapping = {
+        "product.create": AuditAction.CREATE,
+        "product.update": AuditAction.UPDATE,
+        "product.delete": AuditAction.DELETE,
+        "category.create": AuditAction.CREATE,
+        "category.update": AuditAction.UPDATE,
+        "category.delete": AuditAction.DELETE,
+    }
+
+    entity_mapping = {
+        "Product": AuditEntity.PRODUCT,
+        "Category": AuditEntity.CATEGORY,
+        "Variant": AuditEntity.VARIANT,
+    }
+
+    audit_action = action_mapping.get(action, AuditAction.UPDATE)
+    audit_entity = entity_mapping.get(entity, AuditEntity.PRODUCT)
+
+    await AuditService.log_event(
+        action=audit_action,
+        entity=audit_entity,
+        entity_id=entity_id,
+        before=before,
+        after=after,
+        actor_id=actor_id,
+        session=db
+    )
 
 
 async def get_product_with_details(db: AsyncSession, product_id: int) -> Optional[Product]:
@@ -1460,15 +1491,18 @@ async def update_sale_categories(
     changes = await update_all_sale_categories(db, current_user.id)
 
     # Audit the bulk update
-    await audit(
-        db,
-        user_id=current_user.id,
-        action="update_sale_categories",
-        entity_type="category",
-        details={
+    from mdv.audit import AuditService
+    from mdv.models import AuditAction, AuditEntity
+
+    await AuditService.log_event(
+        action=AuditAction.BULK_UPDATE,
+        entity=AuditEntity.CATEGORY,
+        metadata={
             "changes": changes,
             "triggered_by": "manual_update"
-        }
+        },
+        actor_id=current_user.id,
+        session=db
     )
 
     return {

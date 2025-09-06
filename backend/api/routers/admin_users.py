@@ -18,8 +18,9 @@ from mdv.rbac import (
     ADMINS, SUPERVISORS, Permission,
     require_permission, require_any_permission
 )
-from mdv.models import User, Role
-from mdv.utils import audit, parse_actor_id
+from mdv.models import User, Role, AuditAction, AuditEntity
+from mdv.utils import parse_actor_id
+from mdv.audit import AuditService
 from ..deps import get_db
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
@@ -278,8 +279,10 @@ async def create_user(
             existing_user.password_hash = hash_password(request.password)
 
             # Audit log for conversion
-            await audit(
-                db, actor_id, "user.convert_to_staff", "User", existing_user.id,
+            await AuditService.log_event(
+                action=AuditAction.UPDATE,
+                entity=AuditEntity.USER,
+                entity_id=existing_user.id,
                 before={
                     "role": "operations",
                     "active": existing_user.active,
@@ -291,7 +294,9 @@ async def create_user(
                     "role": existing_user.role.value,
                     "active": existing_user.active,
                     "has_password": bool(existing_user.password_hash)
-                }
+                },
+                actor_id=actor_id,
+                session=db
             )
 
             await db.commit()
@@ -343,15 +348,19 @@ async def create_user(
         raise
     
     # Audit log
-    await audit(
-        db, actor_id, "user.create", "User", user.id,
+    await AuditService.log_event(
+        action=AuditAction.CREATE,
+        entity=AuditEntity.USER,
+        entity_id=user.id,
         before=None,
         after={
             "name": user.name,
             "email": user.email,
             "role": user.role.value,
             "active": user.active
-        }
+        },
+        actor_id=actor_id,
+        session=db
     )
     
     await db.commit()
@@ -454,15 +463,19 @@ async def create_supervisor(
         raise
     
     # Audit log
-    await audit(
-        db, actor_id, "supervisor.create", "User", user.id,
+    await AuditService.log_event(
+        action=AuditAction.CREATE,
+        entity=AuditEntity.USER,
+        entity_id=user.id,
         before=None,
         after={
             "name": user.name,
             "email": user.email,
             "role": "supervisor",
             "active": True
-        }
+        },
+        actor_id=actor_id,
+        session=db
     )
     
     await db.commit()
@@ -554,10 +567,14 @@ async def update_user(
     }
     
     if before != after:
-        await audit(
-            db, actor_id, "user.update", "User", user.id,
+        await AuditService.log_event(
+            action=AuditAction.UPDATE,
+            entity=AuditEntity.USER,
+            entity_id=user.id,
             before=before,
-            after=after
+            after=after,
+            actor_id=actor_id,
+            session=db
         )
     
     await db.commit()
@@ -650,10 +667,14 @@ async def delete_user(
     user.active = False
 
     # Audit log
-    await audit(
-        db, actor_id, "user.delete", "User", user.id,
+    await AuditService.log_event(
+        action=AuditAction.DELETE,
+        entity=AuditEntity.USER,
+        entity_id=user.id,
         before=before,
-        after={"active": False, "forced": force}
+        after={"active": False, "forced": force},
+        actor_id=actor_id,
+        session=db
     )
 
     await db.commit()
@@ -692,10 +713,14 @@ async def activate_user(
     user.active = True
     
     # Audit log
-    await audit(
-        db, actor_id, "user.activate", "User", user.id,
+    await AuditService.log_event(
+        action=AuditAction.UPDATE,
+        entity=AuditEntity.USER,
+        entity_id=user.id,
         before=before,
-        after={"active": True}
+        after={"active": True},
+        actor_id=actor_id,
+        session=db
     )
     
     await db.commit()
@@ -738,10 +763,14 @@ async def reset_user_password(
     user.force_password_change = True
 
     # Audit log
-    await audit(
-        db, actor_id, "user.password_reset", "User", user.id,
+    await AuditService.log_event(
+        action=AuditAction.PASSWORD_RESET,
+        entity=AuditEntity.USER,
+        entity_id=user.id,
         before={"force_password_change": False},
-        after={"password_reset": True, "force_password_change": True}
+        after={"password_reset": True, "force_password_change": True},
+        actor_id=actor_id,
+        session=db
     )
 
     await db.commit()
@@ -814,8 +843,10 @@ async def create_bulk_users(
             existing_user.password_hash = hash_password(user_data.password)
 
             # Audit log for conversion
-            await audit(
-                db, actor_id, "user.bulk_convert_to_staff", "User", existing_user.id,
+            await AuditService.log_event(
+                action=AuditAction.UPDATE,
+                entity=AuditEntity.USER,
+                entity_id=existing_user.id,
                 before={
                     "role": "operations",
                     "active": existing_user.active,
@@ -827,7 +858,9 @@ async def create_bulk_users(
                     "role": existing_user.role.value,
                     "active": existing_user.active,
                     "has_password": True
-                }
+                },
+                actor_id=actor_id,
+                session=db
             )
 
             created_users.append(UserResponse(
@@ -855,8 +888,10 @@ async def create_bulk_users(
             await db.flush()
 
             # Audit log
-            await audit(
-                db, actor_id, "user.bulk_create", "User", user.id,
+            await AuditService.log_event(
+                action=AuditAction.CREATE,
+                entity=AuditEntity.USER,
+                entity_id=user.id,
                 before=None,
                 after={
                     "name": user.name,
@@ -864,7 +899,9 @@ async def create_bulk_users(
                     "role": user.role.value,
                     "active": user.active,
                     "has_password": bool(user.password_hash)
-                }
+                },
+                actor_id=actor_id,
+                session=db
             )
 
             created_users.append(UserResponse(
@@ -910,10 +947,14 @@ async def change_user_role(
     after = {"role": user.role.value}
     
     # Audit log
-    await audit(
-        db, actor_id, "user.role_change", "User", user.id,
+    await AuditService.log_event(
+        action=AuditAction.ROLE_CHANGE,
+        entity=AuditEntity.USER,
+        entity_id=user.id,
         before=before,
-        after=after
+        after=after,
+        actor_id=actor_id,
+        session=db
     )
     
     await db.commit()

@@ -101,13 +101,19 @@ async def clear_database_data(
         print(f"After cleanup: {product_count_after} products, {user_count_after} users")
         
         # Log the action
-        await audit(
-            db, actor_id, "system.database_clear", "Database", 0,
+        from mdv.audit import AuditService
+        from mdv.models import AuditAction, AuditEntity
+
+        await AuditService.log_event(
+            action=AuditAction.BULK_DELETE,
+            entity=AuditEntity.SYSTEM,
             after={
                 "products_cleared": product_count_before - product_count_after,
                 "users_preserved": user_count_after,
                 "tables_cleared": len(cleared_tables)
-            }
+            },
+            actor_id=actor_id,
+            session=db
         )
         
         await db.commit()
@@ -224,18 +230,20 @@ async def reset_all_users(
             })
 
         # Audit the operation
-        await audit(
-            db=db,
-            actor_id=actor_id,
-            action="RESET_ALL_USERS",
-            resource_type="User",
-            resource_id=None,
-            details={
+        from mdv.audit import AuditService
+        from mdv.models import AuditAction, AuditEntity
+
+        await AuditService.log_event(
+            action=AuditAction.BULK_DELETE,
+            entity=AuditEntity.USER,
+            metadata={
                 "deleted_users_count": user_count,
                 "deleted_users": existing_user_list,
                 "recreated_admin": True,
                 "final_user_count": len(final_users)
-            }
+            },
+            actor_id=actor_id,
+            session=db
         )
 
         return {

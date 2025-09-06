@@ -31,7 +31,9 @@ from mdv.models import (
     Inventory,
     StockLedger,
 )
-from mdv.utils import audit, parse_actor_id
+from mdv.utils import parse_actor_id
+from mdv.audit import AuditService
+from mdv.models import AuditAction, AuditEntity
 from ..deps import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1871,10 +1873,14 @@ async def update_inventory(
         db.add(stock_ledger)
     
     # Audit log
-    await audit(
-        db, actor_id, "inventory.update", "Inventory", variant_id,
+    await AuditService.log_event(
+        action=AuditAction.INVENTORY_UPDATE,
+        entity=AuditEntity.INVENTORY,
+        entity_id=variant_id,
         before={"quantity": old_quantity, "safety_stock": inventory.safety_stock if inventory else 0},
-        after={"quantity": update_request.quantity, "safety_stock": update_request.safety_stock or inventory.safety_stock}
+        after={"quantity": update_request.quantity, "safety_stock": update_request.safety_stock or inventory.safety_stock},
+        actor_id=actor_id,
+        session=db
     )
     
     await db.commit()
