@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { PhotoIcon, TrashIcon, EyeIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline'
 import { ProductImage, Variant } from '@/lib/types'
-import { api } from '@/lib/api'
+import { api } from '@/lib/api-client'
 
 interface VariantImageManagerProps {
   variant: Variant
