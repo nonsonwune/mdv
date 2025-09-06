@@ -286,7 +286,8 @@ async def get_product_recommendations(
                 "width": img.width,
                 "height": img.height,
                 "sort_order": img.sort_order,
-                "is_primary": img.is_primary
+                "is_primary": img.is_primary,
+                "variant_id": img.variant_id
             })
 
         recommendations.append({
@@ -491,6 +492,7 @@ async def list_products(
                 "height": img.height,
                 "sort_order": img.sort_order,
                 "is_primary": img.is_primary,
+                "variant_id": img.variant_id
             })
 
         # Get review statistics for this product
@@ -588,7 +590,8 @@ async def get_products_by_category(
                 "alt_text": img.alt_text,
                 "width": img.width,
                 "height": img.height,
-                "is_primary": img.is_primary
+                "is_primary": img.is_primary,
+                "variant_id": img.variant_id
             })
 
         # Get review statistics for this product
@@ -725,7 +728,8 @@ async def get_sale_products(
                 "alt_text": img.alt_text,
                 "width": img.width,
                 "height": img.height,
-                "is_primary": img.is_primary
+                "is_primary": img.is_primary,
+                "variant_id": img.variant_id
             })
 
         item = {
@@ -773,6 +777,7 @@ async def get_product(id_or_slug: str, db: AsyncSession = Depends(get_db)):
             "height": img.height,
             "sort_order": img.sort_order,
             "is_primary": img.is_primary,
+            "variant_id": img.variant_id
         })
     # Get review statistics
     review_stats = await db.execute(

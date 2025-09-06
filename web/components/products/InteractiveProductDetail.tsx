@@ -23,11 +23,19 @@ export default function InteractiveProductDetail({ product }: InteractiveProduct
   
   // Get images to display (variant-specific or product-level)
   const getDisplayImages = (): ProductImage[] => {
-    if (selectedVariant?.images && selectedVariant.images.length > 0) {
-      // Show variant-specific images if available
-      return selectedVariant.images
+    if (!selectedVariant) {
+      // No variant selected, show product-level images only
+      return product.images?.filter(img => !img.variant_id) || []
     }
-    
+
+    // Get variant-specific images for the selected variant
+    const variantImages = product.images?.filter(img => img.variant_id === selectedVariant.id) || []
+
+    if (variantImages.length > 0) {
+      // Show variant-specific images if available
+      return variantImages
+    }
+
     // Fallback to product-level images (excluding variant-specific ones)
     return product.images?.filter(img => !img.variant_id) || []
   }
