@@ -283,51 +283,120 @@ class CloudinaryManager:
     ) -> Tuple[bool, str]:
         """
         Validate image before upload.
-        
+
         Args:
             file_data: Raw image data
             max_size_mb: Maximum file size in MB
             allowed_formats: List of allowed formats
-            
+
         Returns:
             Tuple of (is_valid, error_message)
         """
+        # Enhanced logging for debugging production issues
+        logger.info(f"Validating image: size={len(file_data)} bytes, first_20_bytes={file_data[:20].hex() if len(file_data) >= 20 else file_data.hex()}")
+
+        # Check if file is empty
+        if len(file_data) == 0:
+            logger.error("Image validation failed: Empty file")
+            return False, "File is empty"
+
         # Check file size
         size_mb = len(file_data) / (1024 * 1024)
         if size_mb > max_size_mb:
+            logger.error(f"Image validation failed: File size {size_mb:.2f}MB exceeds maximum {max_size_mb}MB")
             return False, f"File size {size_mb:.2f}MB exceeds maximum {max_size_mb}MB"
-        
+
         # Check file format using magic bytes
         if allowed_formats is None:
-            allowed_formats = ["jpg", "jpeg", "png", "gif", "webp"]
-        
-        # Simple magic byte checking
+            allowed_formats = ["jpg", "jpeg", "png", "gif", "webp", "svg"]
+
+        # Enhanced magic byte checking with more comprehensive patterns
         magic_bytes = {
-            b'\xff\xd8\xff': 'jpg',
+            # JPEG variants
+            b'\xff\xd8\xff\xe0': 'jpg',  # JFIF
+            b'\xff\xd8\xff\xe1': 'jpg',  # EXIF
+            b'\xff\xd8\xff\xe2': 'jpg',  # Canon
+            b'\xff\xd8\xff\xe3': 'jpg',  # Samsung
+            b'\xff\xd8\xff\xe8': 'jpg',  # SPIFF
+            b'\xff\xd8\xff\xdb': 'jpg',  # Generic JPEG
+            b'\xff\xd8\xff': 'jpg',      # Fallback JPEG
+
+            # PNG
             b'\x89PNG\r\n\x1a\n': 'png',
+
+            # GIF
             b'GIF87a': 'gif',
             b'GIF89a': 'gif',
-            b'RIFF': 'webp',  # WebP starts with RIFF
+
+            # WebP
+            b'RIFF': 'webp',  # Will be validated further below
+
+            # SVG (XML-based)
+            b'<?xml': 'svg',
+            b'<svg': 'svg',
         }
-        
-        file_header = file_data[:10]
+
+        file_header = file_data[:20] if len(file_data) >= 20 else file_data
         detected_format = None
-        
+
+        # Check magic bytes
         for magic, fmt in magic_bytes.items():
             if file_header.startswith(magic):
                 detected_format = fmt
+                logger.info(f"Detected format by magic bytes: {fmt}")
                 break
-        
-        # Special check for WebP
-        if file_header.startswith(b'RIFF') and file_data[8:12] == b'WEBP':
-            detected_format = 'webp'
-        
+
+        # Special validation for WebP
+        if file_header.startswith(b'RIFF') and len(file_data) >= 12:
+            if file_data[8:12] == b'WEBP':
+                detected_format = 'webp'
+                logger.info("Confirmed WebP format")
+            else:
+                logger.warning(f"RIFF file but not WebP: {file_data[8:12]}")
+                detected_format = None
+
+        # Special validation for SVG
+        if detected_format == 'svg':
+            # Additional SVG validation
+            try:
+                file_text = file_data.decode('utf-8', errors='ignore')[:1000]
+                if '<svg' in file_text.lower() or 'xmlns="http://www.w3.org/2000/svg"' in file_text:
+                    logger.info("Confirmed SVG format")
+                else:
+                    logger.warning("XML file but not SVG")
+                    detected_format = None
+            except Exception as e:
+                logger.warning(f"SVG validation error: {e}")
+                detected_format = None
+
+        # Fallback: Try to detect by common patterns in first 100 bytes
+        if not detected_format and len(file_data) >= 10:
+            first_100 = file_data[:100].lower()
+            if b'jfif' in first_100 or b'exif' in first_100:
+                detected_format = 'jpg'
+                logger.info("Detected JPEG by JFIF/EXIF marker")
+            elif b'png' in first_100:
+                detected_format = 'png'
+                logger.info("Detected PNG by content marker")
+
+        # Log detection result
+        if detected_format:
+            logger.info(f"Final detected format: {detected_format}")
+        else:
+            logger.error(f"Could not detect format. File header: {file_header.hex()}")
+
+        # Validate against allowed formats
         if detected_format and detected_format not in allowed_formats:
-            return False, f"File format {detected_format} is not allowed. Allowed formats: {', '.join(allowed_formats)}"
-        
+            error_msg = f"File format {detected_format} is not allowed. Allowed formats: {', '.join(allowed_formats)}"
+            logger.error(f"Image validation failed: {error_msg}")
+            return False, error_msg
+
         if not detected_format:
-            return False, "Could not determine file format or format is not supported"
-        
+            error_msg = f"Could not determine file format or format is not supported. File size: {len(file_data)} bytes, Header: {file_header.hex()}"
+            logger.error(f"Image validation failed: {error_msg}")
+            return False, error_msg
+
+        logger.info(f"Image validation successful: format={detected_format}, size={size_mb:.2f}MB")
         return True, ""
 
 

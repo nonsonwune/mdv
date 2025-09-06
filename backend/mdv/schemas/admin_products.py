@@ -127,6 +127,7 @@ class ImageResponse(BaseModel):
     sort_order: int = 0
     is_primary: bool = False
     public_id: Optional[str] = None
+    variant_id: Optional[int] = None  # For variant-specific images
     responsive_urls: Optional[Dict[str, str]] = None
 
 

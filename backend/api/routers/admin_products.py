@@ -911,22 +911,39 @@ async def upload_product_image(
 ):
     """Upload a product image to Cloudinary."""
     actor_id = parse_actor_id(claims)
-    
+
+    # Enhanced logging for debugging
+    logger.info(f"Image upload request: product_id={product_id}, filename={file.filename}, content_type={file.content_type}, size={file.size}")
+
     # Check product exists
     product = await db.get(Product, product_id)
     if not product:
+        logger.error(f"Product not found: {product_id}")
         raise HTTPException(status_code=404, detail="Product not found")
-    
-    # Validate file
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    
+
+    # Validate file metadata
+    if not file.filename:
+        logger.error("No filename provided")
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    if not file.content_type:
+        logger.warning(f"No content type provided for file: {file.filename}")
+    elif not file.content_type.startswith("image/"):
+        logger.error(f"Invalid content type: {file.content_type} for file: {file.filename}")
+        raise HTTPException(status_code=400, detail=f"File must be an image. Received content type: {file.content_type}")
+
     # Read file data
-    file_data = await file.read()
-    
+    try:
+        file_data = await file.read()
+        logger.info(f"Successfully read file data: {len(file_data)} bytes")
+    except Exception as e:
+        logger.error(f"Failed to read file data: {str(e)}")
+        raise HTTPException(status_code=400, detail="Failed to read file data")
+
     # Validate image
     is_valid, error_msg = cloudinary_manager.validate_image(file_data)
     if not is_valid:
+        logger.error(f"Image validation failed for {file.filename}: {error_msg}")
         raise HTTPException(status_code=400, detail=error_msg)
     
     try:
@@ -1561,3 +1578,144 @@ async def get_sale_products(
         "total_pages": (total + page_size - 1) // page_size,
         "threshold": threshold
     }
+
+
+# ============================================================================
+# VARIANT IMAGE ENDPOINTS
+# ============================================================================
+
+@router.post("/variants/{variant_id}/images", response_model=ImageUploadResponse)
+async def upload_variant_image(
+    variant_id: int,
+    file: UploadFile = File(...),
+    alt_text: Optional[str] = Form(None),
+    is_primary: bool = Form(False),
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_any_permission(Permission.PRODUCT_CREATE, Permission.PRODUCT_EDIT))
+):
+    """Upload a variant-specific image to Cloudinary."""
+    actor_id = parse_actor_id(claims)
+
+    # Enhanced logging for debugging
+    logger.info(f"Variant image upload request: variant_id={variant_id}, filename={file.filename}, content_type={file.content_type}, size={file.size}")
+
+    # Check variant exists and get product info
+    variant = await db.get(Variant, variant_id)
+    if not variant:
+        logger.error(f"Variant not found: {variant_id}")
+        raise HTTPException(status_code=404, detail="Variant not found")
+
+    product = await db.get(Product, variant.product_id)
+    if not product:
+        logger.error(f"Product not found for variant: {variant_id}")
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Validate file metadata
+    if not file.filename:
+        logger.error("No filename provided")
+        raise HTTPException(status_code=400, detail="Filename is required")
+
+    if not file.content_type:
+        logger.warning(f"No content type provided for file: {file.filename}")
+    elif not file.content_type.startswith("image/"):
+        logger.error(f"Invalid content type: {file.content_type} for file: {file.filename}")
+        raise HTTPException(status_code=400, detail=f"File must be an image. Received content type: {file.content_type}")
+
+    # Read file data
+    try:
+        file_data = await file.read()
+        logger.info(f"Successfully read file data: {len(file_data)} bytes")
+    except Exception as e:
+        logger.error(f"Failed to read file data: {str(e)}")
+        raise HTTPException(status_code=400, detail="Failed to read file data")
+
+    # Validate image
+    is_valid, error_msg = cloudinary_manager.validate_image(file_data)
+    if not is_valid:
+        logger.error(f"Image validation failed for {file.filename}: {error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    try:
+        # Upload to Cloudinary with variant-specific folder
+        upload_result = cloudinary_manager.upload_image(
+            file_data,
+            file.filename,
+            folder=f"products/{variant.product_id}/variants/{variant_id}",
+            tags=[f"product_{variant.product_id}", f"variant_{variant_id}", product.slug, variant.sku]
+        )
+
+        # Generate responsive URLs
+        responsive_urls = cloudinary_manager.generate_responsive_urls(
+            upload_result["public_id"],
+            upload_result["url"]
+        )
+
+        # Determine if we should set as primary by default when none exists for this variant
+        result = await db.execute(
+            select(func.count(ProductImage.id))
+            .where(
+                ProductImage.variant_id == variant_id,
+                ProductImage.is_primary == True
+            )
+        )
+        primary_count = result.scalar_one()
+        is_primary_flag = is_primary or (primary_count == 0)
+
+        # If setting as primary, unset other primary images for this variant
+        if is_primary_flag:
+            await db.execute(
+                sql_update(ProductImage)
+                .where(
+                    ProductImage.variant_id == variant_id,
+                    ProductImage.is_primary == True
+                )
+                .values(is_primary=False)
+            )
+
+        # Get next sort order for this variant
+        max_sort = await db.execute(
+            select(func.coalesce(func.max(ProductImage.sort_order), 0))
+            .where(ProductImage.variant_id == variant_id)
+        )
+        next_sort = max_sort.scalar_one() + 1
+
+        # Create database record
+        image = ProductImage(
+            product_id=variant.product_id,
+            variant_id=variant_id,
+            url=upload_result["url"],
+            alt_text=alt_text or f"{product.title} - {variant.color or ''} {variant.size or ''}".strip(),
+            width=upload_result.get("width"),
+            height=upload_result.get("height"),
+            sort_order=next_sort,
+            is_primary=is_primary_flag,
+            public_id=upload_result["public_id"]
+        )
+        db.add(image)
+
+        # Log action
+        await log_admin_action(
+            db, actor_id, "image.upload", "ProductImage", variant_id,
+            after={"filename": file.filename, "public_id": upload_result["public_id"], "variant_id": variant_id}
+        )
+
+        await db.commit()
+        await db.refresh(image)
+
+        return ImageUploadResponse(
+            id=image.id,
+            product_id=variant.product_id,
+            url=image.url,
+            public_id=upload_result["public_id"],
+            width=image.width,
+            height=image.height,
+            size=upload_result.get("size"),
+            format=upload_result.get("format"),
+            responsive_urls=responsive_urls
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error uploading variant image: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload image")
