@@ -16,6 +16,8 @@ class VariantOut(BaseModel):
     size: Optional[str] = None
     color: Optional[str] = None
     price: float
+    stock_quantity: Optional[int] = None
+    stock_status: Optional[str] = None
 
 
 class ProductOut(BaseModel):
@@ -26,6 +28,9 @@ class ProductOut(BaseModel):
     compare_at_price: Optional[float] = None
     variants: List[VariantOut] = []
     images: Optional[list[dict]] = None
+    # Inventory data
+    total_stock: Optional[int] = None
+    stock_status: Optional[str] = None
     # Review data
     average_rating: Optional[float] = None
     review_count: Optional[int] = None
