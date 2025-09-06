@@ -182,14 +182,12 @@ async def get_featured_product_candidates(
 @router.post("/create-table")
 async def create_homepage_config_table(
     db: AsyncSession = Depends(get_db),
-    claims: dict = Depends(get_current_claims)
+    claims: dict = Depends(require_permission(Permission.SYSTEM_SETTINGS))
 ):
     """
     Emergency endpoint to create homepage_config table if it doesn't exist.
     This is a temporary fix for migration issues.
     """
-    # Require admin permission
-    require_permission(claims, Permission.SYSTEM_SETTINGS)
 
     try:
         # Check if table exists
