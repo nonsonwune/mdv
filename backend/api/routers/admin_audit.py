@@ -20,7 +20,7 @@ from mdv.models import Role
 from mdv.models import AuditLog, AuditAction, AuditEntity, AuditStatus, User
 from mdv.db import get_async_db
 
-router = APIRouter(prefix="/admin/audit", tags=["Admin Audit"])
+router = APIRouter(prefix="/api/admin/audit", tags=["Admin Audit"])
 
 
 # Pydantic models for API responses
