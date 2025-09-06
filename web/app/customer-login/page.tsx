@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "../../lib/auth-context"
 import { LoadingButton } from "../../components/ui/loading-spinner"
 import { useToast } from "../_components/ToastProvider"
@@ -168,6 +169,15 @@ export default function CustomerLoginPage() {
     <div className="min-h-screen bg-neutral-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
         <div className="text-center mb-8">
+          <div className="mb-6">
+            <Image
+              src="/images/mdv-logo-rlogomark-btext-nobg.png"
+              alt="MDV - Maison De Valeur"
+              width={150}
+              height={50}
+              className="h-12 w-auto mx-auto"
+            />
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-600">Sign in to your customer account</p>
         </div>

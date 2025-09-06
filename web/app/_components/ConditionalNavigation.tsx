@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "../../lib/auth-context"
 import HeaderCart from "./HeaderCart"
 import SearchBar from "./SearchBar"
@@ -31,8 +32,15 @@ export default function ConditionalNavigation() {
           {/* Logo and Mobile Menu */}
           <div className="flex items-center gap-4">
             <MobileNav />
-            <Link href="/" className="text-xl font-semibold" style={{color: "var(--maroon-700)"}}>
-              MDV
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/images/mdv-logo-rlogomark-btext-nobg.png"
+                alt="MDV - Maison De Valeur"
+                width={120}
+                height={40}
+                className="h-10 w-auto"
+                priority={true}
+              />
             </Link>
           </div>
           

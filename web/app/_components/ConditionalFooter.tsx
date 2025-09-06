@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "../../lib/auth-context"
 
 export default function ConditionalFooter() {
@@ -27,7 +28,15 @@ export default function ConditionalFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand Column */}
           <div>
-            <h3 className="font-semibold mb-4" style={{color: "var(--maroon-700)"}}>Maison De Valeur</h3>
+            <div className="mb-4">
+              <Image
+                src="/images/mdv-logo-rlogomark-btext-nobg.png"
+                alt="MDV - Maison De Valeur"
+                width={140}
+                height={47}
+                className="h-12 w-auto"
+              />
+            </div>
             <p className="text-sm text-neutral-600">
               Affordable essentials and last-season fashion for Nigeria.
             </p>

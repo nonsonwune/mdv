@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import { LoadingButton } from "../../components/ui/loading-spinner"
 import { useToast } from "../_components/ToastProvider"
@@ -272,10 +273,14 @@ export default function StaffLoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-maroon-50 to-neutral-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-maroon-600 rounded-lg mx-auto mb-4 flex items-center justify-center">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
+          <div className="mb-6">
+            <Image
+              src="/images/mdv-logo-rlogomark-btext-nobg.png"
+              alt="MDV - Maison De Valeur"
+              width={150}
+              height={50}
+              className="h-12 w-auto mx-auto"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Staff Portal</h1>
           <p className="text-gray-600">Sign in to access admin dashboard</p>

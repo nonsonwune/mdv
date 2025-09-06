@@ -1,6 +1,18 @@
+import Image from "next/image"
+
 export default function Loading() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="text-center mb-8">
+        <Image
+          src="/images/mdv-logo-rlogomark-btext-nobg.png"
+          alt="MDV - Maison De Valeur"
+          width={80}
+          height={27}
+          className="h-6 w-auto mx-auto mb-4 animate-pulse"
+        />
+        <p className="text-sm text-gray-500">Loading...</p>
+      </div>
       <div className="animate-pulse space-y-4">
         <div className="h-6 bg-neutral-100 rounded w-1/3" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

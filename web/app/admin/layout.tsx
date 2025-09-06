@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   HomeIcon,
@@ -299,8 +300,15 @@ export default function AdminLayout({
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-            <Link href="/admin" className="text-xl font-bold text-maroon-700">
-              MDV Admin
+            <Link href="/admin" className="flex items-center gap-2">
+              <Image
+                src="/images/mdv-logo-rlogomark-btext-nobg.png"
+                alt="MDV - Maison De Valeur"
+                width={150}
+                height={50}
+                className="h-8 w-auto"
+              />
+              <span className="text-lg font-semibold text-maroon-700">Admin</span>
             </Link>
             <button
               onClick={() => setIsSidebarOpen(false)}
@@ -384,7 +392,16 @@ export default function AdminLayout({
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
-            <span className="text-lg font-semibold text-gray-900">MDV Admin</span>
+            <div className="flex items-center gap-2">
+              <Image
+                src="/images/mdv-logo-rlogomark-btext-nobg.png"
+                alt="MDV"
+                width={80}
+                height={27}
+                className="h-6 w-auto"
+              />
+              <span className="text-lg font-semibold text-gray-900">Admin</span>
+            </div>
           </div>
 
           {/* Mobile user info */}

@@ -61,8 +61,9 @@ def order_confirmation_email(order_data: Dict[str, Any]) -> tuple[str, str]:
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             <!-- Header -->
             <div style="background-color: #800000; color: #ffffff; padding: 30px 20px; text-align: center;">
-                <h1 style="margin: 0; font-size: 28px; font-weight: 600;">MDV</h1>
-                <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Maison De Valeur</p>
+                <img src="https://mdv.ng/images/mdv-logo-rlogomark-wtext-nobg.png"
+                     alt="MDV - Maison De Valeur"
+                     style="width: 200px; height: auto; max-width: 100%;" />
             </div>
             
             <!-- Content -->
@@ -391,8 +392,10 @@ def welcome_email(user_data: Dict[str, Any]) -> tuple[str, str]:
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
             <!-- Header -->
             <div style="background-color: #800000; color: #ffffff; padding: 40px 20px; text-align: center;">
-                <h1 style="margin: 0; font-size: 32px; font-weight: 600;">Welcome to MDV!</h1>
-                <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Affordable Essentials & Fashion</p>
+                <img src="https://mdv.ng/images/mdv-logo-rlogomark-wtext-nobg.png"
+                     alt="MDV - Maison De Valeur"
+                     style="width: 200px; height: auto; max-width: 100%; margin-bottom: 10px;" />
+                <p style="margin: 0; font-size: 16px; opacity: 0.9;">Welcome to Affordable Essentials & Fashion</p>
             </div>
             
             <!-- Content -->
