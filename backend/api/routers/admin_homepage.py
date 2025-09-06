@@ -119,6 +119,31 @@ async def update_homepage_config(
 
 
 
+@router.post("/migrate-remove-featured-products")
+async def migrate_remove_featured_products(
+    db: AsyncSession = Depends(get_db),
+    claims: dict = Depends(require_permission(Permission.SYSTEM_SETTINGS))
+):
+    """
+    Migration endpoint to remove featured_product_ids column from homepage_config table.
+    """
+    try:
+        # Execute the migration SQL
+        await db.execute(text("ALTER TABLE homepage_config DROP COLUMN IF EXISTS featured_product_ids"))
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "Successfully removed featured_product_ids column from homepage_config table"
+        }
+    except Exception as e:
+        await db.rollback()
+        return {
+            "success": False,
+            "message": f"Migration failed: {str(e)}"
+        }
+
+
 @router.post("/create-table")
 async def create_homepage_config_table(
     db: AsyncSession = Depends(get_db),
