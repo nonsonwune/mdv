@@ -5,10 +5,9 @@ import { api } from "../../../lib/api-client"
 import { RoleGuard } from "../../../components/auth/RoleGuard"
 import { PermissionGuard } from "../../../components/auth/PermissionGuard"
 import { Permission } from "../../../lib/auth-context"
-import { 
-  HomeIcon, 
-  PhotoIcon, 
-  SparklesIcon,
+import {
+  HomeIcon,
+  PhotoIcon,
   EyeIcon,
   CheckIcon,
   XMarkIcon
@@ -20,25 +19,13 @@ interface HomepageConfig {
   hero_subtitle: string | null
   hero_cta_text: string
   hero_image_url: string | null
-  featured_product_ids: number[]
   categories_enabled: boolean
   created_at: string
   updated_at: string | null
 }
 
-interface FeaturedProductCandidate {
-  id: number
-  title: string
-  slug: string
-  image_url: string | null
-  min_price: number | null
-  total_inventory: number
-  is_featured: boolean
-}
-
 export default function HomepageManagement() {
   const [config, setConfig] = useState<HomepageConfig | null>(null)
-  const [candidates, setCandidates] = useState<FeaturedProductCandidate[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -48,7 +35,6 @@ export default function HomepageManagement() {
   const [heroSubtitle, setHeroSubtitle] = useState("")
   const [heroCtaText, setHeroCtaText] = useState("")
   const [heroImageUrl, setHeroImageUrl] = useState("")
-  const [featuredProductIds, setFeaturedProductIds] = useState<number[]>([])
   const [categoriesEnabled, setCategoriesEnabled] = useState(true)
 
   useEffect(() => {
@@ -58,20 +44,15 @@ export default function HomepageManagement() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [configRes, candidatesRes] = await Promise.all([
-        api<HomepageConfig>('/api/admin/homepage/config'),
-        api<FeaturedProductCandidate[]>('/api/admin/homepage/featured-candidates')
-      ])
+      const configRes = await api<HomepageConfig>('/api/admin/homepage/config')
 
       setConfig(configRes)
-      setCandidates(candidatesRes)
 
       // Set form values
       setHeroTitle(configRes.hero_title)
       setHeroSubtitle(configRes.hero_subtitle || "")
       setHeroCtaText(configRes.hero_cta_text)
       setHeroImageUrl(configRes.hero_image_url || "")
-      setFeaturedProductIds(configRes.featured_product_ids)
       setCategoriesEnabled(configRes.categories_enabled)
     } catch (error) {
       console.error('Failed to load homepage data:', error)
@@ -90,7 +71,6 @@ export default function HomepageManagement() {
           hero_subtitle: heroSubtitle || null,
           hero_cta_text: heroCtaText,
           hero_image_url: heroImageUrl || null,
-          featured_product_ids: featuredProductIds,
           categories_enabled: categoriesEnabled
         })
       })
@@ -108,13 +88,7 @@ export default function HomepageManagement() {
     }
   }
 
-  const toggleFeaturedProduct = (productId: number) => {
-    setFeaturedProductIds(prev => 
-      prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    )
-  }
+
 
   if (loading) {
     return (
@@ -255,60 +229,7 @@ export default function HomepageManagement() {
               </div>
             </div>
 
-            {/* Featured Products */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <SparklesIcon className="h-5 w-5" />
-                Featured Products ({featuredProductIds.length} selected)
-              </h2>
-              
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {candidates.map((product) => (
-                  <div
-                    key={product.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      featuredProductIds.includes(product.id)
-                        ? 'border-maroon-500 bg-maroon-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => toggleFeaturedProduct(product.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                            <PhotoIcon className="h-6 w-6 text-gray-400" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-medium text-gray-900 truncate">
-                          {product.title}
-                        </h3>
-                        <p className="text-xs text-gray-500">
-                          ₦{product.min_price?.toLocaleString()} • {product.total_inventory} in stock
-                        </p>
-                      </div>
-                      
-                      <div className="flex-shrink-0">
-                        {featuredProductIds.includes(product.id) ? (
-                          <CheckIcon className="h-5 w-5 text-maroon-600" />
-                        ) : (
-                          <div className="h-5 w-5 border border-gray-300 rounded"></div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+
           </div>
         </div>
       </PermissionGuard>
