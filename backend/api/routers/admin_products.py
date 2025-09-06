@@ -1583,10 +1583,6 @@ async def get_sale_products(
 # ============================================================================
 # VARIANT IMAGE ENDPOINTS
 # ============================================================================
-# TODO: Temporarily disabled until migration is applied in production
-
-# TODO: Temporarily disabled until migration is applied in production
-"""
 @router.post("/variants/{variant_id}/images", response_model=ImageUploadResponse)
 async def upload_variant_image(
     variant_id: int,
@@ -1596,7 +1592,7 @@ async def upload_variant_image(
     db: AsyncSession = Depends(get_db),
     claims: dict = Depends(require_any_permission(Permission.PRODUCT_CREATE, Permission.PRODUCT_EDIT))
 ):
-    # Upload a variant-specific image to Cloudinary.
+    """Upload a variant-specific image to Cloudinary."""
     actor_id = parse_actor_id(claims)
 
     # Enhanced logging for debugging
@@ -1722,4 +1718,3 @@ async def upload_variant_image(
     except Exception as e:
         logger.error(f"Error uploading variant image: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to upload image")
-"""
