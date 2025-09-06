@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ChevronDownIcon } from '@heroicons/react/24/outline'
+import { usePathname } from 'next/navigation'
+import {
+  ChevronDownIcon,
+  UserIcon,
+  SparklesIcon,
+  TagIcon,
+  CubeIcon,
+  ShirtIcon,
+  BuildingStorefrontIcon
+} from '@heroicons/react/24/outline'
 import { api } from '@/lib/api-client'
 
 interface NavigationCategory {
@@ -138,6 +147,7 @@ export function DynamicMobileNavigation() {
   const [navigationData, setNavigationData] = useState<NavigationData | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
+  const pathname = usePathname()
 
   useEffect(() => {
     fetchNavigationData()
@@ -168,19 +178,19 @@ export function DynamicMobileNavigation() {
   }
 
   const getIconForCategory = (icon?: string) => {
-    const iconMap: Record<string, string> = {
-      'men': '👔',
-      'women': '👗',
-      'essentials': '✨',
-      'sale': '🏷️',
-      'shoes': '👟',
-      'shirts': '👕',
-      'pants': '👖',
-      'accessories': '👜',
-      'watches': '⌚',
-      'jewelry': '💍'
+    const iconComponents: Record<string, React.ReactNode> = {
+      'men': <UserIcon className="h-5 w-5" />,
+      'women': <UserIcon className="h-5 w-5" />,
+      'essentials': <SparklesIcon className="h-5 w-5" />,
+      'sale': <TagIcon className="h-5 w-5" />,
+      'shoes': <BuildingStorefrontIcon className="h-5 w-5" />,
+      'shirts': <ShirtIcon className="h-5 w-5" />,
+      'pants': <CubeIcon className="h-5 w-5" />,
+      'accessories': <CubeIcon className="h-5 w-5" />,
+      'watches': <CubeIcon className="h-5 w-5" />,
+      'jewelry': <CubeIcon className="h-5 w-5" />
     }
-    return iconMap[icon || ''] || '📦'
+    return iconComponents[icon || ''] || <CubeIcon className="h-5 w-5" />
   }
 
   if (loading) {
@@ -188,7 +198,7 @@ export function DynamicMobileNavigation() {
       <div className="space-y-1">
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="animate-pulse">
-            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-12 bg-gray-200 rounded-lg"></div>
           </div>
         ))}
       </div>
@@ -200,10 +210,10 @@ export function DynamicMobileNavigation() {
       <div className="space-y-1">
         <Link
           href="/about"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors"
+          className="flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] text-gray-700 hover:bg-gray-50 hover:text-gray-900"
         >
-          <span className="text-lg">ℹ️</span>
-          <span className="font-medium">About</span>
+          <span className="text-gray-500 group-hover:text-gray-700">ℹ️</span>
+          <span className="flex-1">About</span>
         </Link>
       </div>
     )
@@ -211,70 +221,88 @@ export function DynamicMobileNavigation() {
 
   return (
     <div className="space-y-1">
-      {/* Home Link */}
-      <Link
-        href="/"
-        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors"
-      >
-        <span className="text-lg">🏠</span>
-        <span className="font-medium">Home</span>
-      </Link>
-
       {/* Dynamic Categories */}
-      {navigationData.categories.map((category) => (
-        <div key={category.id}>
-          <div className="flex items-center">
-            <Link
-              href={`/${category.slug}`}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors flex-1 ${
-                category.slug === 'sale' ? 'text-maroon-700' : ''
-              }`}
-            >
-              <span className="text-lg">{getIconForCategory(category.navigation_icon)}</span>
-              <span className={`font-medium ${category.slug === 'sale' ? 'text-maroon-700' : ''}`}>
-                {category.name}
-              </span>
-              {category.slug === 'sale' && (
-                <span className="ml-auto bg-maroon-700 text-white text-xs px-2 py-0.5 rounded">
-                  SALE
-                </span>
-              )}
-            </Link>
-            
-            {category.children.length > 0 && (
-              <button
-                onClick={() => toggleExpanded(category.id)}
-                className="p-2 hover:bg-neutral-100 rounded"
+      {navigationData.categories.map((category) => {
+        const categoryPath = `/${category.slug}`
+        const isActive = pathname === categoryPath
+
+        return (
+          <div key={category.id}>
+            <div className="flex items-center">
+              <Link
+                href={categoryPath}
+                className={`flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] flex-1 ${
+                  isActive
+                    ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`}
               >
-                <ChevronDownIcon 
-                  className={`w-4 h-4 transition-transform ${
-                    expandedCategories.has(category.id) ? 'rotate-180' : ''
-                  }`} 
-                />
-              </button>
+                <span className={`${isActive ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`}>
+                  {getIconForCategory(category.navigation_icon)}
+                </span>
+                <span className="flex-1">
+                  {category.name}
+                  {category.slug === 'sale' && (
+                    <span className="ml-2 bg-maroon-600 text-white text-xs px-2 py-0.5 rounded-full">
+                      SALE
+                    </span>
+                  )}
+                </span>
+                {isActive && (
+                  <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                )}
+              </Link>
+
+              {category.children.length > 0 && (
+                <button
+                  onClick={() => toggleExpanded(category.id)}
+                  className="p-2 hover:bg-gray-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  aria-label={`${expandedCategories.has(category.id) ? 'Collapse' : 'Expand'} ${category.name} subcategories`}
+                >
+                  <ChevronDownIcon
+                    className={`w-4 h-4 text-gray-500 transition-transform ${
+                      expandedCategories.has(category.id) ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
+              )}
+            </div>
+
+            {/* Subcategories */}
+            {category.children.length > 0 && expandedCategories.has(category.id) && (
+              <div className="ml-6 mt-1 space-y-1">
+                {category.children.map((child) => {
+                  const childPath = `/${category.slug}/${child.slug}`
+                  const isChildActive = pathname === childPath
+
+                  return (
+                    <Link
+                      key={child.id}
+                      href={childPath}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group min-h-[40px] ${
+                        isChildActive
+                          ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <span className={`${isChildActive ? 'text-maroon-600' : 'text-gray-400 group-hover:text-gray-600'}`}>
+                        {getIconForCategory(child.navigation_icon)}
+                      </span>
+                      <span className="flex-1">{child.name}</span>
+                      {child.product_count > 0 && (
+                        <span className="text-xs text-gray-400">({child.product_count})</span>
+                      )}
+                      {isChildActive && (
+                        <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                      )}
+                    </Link>
+                  )
+                })}
+              </div>
             )}
           </div>
-
-          {/* Subcategories */}
-          {category.children.length > 0 && expandedCategories.has(category.id) && (
-            <div className="ml-6 mt-1 space-y-1">
-              {category.children.map((child) => (
-                <Link
-                  key={child.id}
-                  href={`/${category.slug}/${child.slug}`}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors text-sm"
-                >
-                  <span className="text-base">{getIconForCategory(child.navigation_icon)}</span>
-                  <span>{child.name}</span>
-                  {child.product_count > 0 && (
-                    <span className="ml-auto text-xs text-gray-400">({child.product_count})</span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

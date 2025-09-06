@@ -7,6 +7,19 @@ import { createPortal } from "react-dom"
 import { useAuth } from "../../lib/auth-context"
 import { DynamicMobileNavigation } from "./DynamicNavigation"
 import SearchBar from "../../app/_components/SearchBar"
+import {
+  HomeIcon,
+  UserIcon,
+  InformationCircleIcon,
+  PhoneIcon,
+  TruckIcon,
+  QuestionMarkCircleIcon,
+  ArrowLeftOnRectangleIcon,
+  UserGroupIcon,
+  EyeIcon,
+  ClipboardDocumentListIcon,
+  MapPinIcon
+} from '@heroicons/react/24/outline'
 
 interface MobileNavProps {
   cartCount?: number
@@ -149,137 +162,266 @@ export default function MobileNav({ cartCount = 0 }: MobileNavProps) {
 
           {/* Menu Panel */}
           <div
-            className={`absolute left-0 top-0 h-full w-[280px] bg-white shadow-xl transform transition-transform duration-300 ${
+            className={`absolute left-0 top-0 h-full w-80 md:w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out safe-area-inset ${
               isOpen ? "translate-x-0" : "-translate-x-full"
             }`}
           >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-neutral-200">
-              <Link href="/" className="text-xl font-semibold" style={{ color: "var(--maroon-700)" }}>
-                MDV
-              </Link>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 -m-2 rounded-lg hover:bg-neutral-100 transition-colors"
-                aria-label="Close menu"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto" style={{ maxHeight: "calc(100vh - 73px)" }}>
-              {/* Enhanced Search Bar */}
-              <div className="p-4 border-b border-neutral-100">
-                <SearchBar
-                  isMobile={true}
-                  onClose={() => setIsOpen(false)}
-                  autoFocus={false}
-                />
-              </div>
-
-              {/* Cart Link */}
-              <div className="p-4 border-b border-neutral-100">
-                <Link
-                  href="/cart"
-                  className="flex items-center justify-between p-3 bg-maroon-50 rounded-lg hover:bg-maroon-100 transition-colors"
-                  onClick={() => setIsOpen(false)}
-                >
-                  <span className="flex items-center gap-3">
-                    <span className="text-lg">🛒</span>
-                    <span className="font-medium" style={{ color: "var(--maroon-700)" }}>
-                      View Cart
-                    </span>
-                  </span>
-                  {cartCount > 0 && (
-                    <span className="bg-maroon-700 text-white text-xs px-2 py-1 rounded-full">
-                      {cartCount}
-                    </span>
-                  )}
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+                <Link href="/" className="text-xl font-bold text-maroon-700">
+                  MDV
                 </Link>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="lg:hidden"
+                  aria-label="Close menu"
+                >
+                  <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
 
-              {/* Main Navigation - Dynamic */}
-              <nav className="p-4">
-                <h3 className="text-xs font-semibold uppercase text-neutral-500 mb-2">Shop</h3>
-                <DynamicMobileNavigation />
-              </nav>
+              {/* Navigation */}
+              <nav className="flex-1 px-4 py-4 overflow-y-auto">
+                {/* Search Section */}
+                <div className="mb-6">
+                  <div className="px-3 py-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Search
+                    </h3>
+                  </div>
+                  <div className="px-3">
+                    <SearchBar
+                      isMobile={true}
+                      onClose={() => setIsOpen(false)}
+                      autoFocus={false}
+                    />
+                  </div>
+                </div>
 
-              {/* Account Section */}
-              <nav className="p-4 border-t border-neutral-100">
-                <h3 className="text-xs font-semibold uppercase text-neutral-500 mb-2">Account</h3>
-                <ul className="space-y-1">
-                  {accountItems.map((item) => (
-                    <li key={item.href + item.label}>
-                      {item.href === "#" && item.label.includes("━") ? (
+                {/* Cart Section */}
+                <div className="mb-6">
+                  <div className="px-3 py-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Cart
+                    </h3>
+                  </div>
+                  <div className="space-y-1">
+                    <Link
+                      href="/cart"
+                      className={`flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] ${
+                        pathname === '/cart'
+                          ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <svg className={`h-5 w-5 ${pathname === '/cart' ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 6M7 13l-1.5-6m0 0h15M17 21a2 2 0 100-4 2 2 0 000 4zM9 21a2 2 0 100-4 2 2 0 000 4z" />
+                      </svg>
+                      <span className="flex-1">View Cart</span>
+                      {cartCount > 0 && (
+                        <span className="bg-maroon-600 text-white text-xs px-2 py-1 rounded-full min-w-[20px] text-center">
+                          {cartCount}
+                        </span>
+                      )}
+                      {pathname === '/cart' && (
+                        <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                      )}
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Shop Section */}
+                <div className="mb-6">
+                  <div className="px-3 py-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Shop
+                    </h3>
+                  </div>
+                  <div className="space-y-1">
+                    <Link
+                      href="/"
+                      className={`flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] ${
+                        pathname === '/'
+                          ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                          : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <HomeIcon className={`h-5 w-5 ${pathname === '/' ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                      <span className="flex-1">Home</span>
+                      {pathname === '/' && (
+                        <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                      )}
+                    </Link>
+                    <DynamicMobileNavigation />
+                  </div>
+                </div>
+
+                {/* Account Section */}
+                <div className="mb-6">
+                  <div className="px-3 py-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Account
+                    </h3>
+                  </div>
+                  <div className="space-y-1">
+                    {accountItems.map((item) => {
+                      if (item.href === "#" && item.label.includes("━")) {
                         // Divider
-                        <div className="px-3 py-1 text-center text-neutral-300 text-xs">
-                          {item.label}
-                        </div>
-                      ) : item.onClick ? (
-                        <button
-                          onClick={() => {
-                            setIsOpen(false)
-                            item.onClick!()
-                          }}
-                          className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors w-full text-left"
-                        >
-                          <span className="text-lg">{item.icon}</span>
-                          <span>{item.label}</span>
-                        </button>
-                      ) : (
+                        return (
+                          <div key={item.label} className="px-3 py-1 text-center text-gray-300 text-xs">
+                            {item.label}
+                          </div>
+                        )
+                      }
+
+                      const getIcon = (iconText: string) => {
+                        switch (iconText) {
+                          case "👤": return <UserIcon className="h-5 w-5" />
+                          case "📦": return <ClipboardDocumentListIcon className="h-5 w-5" />
+                          case "📍": return <MapPinIcon className="h-5 w-5" />
+                          case "🚪": return <ArrowLeftOnRectangleIcon className="h-5 w-5" />
+                          case "👁️": return <EyeIcon className="h-5 w-5" />
+                          case "📊": return <ClipboardDocumentListIcon className="h-5 w-5" />
+                          case "🔑": return <UserGroupIcon className="h-5 w-5" />
+                          default: return <UserIcon className="h-5 w-5" />
+                        }
+                      }
+
+                      const isActive = pathname === item.href ||
+                        (item.href.includes('?tab=') && pathname === item.href.split('?')[0])
+
+                      if (item.onClick) {
+                        return (
+                          <button
+                            key={item.label}
+                            onClick={() => {
+                              setIsOpen(false)
+                              item.onClick!()
+                            }}
+                            className={`flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] w-full text-left ${
+                              isActive
+                                ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
+                          >
+                            <span className={`${isActive ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`}>
+                              {getIcon(item.icon)}
+                            </span>
+                            <span className="flex-1">{item.label}</span>
+                            {isActive && (
+                              <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                            )}
+                          </button>
+                        )
+                      }
+
+                      return (
                         <Link
+                          key={item.href + item.label}
                           href={item.href as any}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors ${
-                            pathname === item.href ? "bg-neutral-100" : ""
+                          className={`flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] ${
+                            isActive
+                              ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                           }`}
                           onClick={() => setIsOpen(false)}
                         >
-                          <span className="text-lg">{item.icon}</span>
-                          <span>{item.label}</span>
+                          <span className={`${isActive ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`}>
+                            {getIcon(item.icon)}
+                          </span>
+                          <span className="flex-1">{item.label}</span>
+                          {isActive && (
+                            <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                          )}
                         </Link>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Information Section */}
+                <div>
+                  <div className="px-3 py-2 mb-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      Information
+                    </h3>
+                  </div>
+                  <div className="space-y-1">
+                    {infoItems.map((item) => {
+                      const getIcon = (iconText: string) => {
+                        switch (iconText) {
+                          case "ℹ️": return <InformationCircleIcon className="h-5 w-5" />
+                          case "📞": return <PhoneIcon className="h-5 w-5" />
+                          case "📦": return <TruckIcon className="h-5 w-5" />
+                          case "📏": return <InformationCircleIcon className="h-5 w-5" />
+                          case "❓": return <QuestionMarkCircleIcon className="h-5 w-5" />
+                          default: return <InformationCircleIcon className="h-5 w-5" />
+                        }
+                      }
+
+                      const isActive = pathname === item.href
+
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href as any}
+                          className={`flex items-center gap-3 px-3 py-3 md:py-2 rounded-lg text-base md:text-sm font-medium transition-colors group min-h-[44px] ${
+                            isActive
+                              ? 'bg-maroon-50 text-maroon-700 border border-maroon-200'
+                              : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                          }`}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <span className={`${isActive ? 'text-maroon-600' : 'text-gray-500 group-hover:text-gray-700'}`}>
+                            {getIcon(item.icon)}
+                          </span>
+                          <span className="flex-1">{item.label}</span>
+                          {isActive && (
+                            <div className="w-2 h-2 bg-maroon-600 rounded-full"></div>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
               </nav>
 
-              {/* Information Section */}
-              <nav className="p-4 border-t border-neutral-100">
-                <h3 className="text-xs font-semibold uppercase text-neutral-500 mb-2">Information</h3>
-                <ul className="space-y-1">
-                  {infoItems.map((item) => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href as any}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100 transition-colors ${
-                          pathname === item.href ? "bg-neutral-100" : ""
-                        }`}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <span className="text-lg">{item.icon}</span>
-                        <span>{item.label}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
+              {/* Contact Info & User Section */}
+              <div className="p-4 border-t border-gray-200">
+                {/* User info if authenticated */}
+                {isAuthenticated && user && (
+                  <div className="mb-4">
+                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                    <p className="text-xs text-gray-500">{user.email}</p>
+                    {user.role && (
+                      <span className="inline-block mt-1 px-2 py-1 text-xs bg-maroon-100 text-maroon-700 rounded capitalize">
+                        {user.role}
+                      </span>
+                    )}
+                  </div>
+                )}
 
-              {/* Contact Info */}
-              <div className="p-4 border-t border-neutral-100">
-                <p className="text-sm text-neutral-600">
-                  WhatsApp Support:
+                {/* Contact Info */}
+                <div className="text-sm text-gray-600">
+                  <p className="font-medium mb-1">WhatsApp Support:</p>
                   <a
                     href="https://wa.me/+2348136514087"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block mt-1 font-medium text-maroon-700"
+                    className="text-maroon-700 hover:text-maroon-800 transition-colors"
                   >
                     +234 813 651 4087
                   </a>
-                </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Monday - Saturday<br />
+                    9:00 AM - 6:00 PM WAT
+                  </p>
+                </div>
               </div>
             </div>
           </div>
