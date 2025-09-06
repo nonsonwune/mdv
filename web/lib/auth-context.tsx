@@ -287,6 +287,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isProtectedPage = () => {
     if (typeof window === 'undefined') return false
     const path = window.location.pathname
+
+    // Exclude public checkout pages that guest users need access to
+    if (path.startsWith('/checkout/callback') || path.startsWith('/checkout/success')) {
+      return false
+    }
+
     return path.startsWith('/admin') || path.startsWith('/account') || path.startsWith('/checkout')
   }
 
