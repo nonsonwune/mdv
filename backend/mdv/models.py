@@ -252,7 +252,8 @@ class Variant(Base):
         cascade="all, delete-orphan",
         passive_deletes=True
     )
-    images: Mapped[list["ProductImage"]] = relationship("ProductImage", back_populates="variant", cascade="all, delete-orphan")
+    # TODO: Temporarily commented out until migration is applied in production
+    # images: Mapped[list["ProductImage"]] = relationship("ProductImage", back_populates="variant", cascade="all, delete-orphan")
 
 
 class Inventory(Base):
@@ -287,7 +288,8 @@ class ProductImage(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True)
-    variant_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), nullable=True, index=True)
+    # TODO: Temporarily commented out until migration is applied in production
+    # variant_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("variants.id", ondelete="CASCADE"), nullable=True, index=True)
     url: Mapped[str] = mapped_column(String(500))
     public_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # Cloudinary public_id for deletion
     alt_text: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -298,7 +300,8 @@ class ProductImage(Base):
 
     # Relationships
     product: Mapped["Product"] = relationship("Product", back_populates="images")
-    variant: Mapped[Optional["Variant"]] = relationship("Variant", back_populates="images")
+    # TODO: Temporarily commented out until migration is applied in production
+    # variant: Mapped[Optional["Variant"]] = relationship("Variant", back_populates="images")
 
 
 # Cart & Reservation
