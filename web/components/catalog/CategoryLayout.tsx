@@ -102,22 +102,26 @@ function ProductGrid({ products, loading, searchParams }: { products: Product[],
     // Default empty state for customers
     return (
       <EmptyState
-        icon={
-          <svg className="w-20 h-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-        }
+        variant="illustration"
+        illustration="coming-soon"
         title="Coming Soon"
-        description={"We're working on adding products to this collection. Check back soon for updates!"}
+        description="We're working on adding amazing products to this collection. Check back soon for exciting updates and new arrivals!"
         size="lg"
         action={
-          <Button 
-            variant="primary"
-            onClick={() => window.location.href = '/'}
-          >
-            Browse Other Categories
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button
+              variant="primary"
+              onClick={() => window.location.href = '/'}
+            >
+              Browse Other Categories
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => window.location.href = '/contact'}
+            >
+              Get Notified
+            </Button>
+          </div>
         }
       />
     )
