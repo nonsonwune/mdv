@@ -367,6 +367,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Always check on protected pages
     if (isProtectedPage()) return true
 
+    // Never check auth on checkout callback pages - they're for guest users
+    const currentPath = window.location.pathname
+    if (currentPath.startsWith('/checkout/callback') || currentPath.startsWith('/checkout/success')) {
+      return false
+    }
+
     // Check if we have any indication of being logged in
     // Look for non-httpOnly cookies that might indicate auth state
     const hasRoleIndicator = document.cookie.includes('mdv_role=')
@@ -492,8 +498,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
           if (isProtectedPage()) {
             // Redirect to staff login for protected pages (admin/staff areas)
-            window.location.href = '/staff-login?expired=true'
-            return
+            // But never redirect from checkout callback pages as they're used by guest users
+            const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+            if (!currentPath.startsWith('/checkout/callback') && !currentPath.startsWith('/checkout/success')) {
+              window.location.href = '/staff-login?expired=true'
+              return
+            }
           }
           break
 
