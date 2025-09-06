@@ -76,7 +76,7 @@ export default function RandomFeaturedProduct({ className = "" }: RandomFeatured
   const compareAtPrice = product.compare_at_price
 
   return (
-    <Link href={`/products/${product.slug}`} className={`block group ${className}`}>
+    <Link href={`/product/${product.slug}`} className={`block group ${className}`}>
       <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden transition-transform duration-300 group-hover:scale-[1.02]">
         <div className="aspect-[4/5] relative">
           {primaryImage ? (
