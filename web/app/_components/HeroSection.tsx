@@ -2,9 +2,60 @@
 
 import Link from "next/link"
 import Image from "next/image"
+import { useState, useEffect } from "react"
 import { ArrowRightIcon, SparklesIcon, TruckIcon, ShieldCheckIcon } from "@heroicons/react/24/outline"
+import { api } from "../../lib/api-client"
+
+interface HomepageConfig {
+  hero_title: string
+  hero_subtitle: string | null
+  hero_cta_text: string
+  hero_image_url: string | null
+  featured_product_ids: number[]
+  categories_enabled: boolean
+}
 
 export default function HeroSection() {
+  const [config, setConfig] = useState<HomepageConfig | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadConfig()
+  }, [])
+
+  const loadConfig = async () => {
+    try {
+      const configData = await api<HomepageConfig>('/api/homepage-config')
+      setConfig(configData)
+    } catch (error) {
+      console.error('Failed to load homepage config:', error)
+      // Use default config on error
+      setConfig({
+        hero_title: "Maison De Valeur",
+        hero_subtitle: "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.",
+        hero_cta_text: "Shop Now",
+        hero_image_url: null,
+        featured_product_ids: [],
+        categories_enabled: true
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="relative overflow-hidden bg-gradient-to-br from-neutral-50 via-white to-maroon-50 min-h-[600px]">
+        <div className="max-w-7xl mx-auto px-4 py-16 lg:py-24">
+          <div className="animate-pulse">
+            <div className="h-12 bg-neutral-200 rounded w-96 mb-4"></div>
+            <div className="h-6 bg-neutral-200 rounded w-128 mb-8"></div>
+            <div className="h-12 bg-neutral-200 rounded w-32"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
   return (
     <div className="relative overflow-hidden bg-gradient-to-br from-neutral-50 via-white to-maroon-50">
       {/* Background Pattern */}
@@ -27,12 +78,10 @@ export default function HeroSection() {
             {/* Main Heading */}
             <div className="space-y-4">
               <h1 className="text-4xl lg:text-6xl font-bold text-ink-700 leading-tight">
-                Maison De
-                <span className="block text-maroon-700">Valeur</span>
+                {config?.hero_title || "Maison De Valeur"}
               </h1>
               <p className="text-xl text-ink-600 leading-relaxed max-w-lg">
-                Discover affordable essentials and last-season fashion pieces. 
-                Quality style that doesn't break the bank, exclusively for Nigeria.
+                {config?.hero_subtitle || "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria."}
               </p>
             </div>
 
@@ -42,7 +91,7 @@ export default function HeroSection() {
                 href="#catalog"
                 className="btn-primary text-lg px-8 py-4 inline-flex items-center gap-2 group"
               >
-                Shop Now
+                {config?.hero_cta_text || "Shop Now"}
                 <ArrowRightIcon className="w-5 h-5 transition-transform group-hover:translate-x-1" />
               </Link>
               <Link 

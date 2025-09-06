@@ -26,7 +26,7 @@ from mdv.response_schemas import health, success
 from sqlalchemy import select
 from .routers import public, admin, payments
 from .routers import auth as auth_router
-from .routers import users, orders, wishlist, reviews, admin_users, admin_products, admin_system, admin_reports, admin_audit
+from .routers import users, orders, wishlist, reviews, admin_users, admin_products, admin_system, admin_reports, admin_audit, admin_homepage
 from .routers import security
 from . import inventory as inventory_router
 from . import analytics as analytics_router
@@ -787,6 +787,7 @@ app.include_router(payments.router)
 app.include_router(admin.router)
 app.include_router(admin_users.router)
 app.include_router(admin_products.router)
+app.include_router(admin_homepage.router)
 app.include_router(admin_system.router)
 app.include_router(admin_reports.router)
 app.include_router(admin_audit.router)

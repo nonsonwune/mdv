@@ -174,6 +174,14 @@ export default function AdminLayout({
           description: 'System activity monitoring and compliance'
         },
         {
+          name: 'Homepage',
+          href: '/admin/homepage',
+          icon: HomeIcon,
+          permission: Permission.SYSTEM_SETTINGS,
+          roles: ['admin'],
+          description: 'Homepage configuration and featured products'
+        },
+        {
           name: 'Settings',
           href: '/admin/settings',
           icon: Cog6ToothIcon,

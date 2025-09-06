@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import jwt from 'jsonwebtoken'
+// Client-side RBAC utilities
+// Note: Server-side functionality moved to separate middleware files
 
 export interface UserClaims {
   sub: string
@@ -59,22 +58,30 @@ export const PERMISSIONS = {
 export type Permission = keyof typeof PERMISSIONS
 
 /**
- * Get user claims from JWT token
+ * Get user claims from JWT token (client-side)
  */
-export async function getUserClaims(request: NextRequest): Promise<UserClaims | null> {
+export function getUserClaimsFromToken(token: string): UserClaims | null {
   try {
-    const token = cookies().get('mdv_token')?.value
     if (!token) return null
-    
-    // In production, verify with proper JWT_SECRET from environment
-    const decoded = jwt.decode(token) as UserClaims
+
+    // Decode JWT token (client-side, no verification)
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+
+    const decoded = JSON.parse(jsonPayload) as UserClaims
     if (!decoded || !decoded.sub || !decoded.role) return null
-    
+
     // Check expiration
     if (decoded.exp && decoded.exp < Date.now() / 1000) {
       return null
     }
-    
+
     return decoded
   } catch (error) {
     console.error('Failed to decode token:', error)
@@ -97,55 +104,8 @@ export function isRoleHigherOrEqual(roleA: Role, roleB: Role): boolean {
   return ROLE_HIERARCHY[roleA] >= ROLE_HIERARCHY[roleB]
 }
 
-/**
- * Middleware to check if user has required role(s)
- */
-export function requireRole(...allowedRoles: Role[]) {
-  return async function middleware(request: NextRequest) {
-    const claims = await getUserClaims(request)
-    
-    if (!claims) {
-      return NextResponse.json(
-        { error: 'Unauthorized: No valid authentication' },
-        { status: 401 }
-      )
-    }
-    
-    if (!allowedRoles.includes(claims.role as Role)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Insufficient permissions' },
-        { status: 403 }
-      )
-    }
-    
-    return null // Continue to the handler
-  }
-}
-
-/**
- * Middleware to check if user has required permission
- */
-export function requirePermission(permission: Permission) {
-  return async function middleware(request: NextRequest) {
-    const claims = await getUserClaims(request)
-    
-    if (!claims) {
-      return NextResponse.json(
-        { error: 'Unauthorized: No valid authentication' },
-        { status: 401 }
-      )
-    }
-    
-    if (!hasPermission(claims.role as Role, permission)) {
-      return NextResponse.json(
-        { error: 'Forbidden: Insufficient permissions' },
-        { status: 403 }
-      )
-    }
-    
-    return null // Continue to the handler
-  }
-}
+// Server-side middleware functions moved to separate middleware files
+// These are client-side utilities only
 
 /**
  * Check permissions for frontend components

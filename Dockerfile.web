@@ -5,8 +5,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Needed for building native deps like sharp
 RUN apk add --no-cache libc6-compat python3 make g++
 COPY web/package.json web/package-lock.json ./
-# Use npm ci with increased memory and timeout for Railway
-RUN npm ci --maxsockets 1 --prefer-offline
+# Use npm install with error handling for Railway
+RUN npm install --maxsockets 1 --prefer-offline --no-audit --no-fund || \
+    (echo "npm install failed, trying with cache clean..." && \
+     npm cache clean --force && \
+     npm install --maxsockets 1 --prefer-offline --no-audit --no-fund)
 
 # ---------- build: compile Next.js (standalone) ----------
 FROM node:20-alpine AS build

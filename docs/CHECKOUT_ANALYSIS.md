@@ -163,7 +163,7 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession):
         user = User(
             name=body.address.name,
             email=body.email,
-            role=Role.operations,  # Customer role
+            role=Role.customer,  # Customer role
             password_hash=None     # No password for guest checkout
         )
     

@@ -19,7 +19,7 @@ from mdv.schemas import (
     CartItemQtyUpdate,
     ShippingEstimate,
 )
-from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category, Review, User, Role
+from mdv.models import Product, Variant, Cart, CartItem, Coupon, Zone, StateZone, Inventory, Reservation, ReservationStatus, Order, OrderItem, OrderStatus, Address, Shipment, ShipmentEvent, ShipmentStatus, Fulfillment, FulfillmentStatus, ProductImage, Category, Review, User, Role, HomepageConfig
 from mdv.config import settings
 from mdv.services.slug_service import get_category_by_path
 from ..deps import get_db
@@ -32,6 +32,33 @@ router = APIRouter()
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     return HealthResponse()
+
+
+@router.get("/api/homepage-config")
+async def get_public_homepage_config(db: AsyncSession = Depends(get_db)):
+    """Get homepage configuration for public frontend consumption."""
+    result = await db.execute(select(HomepageConfig).order_by(HomepageConfig.id.desc()).limit(1))
+    config = result.scalar_one_or_none()
+
+    if not config:
+        # Return default configuration
+        return {
+            "hero_title": "Maison De Valeur",
+            "hero_subtitle": "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.",
+            "hero_cta_text": "Shop Now",
+            "hero_image_url": None,
+            "featured_product_ids": [],
+            "categories_enabled": True
+        }
+
+    return {
+        "hero_title": config.hero_title,
+        "hero_subtitle": config.hero_subtitle,
+        "hero_cta_text": config.hero_cta_text,
+        "hero_image_url": config.hero_image_url,
+        "featured_product_ids": config.featured_product_ids or [],
+        "categories_enabled": config.categories_enabled
+    }
 
 
 @router.get("/api/orders/{order_id}/tracking")
@@ -1085,11 +1112,11 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
         # For now, we'll allow it but this should ideally require authentication
         user = existing_user
     else:
-        # Create a new guest customer user (operations role, no password)
+        # Create a new guest customer user (customer role, no password)
         user = User(
             name=body.address.name,
             email=body.email,
-            role=Role.operations,  # Customer role
+            role=Role.customer,  # Customer role
             active=True,
             password_hash=None  # No password for guest checkout users
         )

@@ -18,7 +18,8 @@ import httpx
 
 from mdv.db import get_session_factory, Base
 from mdv.models import User, Product, Variant, Category, Order, OrderItem
-from mdv.auth import create_access_token, get_password_hash
+from mdv.auth import create_access_token
+from mdv.password import hash_password as get_password_hash
 from mdv.config import settings
 from api.main import app
 from api.deps import get_db
