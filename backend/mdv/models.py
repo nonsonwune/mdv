@@ -472,7 +472,6 @@ class HomepageConfig(Base):
     hero_subtitle: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default="Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.")
     hero_cta_text: Mapped[str] = mapped_column(String(100), default="Shop Now")
     hero_image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    featured_product_ids: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=list)
     categories_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)

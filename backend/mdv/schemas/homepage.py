@@ -14,7 +14,6 @@ class HomepageConfigRequest(BaseModel):
     hero_subtitle: Optional[str] = Field(None, max_length=1000, description="Hero section subtitle")
     hero_cta_text: str = Field(..., min_length=1, max_length=100, description="Hero section CTA button text")
     hero_image_url: Optional[str] = Field(None, max_length=500, description="Hero section background image URL")
-    featured_product_ids: List[int] = Field(default_factory=list, description="List of product IDs to feature")
     categories_enabled: bool = Field(True, description="Whether to show categories showcase")
 
 
@@ -25,7 +24,6 @@ class HomepageConfigResponse(BaseModel):
     hero_subtitle: Optional[str] = None
     hero_cta_text: str
     hero_image_url: Optional[str] = None
-    featured_product_ids: List[int]
     categories_enabled: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
@@ -54,5 +52,4 @@ class PublicHomepageConfig(BaseModel):
     hero_subtitle: Optional[str] = None
     hero_cta_text: str
     hero_image_url: Optional[str] = None
-    featured_product_ids: List[int]
     categories_enabled: bool

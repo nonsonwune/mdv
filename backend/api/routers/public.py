@@ -47,7 +47,6 @@ async def get_public_homepage_config(db: AsyncSession = Depends(get_db)):
             "hero_subtitle": "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.",
             "hero_cta_text": "Shop Now",
             "hero_image_url": None,
-            "featured_product_ids": [],
             "categories_enabled": True
         }
 
@@ -56,7 +55,6 @@ async def get_public_homepage_config(db: AsyncSession = Depends(get_db)):
         "hero_subtitle": config.hero_subtitle,
         "hero_cta_text": config.hero_cta_text,
         "hero_image_url": config.hero_image_url,
-        "featured_product_ids": config.featured_product_ids or [],
         "categories_enabled": config.categories_enabled
     }
 

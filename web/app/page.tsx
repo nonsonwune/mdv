@@ -8,7 +8,6 @@ import type { Product } from "../lib/types"
 import ProductCard from "./_components/ProductCard"
 import ProductSkeleton from "./_components/ProductSkeleton"
 import HeroSection from "./_components/HeroSection"
-import FeaturedProducts from "./_components/FeaturedProducts"
 import CategoriesShowcase from "./_components/CategoriesShowcase"
 import { useSearchParams, useRouter } from "next/navigation"
 
@@ -59,34 +58,40 @@ export default function Home() {
       {/* Hero Section */}
       <HeroSection />
 
-      {/* Featured Products */}
-      <FeaturedProducts products={products} loading={loading} />
-
       {/* Categories Showcase */}
       <CategoriesShowcase />
 
       {/* Main Catalog Section */}
-      <section id="catalog" className="py-16 bg-white">
+      <section id="catalog" className="py-20 bg-gradient-to-br from-white via-neutral-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           {/* Section Header */}
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-bold text-ink-700 mb-4">
-              Complete Catalog
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-maroon-100 text-maroon-800 px-4 py-2 rounded-full text-sm font-medium mb-6">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Our Complete Collection
+            </div>
+            <h2 className="text-4xl lg:text-5xl font-bold text-ink-700 mb-6">
+              Premium Fashion Essentials
             </h2>
-            <p className="text-lg text-ink-600 max-w-2xl mx-auto mb-8">
-              Browse our entire collection of premium fashion essentials
+            <p className="text-xl text-ink-600 max-w-3xl mx-auto mb-8">
+              Discover affordable luxury and last-season fashion pieces. Quality style that doesn't break the bank, exclusively curated for Nigeria.
             </p>
 
             {/* Sort Controls */}
-            <div className="inline-flex items-center gap-4 bg-neutral-50 rounded-xl p-4">
-              <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
+            <div className="inline-flex items-center gap-4 bg-white rounded-2xl p-6 shadow-lg border border-neutral-200">
+              <label className="flex items-center gap-3 text-sm font-medium text-ink-700">
+                <svg className="w-4 h-4 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                </svg>
                 Sort by:
                 <select
-                  className="input text-sm min-w-[160px]"
+                  className="input text-sm min-w-[180px] border-neutral-300 focus:border-maroon-500 focus:ring-maroon-500"
                   value={sort}
                   onChange={e => setSort(e.target.value as any)}
                 >
-                  <option value="default">Default</option>
+                  <option value="default">Featured First</option>
                   <option value="price_asc">Price: Low to High</option>
                   <option value="price_desc">Price: High to Low</option>
                 </select>
@@ -96,38 +101,50 @@ export default function Home() {
 
           {/* Products Grid */}
           {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {Array.from({ length: pageSize }).map((_, i) => (
                 <ProductSkeleton key={i} />
               ))}
             </div>
           ) : products.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-12">
-                {products.map((p: Product) => (
-                  <ProductCard key={p.id} product={p} />
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-16">
+                {products.map((p: Product, index) => (
+                  <div
+                    key={p.id}
+                    className="animate-fadeIn"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <ProductCard product={p} />
+                  </div>
                 ))}
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-6 bg-white rounded-2xl p-6 shadow-lg border border-neutral-200">
                 <button
-                  className="btn-secondary px-6 py-3"
+                  className="btn-secondary px-8 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={page <= 1}
                   onClick={() => goToPage(page - 1)}
                 >
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                   Previous
                 </button>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-ink-600">Page</span>
-                  <span className="bg-maroon-700 text-white px-3 py-1 rounded-lg font-medium">{page}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-ink-600 font-medium">Page</span>
+                  <span className="bg-maroon-700 text-white px-4 py-2 rounded-xl font-semibold min-w-[3rem] text-center">{page}</span>
                 </div>
                 <button
-                  className="btn-secondary px-6 py-3"
+                  className="btn-secondary px-8 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={products.length < pageSize}
                   onClick={() => goToPage(page + 1)}
                 >
                   Next
+                  <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
             </>

@@ -3,15 +3,15 @@
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
-import { ArrowRightIcon, SparklesIcon, TruckIcon, ShieldCheckIcon } from "@heroicons/react/24/outline"
+import { ArrowRightIcon, TruckIcon, ShieldCheckIcon } from "@heroicons/react/24/outline"
 import { api } from "../../lib/api-client"
+import RandomFeaturedProduct from "./RandomFeaturedProduct"
 
 interface HomepageConfig {
   hero_title: string
   hero_subtitle: string | null
   hero_cta_text: string
   hero_image_url: string | null
-  featured_product_ids: number[]
   categories_enabled: boolean
 }
 
@@ -35,7 +35,6 @@ export default function HeroSection() {
         hero_subtitle: "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.",
         hero_cta_text: "Shop Now",
         hero_image_url: null,
-        featured_product_ids: [],
         categories_enabled: true
       })
     } finally {
@@ -140,29 +139,9 @@ export default function HeroSection() {
             <div className="relative">
               {/* Background Decoration */}
               <div className="absolute -inset-4 bg-gradient-to-r from-maroon-200 to-maroon-300 rounded-3xl opacity-20 blur-xl"></div>
-              
-              {/* Hero Image */}
-              <div className="relative bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div className="aspect-[4/5] bg-gradient-to-br from-neutral-100 to-neutral-200 flex items-center justify-center">
-                  {/* Placeholder for hero image - replace with actual product image */}
-                  <div className="text-center text-neutral-500">
-                    <div className="w-24 h-24 mx-auto mb-4 bg-neutral-300 rounded-full flex items-center justify-center">
-                      <SparklesIcon className="w-12 h-12" />
-                    </div>
-                    <p className="text-lg font-medium">Featured Collection</p>
-                    <p className="text-sm">Premium Fashion Essentials</p>
-                  </div>
-                </div>
-                
-                {/* Floating Price Tag */}
-                <div className="absolute top-6 right-6 bg-white rounded-xl shadow-lg p-4">
-                  <div className="text-center">
-                    <div className="text-sm text-ink-600">Starting from</div>
-                    <div className="text-2xl font-bold text-maroon-700">₦15,000</div>
-                    <div className="text-xs text-success">Save up to 40%</div>
-                  </div>
-                </div>
-              </div>
+
+              {/* Random Featured Product */}
+              <RandomFeaturedProduct />
 
               {/* Floating Elements */}
               <div className="absolute -top-6 -left-6 w-20 h-20 bg-maroon-700 rounded-full opacity-10 animate-pulse"></div>

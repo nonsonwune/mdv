@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
         hero_subtitle: "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.",
         hero_cta_text: "Shop Now",
         hero_image_url: null,
-        featured_product_ids: [],
         categories_enabled: true
       })
     }
@@ -47,7 +46,6 @@ export async function GET(request: NextRequest) {
       hero_subtitle: "Discover affordable essentials and last-season fashion pieces. Quality style that doesn't break the bank, exclusively for Nigeria.",
       hero_cta_text: "Shop Now",
       hero_image_url: null,
-      featured_product_ids: [],
       categories_enabled: true
     })
   }
