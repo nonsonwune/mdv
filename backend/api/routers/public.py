@@ -1017,10 +1017,75 @@ async def checkout_init(body: CheckoutInitRequest, db: AsyncSession = Depends(ge
     if not items:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
-    # Create or find customer user for this email
-    user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
-    if not user:
-        # Create a customer user (operations role, no password)
+    # SECURITY FIX: Prevent guest checkout using staff/admin email addresses
+    # Additional validation for common admin email patterns
+    email_lower = body.email.lower()
+    restricted_patterns = [
+        'admin@mdv.ng',
+        'administrator@mdv.ng',
+        'supervisor@mdv.ng',
+        'logistics@mdv.ng',
+        'operations@mdv.ng',
+        'staff@mdv.ng',
+        'system@mdv.ng'
+    ]
+
+    if email_lower in restricted_patterns:
+        # Log security event for attempted admin email usage
+        await AuditService.log_event(
+            action=AuditAction.SECURITY_VIOLATION,
+            entity=AuditEntity.ORDER,
+            entity_id=None,
+            status=AuditStatus.FAILURE,
+            error_message=f"Attempted guest checkout with restricted email: {body.email}",
+            metadata={
+                "email": body.email,
+                "cart_id": body.cart_id,
+                "violation_type": "restricted_email_checkout",
+                "ip_address": "unknown"  # Could be extracted from request if needed
+            },
+            session=db
+        )
+
+        raise HTTPException(
+            status_code=403,
+            detail="This email address is restricted. Please use a different email address or contact support."
+        )
+
+    # Check if email belongs to existing staff/admin user
+    existing_user = (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+
+    if existing_user:
+        # If user exists and has staff/admin role, reject guest checkout
+        if existing_user.role in (Role.admin, Role.supervisor, Role.logistics):
+            # Log security event for attempted staff account checkout
+            await AuditService.log_event(
+                action=AuditAction.SECURITY_VIOLATION,
+                entity=AuditEntity.ORDER,
+                entity_id=existing_user.id,
+                status=AuditStatus.FAILURE,
+                error_message=f"Attempted guest checkout with staff account: {body.email}",
+                metadata={
+                    "email": body.email,
+                    "user_id": existing_user.id,
+                    "user_role": existing_user.role.value,
+                    "cart_id": body.cart_id,
+                    "violation_type": "staff_account_guest_checkout",
+                    "ip_address": "unknown"
+                },
+                session=db
+            )
+
+            raise HTTPException(
+                status_code=403,
+                detail="This email address is associated with a staff account. Please use the staff login to place orders."
+            )
+
+        # If user exists and is operations (customer) role, they should authenticate first
+        # For now, we'll allow it but this should ideally require authentication
+        user = existing_user
+    else:
+        # Create a new guest customer user (operations role, no password)
         user = User(
             name=body.address.name,
             email=body.email,
